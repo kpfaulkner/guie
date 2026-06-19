@@ -3,7 +3,6 @@ package ui
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/render"
 	"github.com/kpfaulkner/uiframework/theme"
 )
 
@@ -34,17 +33,4 @@ func WithResizable(v bool) AppOption {
 // WithTheme sets the app's theme.
 func WithTheme(t theme.Theme) AppOption {
 	return func(a *App) { a.theme = t }
-}
-
-// WithRootDraw installs a temporary step-1 draw callback that paints directly
-// onto the frame canvas. Scaffolding until the widget tree (step 2) provides
-// App.SetContent.
-func WithRootDraw(fn func(render.Canvas)) AppOption {
-	return func(a *App) { a.rootDraw = fn }
-}
-
-// WithRootUpdate installs a temporary step-1 per-frame input callback.
-// Scaffolding until the event system (step 5) is wired in.
-func WithRootUpdate(fn func(render.InputState)) AppOption {
-	return func(a *App) { a.rootUpdate = fn }
 }

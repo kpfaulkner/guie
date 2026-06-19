@@ -7,22 +7,23 @@ package ui
 
 import (
 	ebitenbackend "github.com/kpfaulkner/uiframework/backend/ebiten"
+	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 	"github.com/kpfaulkner/uiframework/theme"
 )
 
-// App owns the main loop and top-level configuration. Construct one with
-// NewApp, configure it with options, and start it with Run.
+// App owns the main loop, the root of the widget tree and top-level
+// configuration. Construct one with NewApp, give it content with SetContent,
+// and start it with Run.
 type App struct {
 	driver render.Driver
 	cfg    render.Config
 	theme  theme.Theme
 
-	// rootDraw and rootUpdate are temporary step-1 scaffolding: until the
-	// retained widget tree lands (step 2), they expose the frame canvas and
-	// per-frame input directly. They will be replaced by SetContent.
-	rootDraw   func(render.Canvas)
-	rootUpdate func(render.InputState)
+	root        Widget
+	ctx         *treeContext
+	needsLayout bool
+	surfaceSize geom.Size
 }
 
 // NewApp creates an App with default configuration, then applies opts.
@@ -48,11 +49,26 @@ func NewApp(opts ...AppOption) *App {
 	if a.cfg.Background == nil {
 		a.cfg.Background = a.theme.Palette.Background
 	}
+
+	a.ctx = &treeContext{requestLayout: func() { a.needsLayout = true }}
 	return a
 }
 
 // Theme returns the app's active theme.
 func (a *App) Theme() theme.Theme { return a.theme }
+
+// SetContent installs w as the root of the widget tree. The root is sized to
+// fill the surface. SetContent may be called before or after Run.
+func (a *App) SetContent(w Widget) {
+	a.root = w
+	if w != nil {
+		w.mount(nil, a.ctx)
+		if a.surfaceSize.W > 0 {
+			w.SetBounds(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H})
+		}
+	}
+	a.needsLayout = true
+}
 
 // Run starts the main loop. It blocks until the window is closed or an error
 // occurs.
@@ -65,18 +81,29 @@ func (a *App) Run() error {
 }
 
 func (a *App) update(in render.InputState) error {
-	if a.rootUpdate != nil {
-		a.rootUpdate(in)
-	}
+	// Event dispatch is wired in step 5; for now we only keep layout current.
+	a.layoutIfNeeded()
 	return nil
 }
 
 func (a *App) draw(c render.Canvas) {
-	if a.rootDraw != nil {
-		a.rootDraw(c)
+	if a.root != nil && a.root.Visible() {
+		a.root.Draw(c)
 	}
 }
 
 func (a *App) resize(width, height int) {
-	// Step 2 will re-layout the widget tree against the new surface size.
+	a.surfaceSize = geom.Size{W: float64(width), H: float64(height)}
+	a.needsLayout = true
+}
+
+// layoutIfNeeded re-runs layout from the root when the tree has been marked
+// dirty, sizing the root to the full surface first.
+func (a *App) layoutIfNeeded() {
+	if !a.needsLayout || a.root == nil {
+		return
+	}
+	a.root.SetBounds(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H})
+	a.root.Layout()
+	a.needsLayout = false
 }

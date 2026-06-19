@@ -62,7 +62,7 @@ func (c *canvas) Fill(clr color.Color) {
 }
 
 func (c *canvas) FillRect(r geom.Rect, clr color.Color) {
-	vector.DrawFilledRect(c.top().target, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), clr, true)
+	vector.FillRect(c.top().target, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), clr, true)
 }
 
 func (c *canvas) StrokeRect(r geom.Rect, clr color.Color, width float64) {
