@@ -104,6 +104,9 @@ func (a *App) drawOverlays(c render.Canvas) {
 		if ov.modal {
 			c.FillRect(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H}, scrimColor)
 		}
+		if a.shadows {
+			drawShadow(c, ov.bounds, a.theme.CornerRadius)
+		}
 		if ov.content.Visible() {
 			ov.content.Draw(c)
 		}

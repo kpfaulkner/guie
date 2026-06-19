@@ -29,6 +29,7 @@ type App struct {
 	cfg       render.Config
 	theme     theme.Theme
 	clipboard render.Clipboard
+	shadows   bool // draw drop shadows under overlays/tooltips
 
 	mu      sync.Mutex  // guards pending
 	pending []func()    // work queued via Do, run at the start of each frame
@@ -57,8 +58,9 @@ type App struct {
 // NewApp creates an App with default configuration, then applies opts.
 func NewApp(opts ...AppOption) *App {
 	a := &App{
-		driver: ebitenbackend.New(),
-		theme:  theme.Default(),
+		driver:  ebitenbackend.New(),
+		theme:   theme.Default(),
+		shadows: true,
 		cfg: render.Config{
 			Title:     "uiframework",
 			Width:     800,
@@ -113,6 +115,9 @@ func (a *App) SetFont(f render.FontFace) {
 // Events returns the global event bus for subscribing to events across the
 // whole UI.
 func (a *App) Events() *EventBus { return a.bus }
+
+// SetShadows enables or disables overlay/tooltip drop shadows at runtime.
+func (a *App) SetShadows(v bool) { a.shadows = v }
 
 // SetContent installs w as the root of the widget tree. The root is sized to
 // fill the surface. SetContent may be called before or after Run.

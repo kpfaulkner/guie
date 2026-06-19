@@ -52,3 +52,9 @@ func WithFont(f render.FontFace) AppOption {
 func WithFontSize(size float64) AppOption {
 	return func(a *App) { a.theme.FontSize = size }
 }
+
+// WithShadows enables or disables the soft drop shadows drawn under overlays
+// (popups, menus, dialogs) and tooltips. Shadows are on by default.
+func WithShadows(v bool) AppOption {
+	return func(a *App) { a.shadows = v }
+}

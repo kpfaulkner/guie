@@ -74,6 +74,9 @@ func (a *App) drawTooltip(c render.Canvas) {
 
 	rect := geom.Rect{X: x, Y: y, W: w, H: h}
 	rad := a.theme.CornerRadius
+	if a.shadows {
+		drawShadow(c, rect, rad)
+	}
 	c.FillRoundRect(rect, rad, lighten(pal.Surface, 1.3))
 	c.StrokeRoundRect(rect, rad, pal.Border, 1)
 	c.DrawText(a.tooltipText, geom.Point{X: x + tooltipPad, Y: vCenterY(f, rect.Y, rect.H)}, f, pal.Text)
