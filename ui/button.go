@@ -26,6 +26,7 @@ type Button struct {
 	hover   bool
 	pressed bool
 	focused bool
+	flat    bool // no fill/border until hover/press (toolbar/ghost style)
 
 	font render.FontFace
 }
@@ -52,6 +53,12 @@ func ButtonFont(f render.FontFace) ButtonOption {
 // button shows just the image.
 func ButtonImage(img render.Image) ButtonOption {
 	return func(b *Button) { b.icon = img }
+}
+
+// ButtonFlat makes the button "flat": no fill or border until hovered/pressed.
+// Useful for toolbars and link-style actions.
+func ButtonFlat() ButtonOption {
+	return func(b *Button) { b.flat = true }
 }
 
 // NewButton returns a Button showing text, configured by opts.
@@ -139,7 +146,23 @@ func (b *Button) fillColor() color.Color {
 }
 
 func (b *Button) labelColor() color.Color {
-	return b.ColorOf(RoleOnPrimary)
+	switch {
+	case !b.Enabled():
+		return b.ColorOf(RoleTextMuted)
+	case b.flat:
+		return b.ColorOf(RoleText)
+	default:
+		return b.ColorOf(RoleOnPrimary)
+	}
+}
+
+// flatHighlight is the subtle background a flat button shows on hover/press.
+func (b *Button) flatHighlight() color.Color {
+	base := b.ColorOf(RoleSurface)
+	if b.pressed && b.hover {
+		return lighten(base, 1.8)
+	}
+	return lighten(base, 1.45)
 }
 
 // Focusable reports whether the button can take keyboard focus (only when
@@ -151,8 +174,14 @@ func (b *Button) Focusable() bool { return b.Enabled() }
 func (b *Button) Draw(c render.Canvas) {
 	rect := b.Bounds()
 	rad := b.cornerRadius()
-	c.FillRoundRect(rect, rad, b.fillColor())
-	c.StrokeRoundRect(rect, rad, b.ColorOf(RoleBorder), 1)
+	if b.flat {
+		if b.Enabled() && (b.hover || b.pressed) {
+			c.FillRoundRect(rect, rad, b.flatHighlight())
+		}
+	} else {
+		c.FillRoundRect(rect, rad, b.fillColor())
+		c.StrokeRoundRect(rect, rad, b.ColorOf(RoleBorder), 1)
+	}
 	if b.focused {
 		ring := rect.Inset(geom.UniformInsets(2))
 		c.StrokeRoundRect(ring, maxF(0, rad-1), b.ColorOf(RoleAccent), 1)

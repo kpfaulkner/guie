@@ -65,6 +65,22 @@ func TestButtonIconOnlyMinSize(t *testing.T) {
 	}
 }
 
+func TestButtonLabelColorByState(t *testing.T) {
+	normal := NewButton("x")
+	if !sameColor(normal.labelColor(), normal.ColorOf(RoleOnPrimary)) {
+		t.Error("a normal button should use OnPrimary for its label")
+	}
+	flat := NewButton("y", ButtonFlat())
+	if !sameColor(flat.labelColor(), flat.ColorOf(RoleText)) {
+		t.Error("a flat button should use Text for its label")
+	}
+	disabled := NewButton("z", ButtonFlat())
+	disabled.SetEnabled(false)
+	if !sameColor(disabled.labelColor(), disabled.ColorOf(RoleTextMuted)) {
+		t.Error("a disabled button should mute its label (TextMuted)")
+	}
+}
+
 func TestButtonIconAddsWidth(t *testing.T) {
 	app := NewApp()
 	textOnly := NewButton("Go")
