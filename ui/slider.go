@@ -30,9 +30,6 @@ func SliderValue(v float64) SliderOption {
 	return func(s *Slider) { s.value = clamp01(v) }
 }
 
-// OnSlide registers a handler called with the new value when it changes.
-func OnSlide(fn func(float64)) SliderOption { return func(s *Slider) { s.onChange = fn } }
-
 // NewSlider returns a Slider configured by opts.
 func NewSlider(opts ...SliderOption) *Slider {
 	s := &Slider{BaseWidget: NewBase()}
@@ -41,6 +38,9 @@ func NewSlider(opts ...SliderOption) *Slider {
 	}
 	return s
 }
+
+// OnChange registers the handler invoked with the new value when it changes.
+func (s *Slider) OnChange(fn func(float64)) { s.onChange = fn }
 
 // Value returns the current value in [0,1].
 func (s *Slider) Value() float64 { return s.value }

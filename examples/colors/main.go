@@ -51,21 +51,20 @@ func main() {
 	root.Add(status)
 
 	// Swatches recolor the sample's RolePrimary; Reset clears the override.
-	set := func(c color.Color) ui.ButtonOption {
-		return ui.OnClick(func() {
-			sample.SetColor(ui.RolePrimary, c)
+	swatch := func(label string, c color.Color) *ui.Button {
+		b := ui.NewButton(label)
+		b.OnClick(func() {
+			sample.SetColor(ui.RolePrimary, c) // nil clears the override
 			update()
 		})
+		return b
 	}
 	swatches := ui.NewContainer()
 	swatches.SetLayout(ui.HBox(10))
-	swatches.Add(ui.NewButton("Crimson", set(color.RGBA{0xC0, 0x39, 0x2B, 0xff})))
-	swatches.Add(ui.NewButton("Forest", set(color.RGBA{0x2E, 0x7D, 0x32, 0xff})))
-	swatches.Add(ui.NewButton("Royal", set(color.RGBA{0x3B, 0x5B, 0xDB, 0xff})))
-	swatches.Add(ui.NewButton("Reset", ui.OnClick(func() {
-		sample.SetColor(ui.RolePrimary, nil) // back to the theme
-		update()
-	})))
+	swatches.Add(swatch("Crimson", color.RGBA{0xC0, 0x39, 0x2B, 0xff}))
+	swatches.Add(swatch("Forest", color.RGBA{0x2E, 0x7D, 0x32, 0xff}))
+	swatches.Add(swatch("Royal", color.RGBA{0x3B, 0x5B, 0xDB, 0xff}))
+	swatches.Add(swatch("Reset", nil))
 	root.Add(swatches, ui.Align(geom.AlignStart))
 
 	// Per-widget text-color overrides (RoleText) on labels.

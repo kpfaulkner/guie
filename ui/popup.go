@@ -37,7 +37,7 @@ func (a *App) openPopup(p *Popup) {
 	if p == nil || p.content == nil {
 		return
 	}
-	p.content.mount(nil, a.ctx)
+	p.content.mount(p.content, nil, a.ctx)
 	p.content.SetBounds(p.bounds)
 	p.content.Layout()
 	a.overlays = append(a.overlays, p)
@@ -136,7 +136,7 @@ const minModalWidth = 240
 // Popup handle; close it with Close (or from within content via the framework).
 func (a *App) ShowModal(content Widget) *Popup {
 	p := &Popup{content: content, modal: true}
-	content.mount(nil, a.ctx) // mount first so MinSize can measure text
+	content.mount(content, nil, a.ctx) // mount first so MinSize can measure text
 	size := content.MinSize()
 	if size.W < minModalWidth {
 		size.W = minModalWidth
@@ -184,12 +184,14 @@ func (a *App) ShowMessage(title, message string, buttons ...DialogButton) *Popup
 	row.SetLayout(HBox(10))
 	for _, b := range buttons {
 		bb := b
-		row.Add(NewButton(bb.Label, OnClick(func() {
+		btn := NewButton(bb.Label)
+		btn.OnClick(func() {
 			if bb.OnClick != nil {
 				bb.OnClick()
 			}
 			a.closePopup(popup)
-		})))
+		})
+		row.Add(btn)
 	}
 	panel.Add(row, Align(geom.AlignEnd), Weight(1))
 

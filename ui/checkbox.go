@@ -28,9 +28,6 @@ type CheckboxOption func(*Checkbox)
 // Checked sets the initial checked state.
 func Checked(v bool) CheckboxOption { return func(c *Checkbox) { c.checked = v } }
 
-// OnToggle registers the change handler for a Checkbox.
-func OnToggle(fn func(bool)) CheckboxOption { return func(c *Checkbox) { c.onChange = fn } }
-
 // NewCheckbox returns a Checkbox with the given label.
 func NewCheckbox(label string, opts ...CheckboxOption) *Checkbox {
 	c := &Checkbox{BaseWidget: NewBase(), label: label}
@@ -39,6 +36,9 @@ func NewCheckbox(label string, opts ...CheckboxOption) *Checkbox {
 	}
 	return c
 }
+
+// OnChange registers the handler invoked when the checked state changes.
+func (c *Checkbox) OnChange(fn func(bool)) { c.onChange = fn }
 
 // Checked reports whether the box is checked.
 func (c *Checkbox) IsChecked() bool { return c.checked }

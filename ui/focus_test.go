@@ -73,7 +73,8 @@ func TestClickEmptyClearsFocus(t *testing.T) {
 
 func TestKeyboardActivation(t *testing.T) {
 	clicks := 0
-	b := NewButton("ok", OnClick(func() { clicks++ }))
+	b := NewButton("ok")
+	b.OnClick(func() { clicks++ })
 	down := Event{Type: EventKeyDown, Key: render.KeySpace}
 	b.HandleEvent(&down)
 	enter := Event{Type: EventKeyDown, Key: render.KeyEnter}
@@ -101,7 +102,7 @@ func TestBubblingReachesAncestor(t *testing.T) {
 	app := &App{bus: newEventBus()}
 	parent := &wheelSink{BaseWidget: NewBase()}
 	leaf := newStub(1, 1)
-	leaf.mount(parent, nil) // wire leaf's parent directly
+	leaf.mount(leaf, parent, nil) // wire leaf's parent directly
 
 	if app.dispatch(leaf, Event{Type: EventWheel, Wheel: geom.Point{Y: -1}}) != true {
 		t.Fatal("event should have been consumed by the ancestor")

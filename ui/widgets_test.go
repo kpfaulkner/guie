@@ -24,7 +24,8 @@ func typeRune(w Widget, r rune) {
 
 func TestCheckboxToggle(t *testing.T) {
 	changes := []bool{}
-	c := NewCheckbox("on", OnToggle(func(v bool) { changes = append(changes, v) }))
+	c := NewCheckbox("on")
+	c.OnChange(func(v bool) { changes = append(changes, v) })
 
 	click(c)
 	if !c.IsChecked() {
@@ -108,7 +109,8 @@ func TestTextFieldEditing(t *testing.T) {
 
 func TestTextFieldSubmit(t *testing.T) {
 	got := ""
-	tf := NewTextField(OnSubmit(func(s string) { got = s }))
+	tf := NewTextField()
+	tf.OnSubmit(func(s string) { got = s })
 	tf.SetText("hello")
 	keyDown(tf, render.KeyEnter)
 	if got != "hello" {
@@ -195,7 +197,8 @@ func TestScrollViewLayoutOffsetsContent(t *testing.T) {
 
 func TestSliderFromPointer(t *testing.T) {
 	var last float64 = -1
-	s := NewSlider(OnSlide(func(v float64) { last = v }))
+	s := NewSlider()
+	s.OnChange(func(v float64) { last = v })
 	s.SetBounds(geom.Rect{X: 0, Y: 0, W: 100, H: 20})
 	// track spans x0=8..x1=92 (handle radius 8).
 

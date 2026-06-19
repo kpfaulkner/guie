@@ -1,6 +1,7 @@
 package ebitenbackend
 
 import (
+	"errors"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -50,12 +51,20 @@ type game struct {
 	sized         bool
 }
 
-// Update polls input and forwards it to the framework's Update hook.
+// Update polls input and forwards it to the framework's Update hook. A
+// render.ErrTerminated result is mapped to EBiten's clean-termination sentinel
+// so the loop stops and RunGame returns nil.
 func (g *game) Update() error {
 	if g.hooks.Update == nil {
 		return nil
 	}
-	return g.hooks.Update(pollInput())
+	if err := g.hooks.Update(pollInput()); err != nil {
+		if errors.Is(err, render.ErrTerminated) {
+			return ebiten.Termination
+		}
+		return err
+	}
+	return nil
 }
 
 // Draw clears the surface to the background color and runs the Draw hook.

@@ -58,12 +58,6 @@ type TextFieldOption func(*TextField)
 // Placeholder sets text shown when the field is empty and unfocused.
 func Placeholder(s string) TextFieldOption { return func(t *TextField) { t.placeholder = s } }
 
-// OnTextChange registers a handler called whenever the text changes.
-func OnTextChange(fn func(string)) TextFieldOption { return func(t *TextField) { t.onChange = fn } }
-
-// OnSubmit registers a handler called when Enter is pressed.
-func OnSubmit(fn func(string)) TextFieldOption { return func(t *TextField) { t.onSubmit = fn } }
-
 // NewTextField returns an empty TextField.
 func NewTextField(opts ...TextFieldOption) *TextField {
 	t := &TextField{BaseWidget: NewBase()}
@@ -72,6 +66,12 @@ func NewTextField(opts ...TextFieldOption) *TextField {
 	}
 	return t
 }
+
+// OnChange registers the handler invoked whenever the text changes.
+func (t *TextField) OnChange(fn func(string)) { t.onChange = fn }
+
+// OnSubmit registers the handler invoked when Enter is pressed.
+func (t *TextField) OnSubmit(fn func(string)) { t.onSubmit = fn }
 
 // Text returns the current contents.
 func (t *TextField) Text() string { return string(t.runes) }

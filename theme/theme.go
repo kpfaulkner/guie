@@ -1,12 +1,11 @@
-// Package theme defines the color palette and styling defaults used by widgets.
-// To start (per the design) it is a simple named palette plus font/spacing
-// defaults; widgets read it during drawing and may override individual values.
+// Package theme defines the color palette and font defaults used by widgets.
+// Widgets resolve colors through these palette roles and may override
+// individual values per widget.
 package theme
 
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 )
 
@@ -24,14 +23,11 @@ type Palette struct {
 	Disabled   color.Color // disabled widget fill
 }
 
-// Theme bundles a palette with font and spacing defaults.
+// Theme bundles the color palette with the default font and its size.
 type Theme struct {
-	Palette      Palette
-	Font         render.FontFace // default text face; may be nil until set
-	FontSize     float64
-	Spacing      float64     // default gap between widgets in a layout
-	Padding      geom.Insets // default inner padding for containers
-	CornerRadius float64
+	Palette  Palette
+	Font     render.FontFace // default text face; may be nil until set
+	FontSize float64
 }
 
 // DefaultPalette returns the built-in dark palette.
@@ -49,15 +45,12 @@ func DefaultPalette() Palette {
 	}
 }
 
-// Default returns the built-in theme: the dark palette with sensible spacing.
-// The Font is left nil here so this package stays backend-independent; the App
-// fills in a default font from the backend if one is not supplied.
+// Default returns the built-in theme: the dark palette at the default font
+// size. The Font is left nil here so this package stays backend-independent;
+// the App fills in a default font from the backend if one is not supplied.
 func Default() Theme {
 	return Theme{
-		Palette:      DefaultPalette(),
-		FontSize:     14,
-		Spacing:      8,
-		Padding:      geom.UniformInsets(8),
-		CornerRadius: 4,
+		Palette:  DefaultPalette(),
+		FontSize: 14,
 	}
 }

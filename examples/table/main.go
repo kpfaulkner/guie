@@ -43,10 +43,10 @@ func main() {
 	// "Name" is twice as wide as the other two columns.
 	table := ui.NewTable(
 		[]ui.Column{{Title: "Name", Weight: 2}, {Title: "Role", Weight: 1}, {Title: "Years", Weight: 1}},
-		ui.OnRowSelect(func(i int) {
-			status.SetText(fmt.Sprintf("Selected: %s (%s)", people[i][0], people[i][1]))
-		}),
 	)
+	table.OnSelect(func(i int) {
+		status.SetText(fmt.Sprintf("Selected: %s (%s)", people[i][0], people[i][1]))
+	})
 	table.SetRows(people)
 
 	root.Add(table, ui.Weight(1))

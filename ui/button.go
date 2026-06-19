@@ -29,11 +29,6 @@ type Button struct {
 // ButtonOption configures a Button during NewButton.
 type ButtonOption func(*Button)
 
-// OnClick registers the click handler.
-func OnClick(fn func()) ButtonOption {
-	return func(b *Button) { b.onClick = fn }
-}
-
 // ButtonColor overrides the button's base fill color (RolePrimary).
 func ButtonColor(c color.Color) ButtonOption {
 	return func(b *Button) { b.SetColor(RolePrimary, c) }
@@ -64,8 +59,9 @@ func (b *Button) SetText(s string) {
 	b.Invalidate()
 }
 
-// SetOnClick replaces the click handler.
-func (b *Button) SetOnClick(fn func()) { b.onClick = fn }
+// OnClick registers the handler invoked when the button is activated (click or
+// Space/Enter while focused).
+func (b *Button) OnClick(fn func()) { b.onClick = fn }
 
 // SetFont overrides the button's label font (nil falls back to the theme font).
 func (b *Button) SetFont(f render.FontFace) {

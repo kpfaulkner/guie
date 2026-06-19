@@ -27,9 +27,6 @@ type ListOption func(*List)
 // ListSelected sets the initially selected index.
 func ListSelected(i int) ListOption { return func(l *List) { l.selected = i } }
 
-// OnSelect registers a handler called with the newly selected index.
-func OnSelect(fn func(int)) ListOption { return func(l *List) { l.onSelect = fn } }
-
 // NewList returns a List of items configured by opts.
 func NewList(items []string, opts ...ListOption) *List {
 	l := &List{BaseWidget: NewBase(), items: items, selected: -1, hoverRow: -1}
@@ -38,6 +35,9 @@ func NewList(items []string, opts ...ListOption) *List {
 	}
 	return l
 }
+
+// OnSelect registers the handler invoked with the newly selected index.
+func (l *List) OnSelect(fn func(int)) { l.onSelect = fn }
 
 // Selected returns the selected index, or -1.
 func (l *List) Selected() int { return l.selected }

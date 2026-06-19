@@ -38,10 +38,11 @@ func main() {
 	// Tab 1: a counter button (keeps its count when you switch away and back).
 	count := 0
 	countLabel := ui.NewLabel("clicks: 0")
-	counterBtn := ui.NewButton("Click me", ui.OnClick(func() {
+	counterBtn := ui.NewButton("Click me")
+	counterBtn.OnClick(func() {
 		count++
 		countLabel.SetText(fmt.Sprintf("clicks: %d", count))
-	}))
+	})
 	tabs.AddTab("Counter", pane(color.RGBA{0x2b, 0x2b, 0x3a, 0xff}, "A stateful counter:", counterBtn, countLabel))
 
 	// Tab 2: a small form.

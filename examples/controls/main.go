@@ -38,17 +38,16 @@ func main() {
 
 	// Text field with a live echo label.
 	echo := ui.NewLabel("you typed: (nothing yet)")
-	field := ui.NewTextField(
-		ui.Placeholder("type here..."),
-		ui.OnTextChange(func(s string) { echo.SetText("you typed: " + s) }),
-	)
+	field := ui.NewTextField(ui.Placeholder("type here..."))
+	field.OnChange(func(s string) { echo.SetText("you typed: " + s) })
 	root.Add(labeledRow("Name:", field))
 	root.Add(echo)
 
 	// Checkbox.
-	check := ui.NewCheckbox("Enable feature", ui.OnToggle(func(v bool) {
+	check := ui.NewCheckbox("Enable feature")
+	check.OnChange(func(v bool) {
 		echo.SetText(fmt.Sprintf("feature enabled: %v", v))
-	}))
+	})
 	root.Add(check)
 
 	// Radio group.
@@ -67,10 +66,11 @@ func main() {
 	// Slider driving a progress bar.
 	progress := ui.NewProgressBar(0.3)
 	valLabel := ui.NewLabel("value: 0.30")
-	slider := ui.NewSlider(ui.SliderValue(0.3), ui.OnSlide(func(v float64) {
+	slider := ui.NewSlider(ui.SliderValue(0.3))
+	slider.OnChange(func(v float64) {
 		progress.SetValue(v)
 		valLabel.SetText(fmt.Sprintf("value: %.2f", v))
-	}))
+	})
 	root.Add(labeledRow("Level:", slider))
 	root.Add(progress)
 	root.Add(valLabel, ui.Weight(1))

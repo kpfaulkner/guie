@@ -36,9 +36,9 @@ func main() {
 	row.SetLayout(ui.HBox(10))
 	for _, name := range []string{"Red", "Green", "Blue"} {
 		n := name
-		row.Add(ui.NewButton(n, ui.OnClick(func() {
-			picked.SetText("picked: " + n)
-		})))
+		b := ui.NewButton(n)
+		b.OnClick(func() { picked.SetText("picked: " + n) })
+		row.Add(b)
 	}
 	root.Add(row, ui.Align(geom.AlignCenter), ui.Weight(1))
 

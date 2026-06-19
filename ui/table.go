@@ -30,20 +30,13 @@ type Table struct {
 	font     render.FontFace
 }
 
-// TableOption configures a Table.
-type TableOption func(*Table)
-
-// OnRowSelect registers a handler called with the newly selected row index.
-func OnRowSelect(fn func(int)) TableOption { return func(t *Table) { t.onSelect = fn } }
-
-// NewTable returns a Table with the given columns, configured by opts.
-func NewTable(columns []Column, opts ...TableOption) *Table {
-	t := &Table{BaseWidget: NewBase(), columns: columns, selected: -1, hoverRow: -1}
-	for _, o := range opts {
-		o(t)
-	}
-	return t
+// NewTable returns a Table with the given columns.
+func NewTable(columns []Column) *Table {
+	return &Table{BaseWidget: NewBase(), columns: columns, selected: -1, hoverRow: -1}
 }
+
+// OnSelect registers the handler invoked with the newly selected row index.
+func (t *Table) OnSelect(fn func(int)) { t.onSelect = fn }
 
 // SetRows replaces all rows and clears the selection.
 func (t *Table) SetRows(rows [][]string) {

@@ -49,11 +49,13 @@ type Widget interface {
 	// Tooltip returns the hover hint text for the widget, or "" for none.
 	Tooltip() string
 
-	// mount connects the widget to the tree. The parent calls it when the widget
-	// is added to an already-mounted tree, and containers call it recursively on
-	// their children. It is implemented by BaseWidget and unexported, so every
-	// widget must embed BaseWidget.
-	mount(parent Widget, ctx *treeContext)
+	// mount connects the widget to the tree. self is the widget's own interface
+	// identity (so containers record the correct parent even when a widget type
+	// embeds another), parent is its parent (nil for the root). The parent calls
+	// it when adding the widget to an already-mounted tree, and containers call
+	// it recursively on their children. Implemented by BaseWidget and unexported,
+	// so every widget must embed BaseWidget.
+	mount(self, parent Widget, ctx *treeContext)
 }
 
 // treeContext is state shared by every widget in a mounted tree. It carries the

@@ -76,7 +76,7 @@ uiframework/
   ui/            # public API: App, Window, widgets, layouts, options
   core/          # widget tree, layout engine, dispatch, focus mgmt (internal)
   render/        # Canvas + drawing primitive interfaces (backend-agnostic)
-  backend/ebiten/# the only package that imports ebiten/v2
+  internal/ebiten/ # the only package that imports ebiten/v2 (unimportable by users)
   geom/          # Point, Size, Rect, Insets, alignment enums
   theme/         # Palette, Theme, default theme, fonts
   assets/        # bundled default font (go:embed)
@@ -396,5 +396,7 @@ Grouped by build priority.
     `TextField` and `TextArea`.
 18. **Grid cell-spanning** — per-cell column/row spans in the `Grid` layout.
 19. **High-DPI scaling** — logical vs physical pixels, device scale factor.
+20. **Button has images instead of text** - allow image buttons (as well as text buttons)
+21. **Display Images** - Can images be displayed in canvases? Or something else?
 
 Build a tiny example app alongside each step to exercise the new pieces.

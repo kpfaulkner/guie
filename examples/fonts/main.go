@@ -68,30 +68,34 @@ func main() {
 	pickerRow := ui.NewContainer()
 	pickerRow.SetLayout(ui.HBox(10))
 	pickerRow.Add(ui.NewLabel("Font:"))
-	pickerRow.Add(ui.NewDropdown(names,
-		ui.DropdownSelected(0),
-		ui.OnSelectIndex(func(i int) {
-			familyIdx = i
-			apply()
-		}),
-	), ui.Align(geom.AlignStart))
+	picker := ui.NewDropdown(names, ui.DropdownSelected(0))
+	picker.OnSelect(func(i int) {
+		familyIdx = i
+		apply()
+	})
+	pickerRow.Add(picker, ui.Align(geom.AlignStart))
 	root.Add(pickerRow, ui.Align(geom.AlignStart))
 
 	// Row 2: size stepper.
+	button := func(label string, fn func()) *ui.Button {
+		b := ui.NewButton(label)
+		b.OnClick(fn)
+		return b
+	}
 	sizeRow := ui.NewContainer()
 	sizeRow.SetLayout(ui.HBox(10))
-	sizeRow.Add(ui.NewButton("A-", ui.OnClick(func() {
+	sizeRow.Add(button("A-", func() {
 		if size > 8 {
 			size -= 2
 			apply()
 		}
-	})))
-	sizeRow.Add(ui.NewButton("A+", ui.OnClick(func() {
+	}))
+	sizeRow.Add(button("A+", func() {
 		if size < 48 {
 			size += 2
 			apply()
 		}
-	})))
+	}))
 	sizeRow.Add(info)
 	root.Add(sizeRow, ui.Align(geom.AlignStart))
 

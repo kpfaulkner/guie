@@ -103,7 +103,8 @@ func TestTextAreaArrowsAcrossLineBoundary(t *testing.T) {
 
 func TestTextAreaOnChange(t *testing.T) {
 	got := ""
-	ta := NewTextArea(OnTextAreaChange(func(s string) { got = s }))
+	ta := NewTextArea()
+	ta.OnChange(func(s string) { got = s })
 	typeStr(ta, "hi")
 	if got != "hi" {
 		t.Fatalf("OnTextAreaChange should report %q, got %q", "hi", got)

@@ -3,7 +3,7 @@ package ui
 import (
 	"os"
 
-	ebitenbackend "github.com/kpfaulkner/uiframework/backend/ebiten"
+	ebitenbackend "github.com/kpfaulkner/uiframework/internal/ebiten"
 	"github.com/kpfaulkner/uiframework/render"
 )
 

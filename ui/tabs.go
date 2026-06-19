@@ -35,14 +35,14 @@ func NewTabContainer() *TabContainer {
 	return &TabContainer{BaseWidget: NewBase(), hover: -1}
 }
 
-// OnTabChange registers a handler called with the newly selected tab index.
-func (t *TabContainer) OnTabChange(fn func(int)) { t.onChange = fn }
+// OnChange registers the handler invoked with the newly selected tab index.
+func (t *TabContainer) OnChange(fn func(int)) { t.onChange = fn }
 
 // AddTab appends a pane with the given title and content widget.
 func (t *TabContainer) AddTab(title string, content Widget) {
 	t.tabs = append(t.tabs, tab{title: title, content: content})
 	if t.ctx != nil {
-		content.mount(t, t.ctx)
+		content.mount(content, t.self, t.ctx)
 	}
 	t.Invalidate()
 }
@@ -103,10 +103,10 @@ func (t *TabContainer) Children() []Widget {
 	return nil
 }
 
-func (t *TabContainer) mount(parent Widget, ctx *treeContext) {
-	t.BaseWidget.mount(parent, ctx)
+func (t *TabContainer) mount(self, parent Widget, ctx *treeContext) {
+	t.BaseWidget.mount(self, parent, ctx)
 	for _, tb := range t.tabs {
-		tb.content.mount(t, ctx)
+		tb.content.mount(tb.content, self, ctx)
 	}
 }
 

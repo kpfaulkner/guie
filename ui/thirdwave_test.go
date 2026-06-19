@@ -15,7 +15,8 @@ func clickAt(app *App, pos geom.Point) {
 
 func TestListClickSelects(t *testing.T) {
 	sel := -1
-	l := NewList([]string{"a", "b", "c"}, OnSelect(func(i int) { sel = i }))
+	l := NewList([]string{"a", "b", "c"})
+	l.OnSelect(func(i int) { sel = i })
 	app := NewApp()
 	app.SetContent(l)
 	rh := l.RowHeight()
@@ -72,7 +73,8 @@ func TestDropdownTogglesPopup(t *testing.T) {
 
 func TestDropdownSelectsFromPopup(t *testing.T) {
 	chosen := -1
-	dd := NewDropdown([]string{"x", "y", "z"}, OnSelectIndex(func(i int) { chosen = i }))
+	dd := NewDropdown([]string{"x", "y", "z"})
+	dd.OnSelect(func(i int) { chosen = i })
 	app := NewApp()
 	root := NewContainer()
 	root.Add(dd)

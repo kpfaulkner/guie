@@ -31,12 +31,15 @@ func main() {
 	row.SetLayout(ui.HBox(10))
 
 	// A simple message dialog with a single OK button.
-	row.Add(ui.NewButton("Show message", ui.OnClick(func() {
+	showMsg := ui.NewButton("Show message")
+	showMsg.OnClick(func() {
 		app.ShowMessage("Hello", "This is a modal message dialog.")
-	})))
+	})
+	row.Add(showMsg)
 
 	// A confirm dialog with Cancel / Delete choices.
-	row.Add(ui.NewButton("Delete...", ui.OnClick(func() {
+	del := ui.NewButton("Delete...")
+	del.OnClick(func() {
 		app.ShowMessage("Delete item?", "This cannot be undone.",
 			ui.DialogButton{Label: "Cancel", OnClick: func() {
 				status.SetText("Last action: cancelled")
@@ -45,7 +48,8 @@ func main() {
 				status.SetText("Last action: deleted")
 			}},
 		)
-	})))
+	})
+	row.Add(del)
 
 	root.Add(row, ui.Align(geom.AlignStart), ui.Weight(1))
 

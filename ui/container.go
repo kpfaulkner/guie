@@ -72,7 +72,7 @@ func (c *Container) Add(w Widget, opts ...ItemOption) {
 	c.children = append(c.children, w)
 	c.data = append(c.data, d)
 	if c.ctx != nil {
-		w.mount(c, c.ctx)
+		w.mount(w, c.self, c.ctx)
 	}
 	c.Invalidate()
 }
@@ -146,9 +146,9 @@ func (c *Container) Draw(canvas render.Canvas) {
 }
 
 // mount attaches the container and all of its current children to the tree.
-func (c *Container) mount(parent Widget, ctx *treeContext) {
-	c.BaseWidget.mount(parent, ctx)
+func (c *Container) mount(self, parent Widget, ctx *treeContext) {
+	c.BaseWidget.mount(self, parent, ctx)
 	for _, ch := range c.children {
-		ch.mount(c, ctx)
+		ch.mount(ch, self, ctx)
 	}
 }

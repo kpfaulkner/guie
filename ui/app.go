@@ -6,8 +6,11 @@
 package ui
 
 import (
-	ebitenbackend "github.com/kpfaulkner/uiframework/backend/ebiten"
+	"sync"
+	"sync/atomic"
+
 	"github.com/kpfaulkner/uiframework/geom"
+	ebitenbackend "github.com/kpfaulkner/uiframework/internal/ebiten"
 	"github.com/kpfaulkner/uiframework/render"
 	"github.com/kpfaulkner/uiframework/theme"
 )
@@ -15,11 +18,21 @@ import (
 // App owns the main loop, the root of the widget tree and top-level
 // configuration. Construct one with NewApp, give it content with SetContent,
 // and start it with Run.
+//
+// Concurrency: an App and its widget tree are not safe for concurrent use. All
+// methods must be called from the UI goroutine — that is, from within Run
+// (event callbacks, Update). The only exceptions are Do and Quit, which are
+// safe to call from any goroutine; use Do to marshal work onto the UI goroutine
+// from a background goroutine.
 type App struct {
 	driver    render.Driver
 	cfg       render.Config
 	theme     theme.Theme
 	clipboard render.Clipboard
+
+	mu      sync.Mutex  // guards pending
+	pending []func()    // work queued via Do, run at the start of each frame
+	quit    atomic.Bool // set by Quit to stop the loop
 
 	root        Widget
 	ctx         *treeContext
@@ -106,7 +119,7 @@ func (a *App) Events() *EventBus { return a.bus }
 func (a *App) SetContent(w Widget) {
 	a.root = w
 	if w != nil {
-		w.mount(nil, a.ctx)
+		w.mount(w, nil, a.ctx)
 		if a.surfaceSize.W > 0 {
 			w.SetBounds(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H})
 		}
@@ -124,7 +137,38 @@ func (a *App) Run() error {
 	})
 }
 
+// Do schedules fn to run on the UI goroutine at the start of the next frame.
+// It is safe to call from any goroutine and is the supported way to update the
+// UI from background work.
+func (a *App) Do(fn func()) {
+	if fn == nil {
+		return
+	}
+	a.mu.Lock()
+	a.pending = append(a.pending, fn)
+	a.mu.Unlock()
+}
+
+// Quit requests a clean shutdown of the main loop; Run then returns nil. It is
+// safe to call from any goroutine.
+func (a *App) Quit() { a.quit.Store(true) }
+
+// runPending drains and runs work queued via Do, on the UI goroutine.
+func (a *App) runPending() {
+	a.mu.Lock()
+	q := a.pending
+	a.pending = nil
+	a.mu.Unlock()
+	for _, fn := range q {
+		fn()
+	}
+}
+
 func (a *App) update(in render.InputState) error {
+	a.runPending()
+	if a.quit.Load() {
+		return render.ErrTerminated
+	}
 	// Keep layout current before hit-testing, then dispatch input.
 	a.layoutIfNeeded()
 	a.dispatchPointer(in)

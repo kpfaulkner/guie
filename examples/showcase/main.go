@@ -50,19 +50,17 @@ func main() {
 	content.SetPadding(geom.UniformInsets(16))
 
 	fruits := []string{"Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Kiwi", "Lemon", "Mango"}
-	list := ui.NewList(fruits, ui.OnSelect(func(i int) {
-		say(fmt.Sprintf("List: %s", fruits[i]))
-	}))
+	list := ui.NewList(fruits)
+	list.OnSelect(func(i int) { say(fmt.Sprintf("List: %s", fruits[i])) })
 	content.Add(list, ui.Weight(1))
 
 	right := ui.NewContainer()
 	right.SetLayout(ui.VBox(10))
 	right.Add(ui.NewLabel("Pick a color:"))
 	colors := []string{"Red", "Orange", "Yellow", "Green", "Blue", "Indigo", "Violet"}
-	right.Add(ui.NewDropdown(colors,
-		ui.DropdownPlaceholder("choose a color"),
-		ui.OnSelectIndex(func(i int) { say("Dropdown: " + colors[i]) }),
-	), ui.Align(geom.AlignStart))
+	dd := ui.NewDropdown(colors, ui.DropdownPlaceholder("choose a color"))
+	dd.OnSelect(func(i int) { say("Dropdown: " + colors[i]) })
+	right.Add(dd, ui.Align(geom.AlignStart))
 	right.Add(ui.NewLabel("(click outside or Esc to close popups)"), ui.Weight(1))
 	content.Add(right, ui.Weight(1))
 

@@ -32,7 +32,7 @@ func TestTabsDefaultSelectsFirst(t *testing.T) {
 func TestTabsClickSwitches(t *testing.T) {
 	changed := -1
 	_, tc, _, b := tabsApp(t)
-	tc.OnTabChange(func(i int) { changed = i })
+	tc.OnChange(func(i int) { changed = i })
 
 	ev := Event{Type: EventClick, Pos: tc.titleRect(1).Center()}
 	tc.HandleEvent(&ev)

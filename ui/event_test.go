@@ -27,7 +27,8 @@ func appWithButton(onClick func()) (*App, *Button) {
 	app := NewApp()
 	root := NewContainer()
 	root.SetBounds(geom.Rect{X: 0, Y: 0, W: 200, H: 200})
-	b := NewButton("ok", OnClick(onClick))
+	b := NewButton("ok")
+	b.OnClick(onClick)
 	b.SetBounds(geom.Rect{X: 10, Y: 10, W: 100, H: 30})
 	root.Add(b)
 	app.SetContent(root)
@@ -37,7 +38,8 @@ func appWithButton(onClick func()) (*App, *Button) {
 
 func TestButtonClickEventFires(t *testing.T) {
 	clicks := 0
-	b := NewButton("ok", OnClick(func() { clicks++ }))
+	b := NewButton("ok")
+	b.OnClick(func() { clicks++ })
 	ev := Event{Type: EventClick, Button: render.MouseLeft}
 	if !b.HandleEvent(&ev) {
 		t.Fatal("button should consume EventClick")
@@ -49,7 +51,8 @@ func TestButtonClickEventFires(t *testing.T) {
 
 func TestButtonDisabledIgnoresClick(t *testing.T) {
 	clicks := 0
-	b := NewButton("ok", OnClick(func() { clicks++ }))
+	b := NewButton("ok")
+	b.OnClick(func() { clicks++ })
 	b.SetEnabled(false)
 	ev := Event{Type: EventClick, Button: render.MouseLeft}
 	if b.HandleEvent(&ev) {

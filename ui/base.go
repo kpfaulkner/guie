@@ -17,6 +17,7 @@ type BaseWidget struct {
 	enabled bool
 	tooltip string
 	colors  map[ColorRole]color.Color // per-widget color overrides
+	self    Widget                    // this widget's interface identity
 	parent  Widget
 	ctx     *treeContext
 }
@@ -67,12 +68,11 @@ func (b *BaseWidget) Tooltip() string { return b.tooltip }
 // widget. An empty string disables it.
 func (b *BaseWidget) SetTooltip(s string) { b.tooltip = s }
 
-// RequestFocus asks the framework to give this widget keyboard focus. The
-// receiver must be the concrete widget (so pass it in); it is a no-op before
-// the widget is mounted.
-func (b *BaseWidget) RequestFocus(self Widget) {
+// RequestFocus asks the framework to give this widget keyboard focus. It is a
+// no-op before the widget is mounted.
+func (b *BaseWidget) RequestFocus() {
 	if b.ctx != nil {
-		b.ctx.focus(self)
+		b.ctx.focus(b.self)
 	}
 }
 
@@ -93,7 +93,8 @@ func (b *BaseWidget) Invalidate() {
 	}
 }
 
-func (b *BaseWidget) mount(parent Widget, ctx *treeContext) {
+func (b *BaseWidget) mount(self, parent Widget, ctx *treeContext) {
+	b.self = self
 	b.parent = parent
 	b.ctx = ctx
 }

@@ -39,9 +39,6 @@ func DropdownPlaceholder(s string) DropdownOption {
 	return func(d *DropdownCombo) { d.placeholder = s }
 }
 
-// OnSelectIndex registers a handler called with the chosen index.
-func OnSelectIndex(fn func(int)) DropdownOption { return func(d *DropdownCombo) { d.onChange = fn } }
-
 // NewDropdown returns a DropdownCombo over options, configured by opts.
 func NewDropdown(options []string, opts ...DropdownOption) *DropdownCombo {
 	d := &DropdownCombo{BaseWidget: NewBase(), options: options, selected: -1, placeholder: "Select..."}
@@ -50,6 +47,9 @@ func NewDropdown(options []string, opts ...DropdownOption) *DropdownCombo {
 	}
 	return d
 }
+
+// OnSelect registers the handler invoked with the chosen index.
+func (d *DropdownCombo) OnSelect(fn func(int)) { d.onChange = fn }
 
 // Selected returns the selected index, or -1.
 func (d *DropdownCombo) Selected() int { return d.selected }

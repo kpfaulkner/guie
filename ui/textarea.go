@@ -127,11 +127,6 @@ func TextAreaPlaceholder(s string) TextAreaOption {
 	return func(t *TextArea) { t.placeholder = s }
 }
 
-// OnTextAreaChange registers a handler called whenever the text changes.
-func OnTextAreaChange(fn func(string)) TextAreaOption {
-	return func(t *TextArea) { t.onChange = fn }
-}
-
 // TextAreaWrap enables soft word-wrapping: long logical lines are wrapped to the
 // content width across multiple visual rows.
 func TextAreaWrap() TextAreaOption {
@@ -146,6 +141,9 @@ func NewTextArea(opts ...TextAreaOption) *TextArea {
 	}
 	return t
 }
+
+// OnChange registers the handler invoked whenever the text changes.
+func (t *TextArea) OnChange(fn func(string)) { t.onChange = fn }
 
 // Text returns the full contents with lines joined by '\n'.
 func (t *TextArea) Text() string {

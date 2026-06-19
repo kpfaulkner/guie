@@ -77,13 +77,13 @@ func (s *SplitPane) Children() []Widget {
 	return out
 }
 
-func (s *SplitPane) mount(parent Widget, ctx *treeContext) {
-	s.BaseWidget.mount(parent, ctx)
+func (s *SplitPane) mount(self, parent Widget, ctx *treeContext) {
+	s.BaseWidget.mount(self, parent, ctx)
 	if s.first != nil {
-		s.first.mount(s, ctx)
+		s.first.mount(s.first, self, ctx)
 	}
 	if s.second != nil {
-		s.second.mount(s, ctx)
+		s.second.mount(s.second, self, ctx)
 	}
 }
 

@@ -1,6 +1,14 @@
 package render
 
-import "image/color"
+import (
+	"errors"
+	"image/color"
+)
+
+// ErrTerminated may be returned from Hooks.Update to request a clean shutdown of
+// the main loop. A Driver must treat it as a normal stop: Run returns nil, not
+// this error.
+var ErrTerminated = errors.New("render: terminated")
 
 // Config describes the host window and loop parameters a Driver should set up.
 type Config struct {

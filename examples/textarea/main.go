@@ -38,8 +38,8 @@ func main() {
 	area := ui.NewTextArea(
 		ui.TextAreaWrap(),
 		ui.TextAreaPlaceholder("Start typing your notes here..."),
-		ui.OnTextAreaChange(update),
 	)
+	area.OnChange(update)
 	area.SetText("The quick brown fox jumps over the lazy dog, and keeps on running well past the right edge so you can see soft word-wrap in action.\nSecond paragraph.")
 	update(area.Text())
 

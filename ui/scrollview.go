@@ -32,7 +32,7 @@ func NewScrollView() *ScrollView { return &ScrollView{BaseWidget: NewBase()} }
 func (s *ScrollView) SetContent(w Widget) {
 	s.content = w
 	if s.ctx != nil && w != nil {
-		w.mount(s, s.ctx)
+		w.mount(w, s.self, s.ctx)
 	}
 	s.Invalidate()
 }
@@ -45,10 +45,10 @@ func (s *ScrollView) Children() []Widget {
 	return []Widget{s.content}
 }
 
-func (s *ScrollView) mount(parent Widget, ctx *treeContext) {
-	s.BaseWidget.mount(parent, ctx)
+func (s *ScrollView) mount(self, parent Widget, ctx *treeContext) {
+	s.BaseWidget.mount(self, parent, ctx)
 	if s.content != nil {
-		s.content.mount(s, ctx)
+		s.content.mount(s.content, self, ctx)
 	}
 }
 
