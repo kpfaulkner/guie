@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — scroll"),
+		ui.WithTitle("guie — scroll"),
 		ui.WithSize(440, 360),
 	)
 

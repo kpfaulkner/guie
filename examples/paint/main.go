@@ -1,4 +1,4 @@
-// Command paint is a tiny freehand drawing program built with uiframework. It
+// Command paint is a tiny freehand drawing program built with guie. It
 // shows how to read mouse position from pointer events: a custom widget records
 // the cursor on pointer-down/move/up (pointer capture delivers the whole drag),
 // and renders strokes via the Canvas. Left-drag draws with the selected color;
@@ -15,9 +15,9 @@ import (
 	"image/png"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 var canvasColor = color.RGBA{R: 0xf6, G: 0xf6, B: 0xf2, A: 0xff}
@@ -111,7 +111,7 @@ func solidImage(c color.RGBA) render.Image {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — paint"),
+		ui.WithTitle("guie — paint"),
 		ui.WithSize(720, 560),
 	)
 

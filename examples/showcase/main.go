@@ -11,13 +11,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — showcase"),
+		ui.WithTitle("guie — showcase"),
 		ui.WithSize(720, 480),
 	)
 
@@ -40,7 +40,7 @@ func main() {
 		ui.NewMenuItem("Paste", func() { say("Edit ▸ Paste") }),
 	)
 	bar.AddMenu("Help",
-		ui.NewMenuItem("About", func() { say("uiframework showcase") }),
+		ui.NewMenuItem("About", func() { say("guie showcase") }),
 	)
 	root.Add(bar)
 

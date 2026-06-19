@@ -8,8 +8,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // canvas implements render.Canvas over an *ebiten.Image.

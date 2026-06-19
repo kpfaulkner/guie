@@ -1,6 +1,6 @@
 package render
 
-import "github.com/kpfaulkner/uiframework/geom"
+import "github.com/kpfaulkner/guie/geom"
 
 // MouseButton identifies a mouse button.
 type MouseButton int

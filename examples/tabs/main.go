@@ -10,8 +10,8 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 // pane builds a simple padded container with a background and a heading.
@@ -29,7 +29,7 @@ func pane(bg color.Color, heading string, body ...ui.Widget) *ui.Container {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — tabs"),
+		ui.WithTitle("guie — tabs"),
 		ui.WithSize(560, 360),
 	)
 

@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goitalic"
 	"golang.org/x/image/font/gofont/gomono"
@@ -30,7 +30,7 @@ type family struct {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — fonts"),
+		ui.WithTitle("guie — fonts"),
 		ui.WithSize(600, 360),
 	)
 

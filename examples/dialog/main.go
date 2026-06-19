@@ -8,13 +8,13 @@ package main
 import (
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — dialog"),
+		ui.WithTitle("guie — dialog"),
 		ui.WithSize(560, 320),
 	)
 

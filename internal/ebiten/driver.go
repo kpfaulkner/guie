@@ -5,7 +5,7 @@ import (
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // Driver implements render.Driver on top of EBiten. Construct one with New and

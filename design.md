@@ -72,7 +72,7 @@ etc.); a single internal package implements those interfaces against EBiten.
 ### Suggested package layout
 
 ```
-uiframework/
+guie/
   ui/            # public API: App, Window, widgets, layouts, options
   core/          # widget tree, layout engine, dispatch, focus mgmt (internal)
   render/        # Canvas + drawing primitive interfaces (backend-agnostic)

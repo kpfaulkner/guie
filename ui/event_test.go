@@ -3,8 +3,8 @@ package ui
 import (
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // down/up build InputState snapshots for a left button press/release at pos. A

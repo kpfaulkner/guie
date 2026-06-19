@@ -15,9 +15,9 @@ import (
 	"log"
 	"math"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 // makePNG builds a w×h image by calling f for each pixel and encodes it as PNG.
@@ -45,7 +45,7 @@ func mustLoad(data []byte) render.Image {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — images"),
+		ui.WithTitle("guie — images"),
 		ui.WithSize(560, 420),
 	)
 

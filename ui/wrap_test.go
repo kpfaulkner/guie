@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/render"
 )
 
 func TestWrapOffIsOneRowPerLine(t *testing.T) {

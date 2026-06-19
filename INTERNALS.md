@@ -1,6 +1,6 @@
 # INTERNALS
 
-Detailed design notes for the `uiframework` library: how the pieces fit
+Detailed design notes for the `guie` library: how the pieces fit
 together, the invariants they rely on, and why things are the way they are.
 This complements `design.md` (the goals/plan) by documenting the *implemented*
 architecture.
@@ -12,7 +12,7 @@ the `ui`, `geom`, `render` and `theme` packages.
 
 ## 1. Overview
 
-`uiframework` is a **retained-mode** GUI toolkit for Go, rendered with EBiten.
+`guie` is a **retained-mode** GUI toolkit for Go, rendered with EBiten.
 The defining constraint is that **EBiten is an internal detail**: the public
 API never exposes an EBiten type, and the EBiten-backed package is physically
 unimportable by users (it lives under `internal/`). The framework owns the main

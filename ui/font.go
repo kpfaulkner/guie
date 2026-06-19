@@ -3,8 +3,8 @@ package ui
 import (
 	"os"
 
-	ebitenbackend "github.com/kpfaulkner/uiframework/internal/ebiten"
-	"github.com/kpfaulkner/uiframework/render"
+	ebitenbackend "github.com/kpfaulkner/guie/internal/ebiten"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // DefaultFont returns the bundled default font at the given point size. Use it

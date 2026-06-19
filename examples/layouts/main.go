@@ -10,8 +10,8 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 // panel is a colored box with a single centered label, built from a Stack.
@@ -25,7 +25,7 @@ func panel(bg color.Color, label string, txt color.Color) *ui.Container {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — layouts"),
+		ui.WithTitle("guie — layouts"),
 		ui.WithSize(720, 480),
 	)
 	pal := app.Theme().Palette

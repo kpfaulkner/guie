@@ -3,8 +3,8 @@ package ui
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // Soft-shadow parameters. The shadow is faked by stacking several translucent,

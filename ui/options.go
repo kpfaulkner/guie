@@ -3,8 +3,8 @@ package ui
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/theme"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
 
 // AppOption configures an App during NewApp.

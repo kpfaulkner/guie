@@ -3,8 +3,8 @@ package ui
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // Label is a non-interactive widget that draws a single line of text. Color and

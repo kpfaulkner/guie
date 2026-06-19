@@ -11,10 +11,10 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/theme"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 // sketch is a custom leaf widget. It receives its font and colors at
@@ -65,7 +65,7 @@ func (s *sketch) Draw(c render.Canvas) {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — canvas"),
+		ui.WithTitle("guie — canvas"),
 		ui.WithSize(520, 360),
 		ui.WithBackground(color.RGBA{R: 0x14, G: 0x14, B: 0x1c, A: 0xff}),
 	)

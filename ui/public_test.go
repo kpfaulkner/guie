@@ -5,8 +5,8 @@ import (
 	"image/color"
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func sameColor(a, b color.Color) bool {
@@ -74,7 +74,7 @@ func TestListSelectionViaPublicAPI(t *testing.T) {
 	}
 }
 
-// ExampleApp shows the typical shape of a uiframework program: construct an App,
+// ExampleApp shows the typical shape of a guie program: construct an App,
 // build a widget tree, wire callbacks, set the content and run.
 func ExampleApp() {
 	app := ui.NewApp(ui.WithTitle("Demo"), ui.WithSize(320, 240))

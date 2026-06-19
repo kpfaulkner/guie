@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // fakeImage is a render.Image with a fixed size, for tests that don't need real

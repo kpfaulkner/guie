@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // tooltipDelayTicks is how long the pointer must rest before a tooltip appears.

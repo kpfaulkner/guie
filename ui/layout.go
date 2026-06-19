@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/kpfaulkner/uiframework/geom"
+import "github.com/kpfaulkner/guie/geom"
 
 // Layout positions a container's children. A container delegates measuring and
 // arranging to its Layout; without one it falls back to leaving children at

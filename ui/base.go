@@ -3,9 +3,9 @@ package ui
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/theme"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
 
 // BaseWidget provides tree wiring, state storage and default method

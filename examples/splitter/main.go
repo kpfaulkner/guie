@@ -11,8 +11,8 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func panel(bg color.Color, heading string) *ui.Container {
@@ -25,7 +25,7 @@ func panel(bg color.Color, heading string) *ui.Container {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — splitter"),
+		ui.WithTitle("guie — splitter"),
 		ui.WithSize(640, 420),
 	)
 

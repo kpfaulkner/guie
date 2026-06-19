@@ -10,7 +10,7 @@ package render
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // Canvas is the drawing surface handed to widgets each frame. All coordinates

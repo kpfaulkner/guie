@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 func spanItem(w Widget, cols, rows int) Item {

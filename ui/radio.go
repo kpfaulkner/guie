@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // RadioGroup coordinates a set of RadioButtons so that exactly one is selected

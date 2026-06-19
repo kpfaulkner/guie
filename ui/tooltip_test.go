@@ -3,8 +3,8 @@ package ui
 import (
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // hoverApp builds an app with a single tooltipped button filling the surface.

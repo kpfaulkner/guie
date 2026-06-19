@@ -6,7 +6,7 @@ package theme
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // Palette is the set of named colors a theme provides. Widgets fall back to

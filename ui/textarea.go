@@ -4,8 +4,8 @@ import (
 	"image/color"
 	"strings"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // textAreaPadding is the inner padding around a text area's content.

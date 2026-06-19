@@ -8,8 +8,8 @@ import (
 	_ "image/png"  // register PNG decoder
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // imageHandle is the backend's concrete render.Image, wrapping an *ebiten.Image.

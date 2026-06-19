@@ -3,7 +3,7 @@ package ui
 import (
 	"image/color"
 
-	"github.com/kpfaulkner/uiframework/theme"
+	"github.com/kpfaulkner/guie/theme"
 )
 
 // ColorRole names a semantic color slot, mirroring the theme Palette. Every

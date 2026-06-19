@@ -3,7 +3,7 @@ package ui
 import (
 	"math"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // Grid arranges children into a fixed number of columns, flowing left to right

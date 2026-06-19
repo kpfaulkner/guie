@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — events"),
+		ui.WithTitle("guie — events"),
 		ui.WithSize(600, 320),
 	)
 

@@ -1,9 +1,9 @@
 package ui
 
 import (
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/theme"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
 
 // Widget is the interface implemented by every node in the retained UI tree.

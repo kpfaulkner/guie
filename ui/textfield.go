@@ -3,8 +3,8 @@ package ui
 import (
 	"strings"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // textFieldPadding is the inner padding around a text field's content.

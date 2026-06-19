@@ -1,4 +1,4 @@
-// Command editor is a small general-purpose text editor built with uiframework.
+// Command editor is a small general-purpose text editor built with guie.
 // It has a menu bar (File / Edit / Help) and a flat icon toolbar. File ▸
 // Open/Save/Quit, Edit ▸ Find/Replace, Help ▸ About. Open and the editing
 // dialogs are custom modal panels (a label + text field(s) + OK/Cancel) shown
@@ -19,9 +19,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 // --- tiny icon rasterizer (so the example needs no asset files) ---
@@ -201,7 +201,7 @@ func replaceDialog(app *ui.App, onReplace func(from, to string)) {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — editor"),
+		ui.WithTitle("guie — editor"),
 		ui.WithSize(820, 600),
 		ui.WithFontSize(18),
 	)
@@ -285,7 +285,7 @@ func main() {
 	)
 	bar.AddMenu("Help",
 		ui.NewMenuItem("About", func() {
-			app.ShowMessage("About", "A small text editor built with uiframework.")
+			app.ShowMessage("About", "A small text editor built with guie.")
 		}),
 	)
 

@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // stub is a leaf widget with a fixed minimum size, used to drive layout tests.

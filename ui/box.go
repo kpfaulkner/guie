@@ -3,7 +3,7 @@ package ui
 import (
 	"math"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // Box arranges children in a single row (Horizontal) or column (Vertical).

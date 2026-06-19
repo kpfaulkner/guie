@@ -3,9 +3,9 @@ package ui
 import (
 	"os"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	ebitenbackend "github.com/kpfaulkner/uiframework/internal/ebiten"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	ebitenbackend "github.com/kpfaulkner/guie/internal/ebiten"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // LoadImageBytes decodes image data (PNG, JPEG or GIF) into a render.Image that

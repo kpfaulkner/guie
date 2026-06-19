@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 // labeledRow puts a fixed-width caption to the left of a control.
@@ -26,7 +26,7 @@ func labeledRow(caption string, control ui.Widget) *ui.Container {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — controls"),
+		ui.WithTitle("guie — controls"),
 		ui.WithSize(560, 420),
 	)
 

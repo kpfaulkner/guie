@@ -9,10 +9,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	ebitenbackend "github.com/kpfaulkner/uiframework/internal/ebiten"
-	"github.com/kpfaulkner/uiframework/render"
-	"github.com/kpfaulkner/uiframework/theme"
+	"github.com/kpfaulkner/guie/geom"
+	ebitenbackend "github.com/kpfaulkner/guie/internal/ebiten"
+	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
 
 // App owns the main loop, the root of the widget tree and top-level
@@ -62,7 +62,7 @@ func NewApp(opts ...AppOption) *App {
 		theme:   theme.Default(),
 		shadows: true,
 		cfg: render.Config{
-			Title:     "uiframework",
+			Title:     "guie",
 			Width:     800,
 			Height:    600,
 			Resizable: true,

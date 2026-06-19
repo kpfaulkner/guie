@@ -13,8 +13,8 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/ui"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/ui"
 )
 
 func hex(c color.Color) string {
@@ -24,7 +24,7 @@ func hex(c color.Color) string {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — colors"),
+		ui.WithTitle("guie — colors"),
 		ui.WithSize(560, 360),
 	)
 

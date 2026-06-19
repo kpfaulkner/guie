@@ -3,7 +3,7 @@ package ui
 import (
 	"math"
 
-	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // Stack overlays all children in the same area, in add order (later children

@@ -2,7 +2,7 @@ package ebitenbackend
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // keyMap translates EBiten key codes into backend-neutral render.Key values.

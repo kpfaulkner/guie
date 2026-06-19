@@ -1,4 +1,4 @@
-module github.com/kpfaulkner/uiframework
+module github.com/kpfaulkner/guie
 
 go 1.25.0
 

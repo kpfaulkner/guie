@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/kpfaulkner/uiframework/render"
+import "github.com/kpfaulkner/guie/render"
 
 // vCenterY returns the y at which to draw a single line of text so its glyph
 // block (ascent + descent, ignoring line gap) is optically centered within the

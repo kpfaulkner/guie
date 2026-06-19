@@ -4,8 +4,8 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/kpfaulkner/uiframework/geom"
-	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 )
 
 // Container is a widget that holds and draws child widgets. It is the basic
