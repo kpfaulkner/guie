@@ -111,9 +111,7 @@ func (r *RadioButton) Draw(canvas render.Canvas) {
 		canvas.FillCircle(center, radius*0.5, r.ColorOf(RoleAccent))
 	}
 
-	textColor := r.ColorOf(RoleText)
-	ts := f.Measure(r.label)
-	canvas.DrawText(r.label, geom.Point{X: b.X + side + indicatorGap, Y: b.Y + (b.H-ts.H)/2}, f, textColor)
+	canvas.DrawText(r.label, geom.Point{X: b.X + side + indicatorGap, Y: vCenterY(f, b.Y, b.H)}, f, r.ColorOf(RoleText))
 }
 
 // HandleEvent selects the button on click or Space/Enter and tracks hover/focus.

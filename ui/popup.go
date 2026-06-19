@@ -173,6 +173,7 @@ func (a *App) ShowMessage(title, message string, buttons ...DialogButton) *Popup
 	panel := NewContainer()
 	panel.SetBackground(pal.Surface)
 	panel.SetBorder(pal.Border, 1)
+	panel.SetCornerRadius(a.theme.CornerRadius)
 	panel.SetLayout(VBox(12))
 	panel.SetPadding(geom.UniformInsets(16))
 

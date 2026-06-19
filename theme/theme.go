@@ -23,34 +23,40 @@ type Palette struct {
 	Disabled   color.Color // disabled widget fill
 }
 
-// Theme bundles the color palette with the default font and its size.
+// Theme bundles the color palette with the default font/size and the default
+// corner radius used by controls.
 type Theme struct {
-	Palette  Palette
-	Font     render.FontFace // default text face; may be nil until set
-	FontSize float64
+	Palette      Palette
+	Font         render.FontFace // default text face; may be nil until set
+	FontSize     float64
+	CornerRadius float64 // rounding of buttons, fields, etc.
 }
 
-// DefaultPalette returns the built-in dark palette.
+// DefaultPalette returns the built-in dark palette. Background and Surface are
+// distinct elevations; Border is a soft, low-contrast separator (not a harsh
+// outline); Accent is reserved for focus and selection.
 func DefaultPalette() Palette {
 	return Palette{
-		Background: color.RGBA{R: 0x1e, G: 0x1e, B: 0x28, A: 0xff},
-		Surface:    color.RGBA{R: 0x2b, G: 0x2b, B: 0x3a, A: 0xff},
+		Background: color.RGBA{R: 0x1a, G: 0x1a, B: 0x22, A: 0xff},
+		Surface:    color.RGBA{R: 0x26, G: 0x26, B: 0x32, A: 0xff},
 		Primary:    color.RGBA{R: 0x4a, G: 0x6f, B: 0xa5, A: 0xff},
-		OnPrimary:  color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff},
-		Text:       color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff},
+		OnPrimary:  color.RGBA{R: 0xf4, G: 0xf6, B: 0xfb, A: 0xff},
+		Text:       color.RGBA{R: 0xea, G: 0xea, B: 0xf2, A: 0xff},
 		TextMuted:  color.RGBA{R: 0x9a, G: 0x9a, B: 0xb0, A: 0xff},
-		Border:     color.RGBA{R: 0x10, G: 0x10, B: 0x18, A: 0xff},
-		Accent:     color.RGBA{R: 0x5d, G: 0x86, B: 0xc4, A: 0xff},
-		Disabled:   color.RGBA{R: 0x55, G: 0x55, B: 0x66, A: 0xff},
+		Border:     color.RGBA{R: 0x3a, G: 0x3a, B: 0x48, A: 0xff},
+		Accent:     color.RGBA{R: 0x6f, G: 0x9a, B: 0xe0, A: 0xff},
+		Disabled:   color.RGBA{R: 0x44, G: 0x44, B: 0x52, A: 0xff},
 	}
 }
 
-// Default returns the built-in theme: the dark palette at the default font
-// size. The Font is left nil here so this package stays backend-independent;
-// the App fills in a default font from the backend if one is not supplied.
+// Default returns the built-in theme: the dark palette at the default font size
+// with softly rounded controls. The Font is left nil here so this package stays
+// backend-independent; the App fills in a default font from the backend if one
+// is not supplied.
 func Default() Theme {
 	return Theme{
-		Palette:  DefaultPalette(),
-		FontSize: 14,
+		Palette:      DefaultPalette(),
+		FontSize:     14,
+		CornerRadius: 5,
 	}
 }

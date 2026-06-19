@@ -73,7 +73,8 @@ func (a *App) drawTooltip(c render.Canvas) {
 	}
 
 	rect := geom.Rect{X: x, Y: y, W: w, H: h}
-	c.FillRect(rect, lighten(pal.Surface, 1.3))
-	c.StrokeRect(rect, pal.Border, 1)
-	c.DrawText(a.tooltipText, geom.Point{X: x + tooltipPad, Y: y + tooltipPad}, f, pal.Text)
+	rad := a.theme.CornerRadius
+	c.FillRoundRect(rect, rad, lighten(pal.Surface, 1.3))
+	c.StrokeRoundRect(rect, rad, pal.Border, 1)
+	c.DrawText(a.tooltipText, geom.Point{X: x + tooltipPad, Y: vCenterY(f, rect.Y, rect.H)}, f, pal.Text)
 }

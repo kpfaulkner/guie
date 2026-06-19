@@ -23,6 +23,7 @@ type Container struct {
 	padding     geom.Insets
 	borderColor color.Color // optional outline; nil means none
 	borderWidth float64
+	radius      float64 // corner radius for background/border; 0 = sharp
 }
 
 // NewContainer returns an empty, visible Container.
@@ -53,6 +54,12 @@ func (c *Container) SetPadding(in geom.Insets) {
 func (c *Container) SetBorder(col color.Color, width float64) {
 	c.borderColor = col
 	c.borderWidth = width
+}
+
+// SetCornerRadius rounds the container's background and border corners.
+func (c *Container) SetCornerRadius(r float64) {
+	c.radius = r
+	c.Invalidate()
 }
 
 // Background returns the container's fill color (nil means transparent).
@@ -130,7 +137,7 @@ func (c *Container) Layout() {
 // area.
 func (c *Container) Draw(canvas render.Canvas) {
 	if c.background != nil {
-		canvas.FillRect(c.Bounds(), c.background)
+		canvas.FillRoundRect(c.Bounds(), c.radius, c.background)
 	}
 	canvas.PushClip(c.ContentRect())
 	for _, ch := range c.children {
@@ -141,7 +148,7 @@ func (c *Container) Draw(canvas render.Canvas) {
 	canvas.PopClip()
 
 	if c.borderColor != nil && c.borderWidth > 0 {
-		canvas.StrokeRect(c.Bounds(), c.borderColor, c.borderWidth)
+		canvas.StrokeRoundRect(c.Bounds(), c.radius, c.borderColor, c.borderWidth)
 	}
 }
 

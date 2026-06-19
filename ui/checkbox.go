@@ -86,17 +86,18 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 	b := c.Bounds()
 	side := f.Measure("Ag").H
 	box := geom.Rect{X: b.X, Y: b.Y + (b.H-side)/2, W: side, H: side}
+	rad := minF(4, side/4)
 
 	if c.checked {
-		canvas.FillRect(box, c.ColorOf(RolePrimary))
+		canvas.FillRoundRect(box, rad, c.ColorOf(RolePrimary))
 	} else if c.hover {
-		canvas.FillRect(box, c.ColorOf(RoleSurface))
+		canvas.FillRoundRect(box, rad, c.ColorOf(RoleSurface))
 	}
 	border := c.ColorOf(RoleBorder)
 	if c.focused {
 		border = c.ColorOf(RoleAccent)
 	}
-	canvas.StrokeRect(box, border, 1)
+	canvas.StrokeRoundRect(box, rad, border, 1)
 
 	if c.checked {
 		col := c.ColorOf(RoleOnPrimary)
@@ -112,8 +113,7 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 		)
 	}
 
-	ts := f.Measure(c.label)
-	canvas.DrawText(c.label, geom.Point{X: box.X + side + indicatorGap, Y: b.Y + (b.H-ts.H)/2}, f, c.ColorOf(RoleText))
+	canvas.DrawText(c.label, geom.Point{X: box.X + side + indicatorGap, Y: vCenterY(f, b.Y, b.H)}, f, c.ColorOf(RoleText))
 }
 
 // HandleEvent toggles on click or Space/Enter and tracks hover/focus.

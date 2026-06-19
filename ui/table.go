@@ -199,7 +199,7 @@ func (t *Table) Draw(canvas render.Canvas) {
 	for c, col := range t.columns {
 		cell := geom.Rect{X: xs[c], Y: b.Y, W: widths[c], H: rh}
 		canvas.PushClip(cell)
-		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: b.Y + tableCellPad}, f, t.ColorOf(RoleText))
+		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, b.Y, rh)}, f, t.ColorOf(RoleText))
 		canvas.PopClip()
 	}
 	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + rh}, geom.Point{X: b.X + b.W, Y: b.Y + rh}, t.ColorOf(RoleBorder), 1)
@@ -228,7 +228,7 @@ func (t *Table) Draw(canvas render.Canvas) {
 			}
 			cell := geom.Rect{X: xs[c], Y: y, W: widths[c], H: rh}
 			canvas.PushClip(cell)
-			canvas.DrawText(row[c], geom.Point{X: xs[c] + tableCellPad, Y: y + tableCellPad}, f, textColor)
+			canvas.DrawText(row[c], geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, y, rh)}, f, textColor)
 			canvas.PopClip()
 		}
 	}

@@ -188,8 +188,7 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 		if i == t.selected {
 			col = t.ColorOf(RoleOnPrimary)
 		}
-		ts := f.Measure(tb.title)
-		canvas.DrawText(tb.title, geom.Point{X: r.X + tabHPad, Y: r.Y + (r.H-ts.H)/2}, f, col)
+		canvas.DrawText(tb.title, geom.Point{X: r.X + tabHPad, Y: vCenterY(f, r.Y, r.H)}, f, col)
 	}
 	// Separator line under the strip.
 	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, t.ColorOf(RoleBorder), 1)

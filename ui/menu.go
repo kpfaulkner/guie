@@ -110,8 +110,7 @@ func (m *MenuBar) Draw(canvas render.Canvas) {
 		case i == m.hover:
 			canvas.FillRect(r, lighten(m.ColorOf(RoleSurface), 1.25))
 		}
-		ts := f.Measure(t)
-		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: r.Y + (r.H-ts.H)/2}, f, m.ColorOf(RoleText))
+		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: vCenterY(f, r.Y, r.H)}, f, m.ColorOf(RoleText))
 	}
 }
 
@@ -156,6 +155,8 @@ func (m *MenuBar) openMenu(i int) {
 
 	panel := NewContainer()
 	panel.SetBackground(m.appTheme().Palette.Surface)
+	panel.SetBorder(m.appTheme().Palette.Border, 1)
+	panel.SetCornerRadius(m.appTheme().CornerRadius)
 	panel.SetLayout(VBox(0))
 	for _, it := range m.menus[i] {
 		action := it.Action
@@ -215,8 +216,7 @@ func (r *menuRow) Draw(canvas render.Canvas) {
 	if r.hover {
 		canvas.FillRect(b, r.ColorOf(RoleAccent))
 	}
-	s := f.Measure(r.label)
-	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: b.Y + (b.H-s.H)/2}, f, r.ColorOf(RoleText))
+	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: vCenterY(f, b.Y, b.H)}, f, r.ColorOf(RoleText))
 }
 
 func (r *menuRow) HandleEvent(ev *Event) bool {

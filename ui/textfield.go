@@ -263,20 +263,20 @@ func (t *TextField) Draw(canvas render.Canvas) {
 		return
 	}
 	b := t.Bounds()
+	rad := t.cornerRadius()
 
-	canvas.FillRect(b, t.ColorOf(RoleSurface))
+	canvas.FillRoundRect(b, rad, t.ColorOf(RoleSurface))
 	border := t.ColorOf(RoleBorder)
 	if t.focused {
 		border = t.ColorOf(RoleAccent)
 	}
-	canvas.StrokeRect(b, border, 1)
+	canvas.StrokeRoundRect(b, rad, border, 1)
 
 	inner := b.Inset(textFieldPadding)
 	canvas.PushClip(inner)
 	defer canvas.PopClip()
 
-	lineH := f.Measure("Ag").H
-	y := inner.Y + (inner.H-lineH)/2
+	y := vCenterY(f, inner.Y, inner.H)
 
 	if len(t.runes) == 0 && !t.focused && t.placeholder != "" {
 		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: y}, f, t.ColorOf(RoleTextMuted))
@@ -289,7 +289,7 @@ func (t *TextField) Draw(canvas render.Canvas) {
 		lo, hi := t.selRange()
 		x0 := inner.X - t.scrollX + f.Measure(string(t.runes[:lo])).W
 		x1 := inner.X - t.scrollX + f.Measure(string(t.runes[:hi])).W
-		canvas.FillRect(geom.Rect{X: x0, Y: y, W: x1 - x0, H: lineH}, t.ColorOf(RolePrimary))
+		canvas.FillRect(geom.Rect{X: x0, Y: inner.Y, W: x1 - x0, H: inner.H}, t.ColorOf(RolePrimary))
 	}
 
 	canvas.DrawText(string(t.runes), geom.Point{X: inner.X - t.scrollX, Y: y}, f, t.ColorOf(RoleText))

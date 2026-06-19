@@ -458,12 +458,13 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 		return
 	}
 	b := t.Bounds()
-	canvas.FillRect(b, t.ColorOf(RoleSurface))
+	rad := t.cornerRadius()
+	canvas.FillRoundRect(b, rad, t.ColorOf(RoleSurface))
 	border := t.ColorOf(RoleBorder)
 	if t.focused {
 		border = t.ColorOf(RoleAccent)
 	}
-	canvas.StrokeRect(b, border, 1)
+	canvas.StrokeRoundRect(b, rad, border, 1)
 
 	inner := b.Inset(textAreaPadding)
 	lh := t.lineHeight()

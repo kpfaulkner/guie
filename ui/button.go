@@ -150,11 +150,12 @@ func (b *Button) Focusable() bool { return b.Enabled() }
 // focus ring when focused.
 func (b *Button) Draw(c render.Canvas) {
 	rect := b.Bounds()
-	c.FillRect(rect, b.fillColor())
-	c.StrokeRect(rect, b.ColorOf(RoleBorder), 1)
+	rad := b.cornerRadius()
+	c.FillRoundRect(rect, rad, b.fillColor())
+	c.StrokeRoundRect(rect, rad, b.ColorOf(RoleBorder), 1)
 	if b.focused {
 		ring := rect.Inset(geom.UniformInsets(2))
-		c.StrokeRect(ring, b.ColorOf(RoleAccent), 1)
+		c.StrokeRoundRect(ring, maxF(0, rad-1), b.ColorOf(RoleAccent), 1)
 	}
 
 	content := b.contentSize()
@@ -172,9 +173,7 @@ func (b *Button) Draw(c render.Canvas) {
 
 	if b.text != "" {
 		if f := b.face(); f != nil {
-			size := f.Measure(b.text)
-			y := rect.Y + (rect.H-size.H)/2
-			c.DrawText(b.text, geom.Point{X: x, Y: y}, f, b.labelColor())
+			c.DrawText(b.text, geom.Point{X: x, Y: vCenterY(f, rect.Y, rect.H)}, f, b.labelColor())
 		}
 	}
 }

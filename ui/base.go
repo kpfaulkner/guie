@@ -115,3 +115,6 @@ func (b *BaseWidget) clipboard() render.Clipboard {
 	}
 	return nil
 }
+
+// cornerRadius returns the theme's default control corner radius.
+func (b *BaseWidget) cornerRadius() float64 { return b.appTheme().CornerRadius }

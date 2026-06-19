@@ -167,7 +167,7 @@ func (l *List) Draw(canvas render.Canvas) {
 		if i == l.selected {
 			textColor = l.ColorOf(RoleOnPrimary)
 		}
-		canvas.DrawText(it, geom.Point{X: b.X + listRowPad, Y: y + listRowPad}, f, textColor)
+		canvas.DrawText(it, geom.Point{X: b.X + listRowPad, Y: vCenterY(f, y, rh)}, f, textColor)
 	}
 	canvas.PopClip()
 

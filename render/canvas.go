@@ -34,6 +34,12 @@ type Canvas interface {
 	FillRect(r geom.Rect, c color.Color)
 	// StrokeRect draws the outline of r with the given line width.
 	StrokeRect(r geom.Rect, c color.Color, width float64)
+	// FillRoundRect fills r with corners rounded to the given radius. A radius of
+	// zero is equivalent to FillRect.
+	FillRoundRect(r geom.Rect, radius float64, c color.Color)
+	// StrokeRoundRect draws the outline of r with rounded corners. A radius of
+	// zero is equivalent to StrokeRect.
+	StrokeRoundRect(r geom.Rect, radius float64, c color.Color, width float64)
 	// DrawLine draws a straight line from a to b with the given width.
 	DrawLine(a, b geom.Point, c color.Color, width float64)
 	// FillCircle fills a circle of radius radius centered at center.

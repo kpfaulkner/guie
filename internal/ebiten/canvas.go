@@ -69,6 +69,54 @@ func (c *canvas) StrokeRect(r geom.Rect, clr color.Color, width float64) {
 	vector.StrokeRect(c.top().target, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), float32(width), clr, true)
 }
 
+// roundRectPath builds a rounded-rectangle path, clamping the radius to half the
+// smaller side.
+func roundRectPath(r geom.Rect, radius float64) *vector.Path {
+	x, y, w, h := float32(r.X), float32(r.Y), float32(r.W), float32(r.H)
+	rad := float32(radius)
+	if rad > w/2 {
+		rad = w / 2
+	}
+	if rad > h/2 {
+		rad = h / 2
+	}
+	var p vector.Path
+	p.MoveTo(x+rad, y)
+	p.LineTo(x+w-rad, y)
+	p.ArcTo(x+w, y, x+w, y+rad, rad)
+	p.LineTo(x+w, y+h-rad)
+	p.ArcTo(x+w, y+h, x+w-rad, y+h, rad)
+	p.LineTo(x+rad, y+h)
+	p.ArcTo(x, y+h, x, y+h-rad, rad)
+	p.LineTo(x, y+rad)
+	p.ArcTo(x, y, x+rad, y, rad)
+	p.Close()
+	return &p
+}
+
+func (c *canvas) FillRoundRect(r geom.Rect, radius float64, clr color.Color) {
+	if radius <= 0 {
+		c.FillRect(r, clr)
+		return
+	}
+	op := &vector.DrawPathOptions{}
+	op.AntiAlias = true
+	op.ColorScale.ScaleWithColor(clr)
+	vector.FillPath(c.top().target, roundRectPath(r, radius), nil, op)
+}
+
+func (c *canvas) StrokeRoundRect(r geom.Rect, radius float64, clr color.Color, width float64) {
+	if radius <= 0 {
+		c.StrokeRect(r, clr, width)
+		return
+	}
+	sop := &vector.StrokeOptions{Width: float32(width), MiterLimit: 10}
+	op := &vector.DrawPathOptions{}
+	op.AntiAlias = true
+	op.ColorScale.ScaleWithColor(clr)
+	vector.StrokePath(c.top().target, roundRectPath(r, radius), sop, op)
+}
+
 func (c *canvas) DrawLine(a, b geom.Point, clr color.Color, width float64) {
 	vector.StrokeLine(c.top().target, float32(a.X), float32(a.Y), float32(b.X), float32(b.Y), float32(width), clr, true)
 }

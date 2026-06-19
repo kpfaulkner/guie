@@ -84,6 +84,5 @@ func (l *Label) Draw(c render.Canvas) {
 	b := l.Bounds()
 	size := f.Measure(l.text)
 	x, _ := alignSpan(l.align, b.X, b.W, size.W)
-	y := b.Y + (b.H-size.H)/2 // vertically centered
-	c.DrawText(l.text, geom.Point{X: x, Y: y}, f, l.ColorOf(RoleText))
+	c.DrawText(l.text, geom.Point{X: x, Y: vCenterY(f, b.Y, b.H)}, f, l.ColorOf(RoleText))
 }

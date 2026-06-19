@@ -98,19 +98,19 @@ func (d *DropdownCombo) Draw(canvas render.Canvas) {
 		return
 	}
 	b := d.Bounds()
-	canvas.FillRect(b, d.ColorOf(RoleSurface))
+	rad := d.cornerRadius()
+	canvas.FillRoundRect(b, rad, d.ColorOf(RoleSurface))
 	border := d.ColorOf(RoleBorder)
 	if d.focused || d.open {
 		border = d.ColorOf(RoleAccent)
 	}
-	canvas.StrokeRect(b, border, 1)
+	canvas.StrokeRoundRect(b, rad, border, 1)
 
 	textColor := d.ColorOf(RoleText)
 	if d.selected < 0 {
 		textColor = d.ColorOf(RoleTextMuted)
 	}
-	ts := f.Measure(d.label())
-	canvas.DrawText(d.label(), geom.Point{X: b.X + listRowPad, Y: b.Y + (b.H-ts.H)/2}, f, textColor)
+	canvas.DrawText(d.label(), geom.Point{X: b.X + listRowPad, Y: vCenterY(f, b.Y, b.H)}, f, textColor)
 
 	// Chevron in the arrow area on the right.
 	cx := b.X + b.W - dropdownArrowW/2 - listRowPad
