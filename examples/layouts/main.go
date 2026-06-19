@@ -44,16 +44,19 @@ func main() {
 	row.Add(panel(pal.Primary, "HBox weight 2", pal.OnPrimary), ui.Weight(2))
 	root.Add(row, ui.Weight(2))
 
-	// A 3-column grid that fills the remaining height.
+	// A 3-column grid that fills the remaining height. The first panel spans all
+	// three columns as a header; a later one spans two columns.
 	grid := ui.NewContainer()
 	grid.SetLayout(ui.NewGrid(3, 8))
+	grid.Add(panel(pal.Primary, "header (spans 3 columns)", pal.OnPrimary), ui.Span(3, 1))
 	colors := []color.Color{
 		color.RGBA{0x8a, 0x4a, 0x4a, 0xff}, color.RGBA{0x4a, 0x8a, 0x5a, 0xff}, color.RGBA{0x4a, 0x5a, 0x8a, 0xff},
-		color.RGBA{0x8a, 0x7a, 0x4a, 0xff}, color.RGBA{0x6a, 0x4a, 0x8a, 0xff}, color.RGBA{0x4a, 0x8a, 0x8a, 0xff},
+		color.RGBA{0x8a, 0x7a, 0x4a, 0xff},
 	}
 	for i, cc := range colors {
 		grid.Add(panel(cc, fmt.Sprintf("cell %d", i+1), pal.Text))
 	}
+	grid.Add(panel(color.RGBA{0x4a, 0x8a, 0x8a, 0xff}, "wide (spans 2)", pal.Text), ui.Span(2, 1))
 	root.Add(grid, ui.Weight(3))
 
 	app.SetContent(root)

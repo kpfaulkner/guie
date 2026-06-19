@@ -31,10 +31,13 @@ type LayoutData struct {
 	// (the cross axis in a Box, the whole cell in a Grid/Stack). AlignStretch
 	// fills the space.
 	Align geom.Alignment
+	// ColSpan and RowSpan are the number of grid cells a child occupies. Used
+	// only by Grid; both default to 1.
+	ColSpan, RowSpan int
 }
 
 func defaultLayoutData() LayoutData {
-	return LayoutData{Align: geom.AlignStretch}
+	return LayoutData{Align: geom.AlignStretch, ColSpan: 1, RowSpan: 1}
 }
 
 // ItemOption configures a child's LayoutData when it is added to a container.
@@ -51,6 +54,18 @@ func Weight(n int) ItemOption {
 // Align sets the child's alignment within the space its layout assigns it.
 func Align(a geom.Alignment) ItemOption {
 	return func(d *LayoutData) { d.Align = a }
+}
+
+// Span sets how many grid columns and rows a child occupies (Grid only). Values
+// below 1 are clamped to 1.
+func Span(cols, rows int) ItemOption {
+	if cols < 1 {
+		cols = 1
+	}
+	if rows < 1 {
+		rows = 1
+	}
+	return func(d *LayoutData) { d.ColSpan, d.RowSpan = cols, rows }
 }
 
 // --- shared axis helpers used by the layout implementations ---

@@ -7,13 +7,14 @@ import (
 )
 
 // Grid arranges children into a fixed number of columns, flowing left to right
-// and wrapping to a new row every Columns items.
+// and wrapping to a new row.
 //
-// Columns and rows fill the available content rectangle: column widths are
-// distributed by ColWeights (equal if unset) and rows share the remaining
+// A child may span multiple columns and/or rows (LayoutData.ColSpan/RowSpan, set
+// with the Span item option); auto-flow skips cells already covered by a
+// spanning child. Columns and rows fill the available content rectangle: column
+// widths are distributed by ColWeights (equal if unset) and rows share the
 // height by RowWeights (equal if unset). Each child is placed within its cell
-// per its Align (AlignStretch fills the cell). Cell spanning is not yet
-// supported; it is planned for a later iteration.
+// block per its Align (AlignStretch fills it).
 type Grid struct {
 	Columns    int
 	Spacing    float64
@@ -36,28 +37,102 @@ func (g *Grid) cols() int {
 	return g.Columns
 }
 
-func (g *Grid) rowsFor(n int) int {
-	cols := g.cols()
-	return (n + cols - 1) / cols
+// cellPlacement is where an item sits in the grid and how many cells it covers.
+type cellPlacement struct {
+	row, col, colSpan, rowSpan int
 }
 
-// Measure returns the minimum size: each column as wide as its widest child and
-// each row as tall as its tallest child, plus inter-cell spacing.
+// place assigns each item a cell block via sparse auto-flow, honouring spans,
+// and returns the placements and the total number of rows used.
+func (g *Grid) place(items []Item) ([]cellPlacement, int) {
+	cols := g.cols()
+	occupied := map[[2]int]bool{}
+	free := func(r, c, cs, rs int) bool {
+		if c+cs > cols {
+			return false
+		}
+		for dr := 0; dr < rs; dr++ {
+			for dc := 0; dc < cs; dc++ {
+				if occupied[[2]int{r + dr, c + dc}] {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+	placements := make([]cellPlacement, len(items))
+	rows := 0
+	cr, cc := 0, 0 // cursor
+	for i, it := range items {
+		cs, rs := spanOf(it.Data)
+		if cs > cols {
+			cs = cols
+		}
+		// Find the next free block at or after the cursor.
+		r, c := cr, cc
+		for {
+			if c+cs > cols {
+				c = 0
+				r++
+				continue
+			}
+			if free(r, c, cs, rs) {
+				break
+			}
+			c++
+		}
+		for dr := 0; dr < rs; dr++ {
+			for dc := 0; dc < cs; dc++ {
+				occupied[[2]int{r + dr, c + dc}] = true
+			}
+		}
+		placements[i] = cellPlacement{row: r, col: c, colSpan: cs, rowSpan: rs}
+		if r+rs > rows {
+			rows = r + rs
+		}
+		// Advance the cursor past the item.
+		cr, cc = r, c+cs
+		if cc >= cols {
+			cr, cc = r+1, 0
+		}
+	}
+	return placements, rows
+}
+
+func spanOf(d LayoutData) (cs, rs int) {
+	cs, rs = d.ColSpan, d.RowSpan
+	if cs < 1 {
+		cs = 1
+	}
+	if rs < 1 {
+		rs = 1
+	}
+	return
+}
+
+// Measure returns the minimum size needed for the placed grid, distributing a
+// spanning child's minimum across the tracks it covers.
 func (g *Grid) Measure(items []Item) geom.Size {
-	n := len(items)
-	if n == 0 {
+	if len(items) == 0 {
 		return geom.Size{}
 	}
 	cols := g.cols()
-	rows := g.rowsFor(n)
+	placements, rows := g.place(items)
 
 	colMin := make([]float64, cols)
 	rowMin := make([]float64, rows)
 	for i, it := range items {
-		c, r := i%cols, i/cols
+		p := placements[i]
 		m := it.Widget.MinSize()
-		colMin[c] = math.Max(colMin[c], m.W)
-		rowMin[r] = math.Max(rowMin[r], m.H)
+		wPer := m.W / float64(p.colSpan)
+		hPer := m.H / float64(p.rowSpan)
+		for dc := 0; dc < p.colSpan; dc++ {
+			colMin[p.col+dc] = math.Max(colMin[p.col+dc], wPer)
+		}
+		for dr := 0; dr < p.rowSpan; dr++ {
+			rowMin[p.row+dr] = math.Max(rowMin[p.row+dr], hPer)
+		}
 	}
 
 	var w, h float64
@@ -72,38 +147,52 @@ func (g *Grid) Measure(items []Item) geom.Size {
 	return geom.Size{W: w, H: h}
 }
 
-// Arrange splits the content rectangle into a grid of cells and places each
-// child within its cell.
+// Arrange splits the content rectangle into a grid and places each child over
+// its (possibly spanning) cell block.
 func (g *Grid) Arrange(items []Item, content geom.Rect) {
-	n := len(items)
-	if n == 0 {
+	if len(items) == 0 {
 		return
 	}
 	cols := g.cols()
-	rows := g.rowsFor(n)
+	placements, rows := g.place(items)
 
 	colW := distributeTracks(cols, content.W, g.Spacing, g.ColWeights)
 	rowH := distributeTracks(rows, content.H, g.Spacing, g.RowWeights)
-
-	// Precompute the top-left of each column and row.
-	colX := make([]float64, cols)
-	x := content.X
-	for c := 0; c < cols; c++ {
-		colX[c] = x
-		x += colW[c] + g.Spacing
-	}
-	rowY := make([]float64, rows)
-	y := content.Y
-	for r := 0; r < rows; r++ {
-		rowY[r] = y
-		y += rowH[r] + g.Spacing
-	}
+	colX := trackOrigins(colW, content.X, g.Spacing)
+	rowY := trackOrigins(rowH, content.Y, g.Spacing)
 
 	for i, it := range items {
-		c, r := i%cols, i/cols
-		cell := geom.Rect{X: colX[c], Y: rowY[r], W: colW[c], H: rowH[r]}
+		p := placements[i]
+		cell := geom.Rect{
+			X: colX[p.col],
+			Y: rowY[p.row],
+			W: spanExtent(colW, p.col, p.colSpan, g.Spacing),
+			H: spanExtent(rowH, p.row, p.rowSpan, g.Spacing),
+		}
 		it.Widget.SetBounds(alignInCell(it.Data.Align, cell, it.Widget.MinSize()))
 	}
+}
+
+// trackOrigins returns the start coordinate of each track given its size and the
+// inter-track spacing, beginning at start.
+func trackOrigins(tracks []float64, start, spacing float64) []float64 {
+	out := make([]float64, len(tracks))
+	x := start
+	for i, t := range tracks {
+		out[i] = x
+		x += t + spacing
+	}
+	return out
+}
+
+// spanExtent sums the sizes of span tracks starting at index, including the
+// spacing between them.
+func spanExtent(tracks []float64, index, span int, spacing float64) float64 {
+	total := 0.0
+	for i := 0; i < span; i++ {
+		total += tracks[index+i]
+	}
+	return total + spacing*float64(span-1)
 }
 
 // alignInCell positions a child of the given preferred size within a cell. With
