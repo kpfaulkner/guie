@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/uiframework/theme"
 )
 
 // BaseWidget provides tree wiring, state storage and default method
@@ -43,6 +44,9 @@ func (b *BaseWidget) Layout() {}
 // Draw is a no-op by default.
 func (b *BaseWidget) Draw(c render.Canvas) {}
 
+// HandleEvent ignores the event by default.
+func (b *BaseWidget) HandleEvent(ev *Event) bool { return false }
+
 // Visible reports whether the widget is visible.
 func (b *BaseWidget) Visible() bool { return b.visible }
 
@@ -69,4 +73,13 @@ func (b *BaseWidget) Invalidate() {
 func (b *BaseWidget) mount(parent Widget, ctx *treeContext) {
 	b.parent = parent
 	b.ctx = ctx
+}
+
+// appTheme returns the active theme, or a default if the widget is not yet
+// mounted. Widgets read it during Draw and MinSize to resolve fonts and colors.
+func (b *BaseWidget) appTheme() theme.Theme {
+	if b.ctx != nil && b.ctx.theme != nil {
+		return *b.ctx.theme
+	}
+	return theme.Default()
 }

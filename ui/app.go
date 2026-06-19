@@ -24,6 +24,10 @@ type App struct {
 	ctx         *treeContext
 	needsLayout bool
 	surfaceSize geom.Size
+
+	// pointer dispatch state
+	hovered     Widget // widget currently under the cursor
+	pressTarget Widget // widget that received the active pointer-down (capture)
 }
 
 // NewApp creates an App with default configuration, then applies opts.
@@ -50,7 +54,10 @@ func NewApp(opts ...AppOption) *App {
 		a.cfg.Background = a.theme.Palette.Background
 	}
 
-	a.ctx = &treeContext{requestLayout: func() { a.needsLayout = true }}
+	a.ctx = &treeContext{
+		requestLayout: func() { a.needsLayout = true },
+		theme:         &a.theme,
+	}
 	return a
 }
 
@@ -81,9 +88,47 @@ func (a *App) Run() error {
 }
 
 func (a *App) update(in render.InputState) error {
-	// Event dispatch is wired in step 5; for now we only keep layout current.
+	// Keep layout current before hit-testing, then dispatch pointer input.
 	a.layoutIfNeeded()
+	a.dispatchPointer(in)
 	return nil
+}
+
+// dispatchPointer translates the frame's mouse input into pointer events and
+// routes them to widgets. Hover enter/leave follow the widget under the cursor;
+// a press captures its target so the matching release (and the click test) goes
+// to the same widget. Full bubbling, focus and keyboard handling arrive in
+// step 5.
+func (a *App) dispatchPointer(in render.InputState) {
+	if a.root == nil {
+		return
+	}
+	pos := in.MousePos
+	hit := hitTest(a.root, pos)
+
+	if hit != a.hovered {
+		if a.hovered != nil {
+			ev := Event{Type: EventPointerLeave, Pos: pos}
+			a.hovered.HandleEvent(&ev)
+		}
+		if hit != nil {
+			ev := Event{Type: EventPointerEnter, Pos: pos}
+			hit.HandleEvent(&ev)
+		}
+		a.hovered = hit
+	}
+
+	if in.MousePressed.Has(render.MouseLeft) && hit != nil {
+		ev := Event{Type: EventPointerDown, Pos: pos, Button: render.MouseLeft}
+		hit.HandleEvent(&ev)
+		a.pressTarget = hit
+	}
+
+	if in.MouseReleased.Has(render.MouseLeft) && a.pressTarget != nil {
+		ev := Event{Type: EventPointerUp, Pos: pos, Button: render.MouseLeft}
+		a.pressTarget.HandleEvent(&ev)
+		a.pressTarget = nil
+	}
 }
 
 func (a *App) draw(c render.Canvas) {

@@ -1,0 +1,183 @@
+package ui
+
+import (
+	"image/color"
+
+	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/uiframework/render"
+)
+
+// buttonPadding is the space reserved around a button's label, used by MinSize.
+var buttonPadding = geom.Insets{Top: 6, Right: 14, Bottom: 6, Left: 14}
+
+// Button is a clickable widget that draws a themed background and a centered
+// label, reacting to hover and press. Click handling is delivered through the
+// pointer events dispatched by the App: a click fires when the pointer is
+// released over the button after being pressed on it.
+type Button struct {
+	BaseWidget
+	text    string
+	onClick func()
+
+	hover   bool
+	pressed bool
+
+	// Optional color overrides; nil falls back to the theme.
+	fill    color.Color
+	textCol color.Color
+	font    render.FontFace
+}
+
+// ButtonOption configures a Button during NewButton.
+type ButtonOption func(*Button)
+
+// OnClick registers the click handler.
+func OnClick(fn func()) ButtonOption {
+	return func(b *Button) { b.onClick = fn }
+}
+
+// ButtonColor overrides the button's base fill color.
+func ButtonColor(c color.Color) ButtonOption {
+	return func(b *Button) { b.fill = c }
+}
+
+// ButtonTextColor overrides the label color.
+func ButtonTextColor(c color.Color) ButtonOption {
+	return func(b *Button) { b.textCol = c }
+}
+
+// ButtonFont overrides the label font.
+func ButtonFont(f render.FontFace) ButtonOption {
+	return func(b *Button) { b.font = f }
+}
+
+// NewButton returns a Button showing text, configured by opts.
+func NewButton(text string, opts ...ButtonOption) *Button {
+	b := &Button{BaseWidget: NewBase(), text: text}
+	for _, o := range opts {
+		o(b)
+	}
+	return b
+}
+
+// SetText replaces the button's label and requests a re-layout.
+func (b *Button) SetText(s string) {
+	b.text = s
+	b.Invalidate()
+}
+
+// SetOnClick replaces the click handler.
+func (b *Button) SetOnClick(fn func()) { b.onClick = fn }
+
+func (b *Button) face() render.FontFace {
+	if b.font != nil {
+		return b.font
+	}
+	return b.appTheme().Font
+}
+
+// MinSize returns the label size plus the button's internal padding.
+func (b *Button) MinSize() geom.Size {
+	f := b.face()
+	if f == nil {
+		return geom.Size{}
+	}
+	s := f.Measure(b.text)
+	return geom.Size{
+		W: s.W + buttonPadding.Left + buttonPadding.Right,
+		H: s.H + buttonPadding.Top + buttonPadding.Bottom,
+	}
+}
+
+// fillColor resolves the background color for the button's current state.
+func (b *Button) fillColor() color.Color {
+	pal := b.appTheme().Palette
+	if !b.Enabled() {
+		return pal.Disabled
+	}
+	base := b.fill
+	if base == nil {
+		base = pal.Primary
+	}
+	switch {
+	case b.pressed && b.hover:
+		return darken(base, 0.8)
+	case b.hover:
+		return lighten(base, 1.15)
+	default:
+		return base
+	}
+}
+
+func (b *Button) labelColor() color.Color {
+	if b.textCol != nil {
+		return b.textCol
+	}
+	return b.appTheme().Palette.OnPrimary
+}
+
+// Draw paints the background, a border, and the centered label.
+func (b *Button) Draw(c render.Canvas) {
+	pal := b.appTheme().Palette
+	rect := b.Bounds()
+	c.FillRect(rect, b.fillColor())
+	c.StrokeRect(rect, pal.Border, 1)
+
+	if f := b.face(); f != nil {
+		size := f.Measure(b.text)
+		x := rect.X + (rect.W-size.W)/2
+		y := rect.Y + (rect.H-size.H)/2
+		c.DrawText(b.text, geom.Point{X: x, Y: y}, f, b.labelColor())
+	}
+}
+
+// HandleEvent updates hover/press state and fires OnClick on a completed click.
+func (b *Button) HandleEvent(ev *Event) bool {
+	if !b.Enabled() {
+		return false
+	}
+	switch ev.Type {
+	case EventPointerEnter:
+		b.hover = true
+		return true
+	case EventPointerLeave:
+		b.hover = false
+		return true
+	case EventPointerDown:
+		if ev.Button == render.MouseLeft {
+			b.pressed = true
+			return true
+		}
+	case EventPointerUp:
+		if ev.Button == render.MouseLeft {
+			wasPressed := b.pressed
+			b.pressed = false
+			if wasPressed && b.Bounds().Contains(ev.Pos) && b.onClick != nil {
+				b.onClick()
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// darken returns c scaled toward black by factor (0..1).
+func darken(c color.Color, factor float64) color.Color { return scaleRGB(c, factor) }
+
+// lighten returns c scaled toward white-ish by factor (>1), clamped to 255.
+func lighten(c color.Color, factor float64) color.Color { return scaleRGB(c, factor) }
+
+func scaleRGB(c color.Color, factor float64) color.Color {
+	r, g, bl, a := c.RGBA() // 16-bit premultiplied; here colors are opaque
+	scale := func(v uint32) uint8 {
+		f := float64(v>>8) * factor
+		if f > 255 {
+			f = 255
+		}
+		if f < 0 {
+			f = 0
+		}
+		return uint8(f)
+	}
+	return color.RGBA{R: scale(r), G: scale(g), B: scale(bl), A: uint8(a >> 8)}
+}

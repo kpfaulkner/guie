@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/uiframework/theme"
 )
 
 // Widget is the interface implemented by every node in the retained UI tree.
@@ -32,6 +33,11 @@ type Widget interface {
 	// Draw paints the widget (and, for containers, its children) onto c.
 	Draw(c render.Canvas)
 
+	// HandleEvent dispatches an input event to the widget. It returns true if
+	// the event was consumed. Step 4 delivers pointer events directly to the
+	// widget under the cursor; step 5 adds bubbling, focus and keyboard events.
+	HandleEvent(ev *Event) bool
+
 	// Visible reports whether the widget should be drawn and receive input.
 	Visible() bool
 	// Enabled reports whether the widget accepts interaction.
@@ -44,11 +50,12 @@ type Widget interface {
 	mount(parent Widget, ctx *treeContext)
 }
 
-// treeContext is state shared by every widget in a mounted tree. For now it
-// carries only the re-layout request; it will grow as later steps add focus
-// management and the event bus.
+// treeContext is state shared by every widget in a mounted tree. It carries the
+// re-layout request and the active theme; later steps add focus management and
+// the event bus.
 type treeContext struct {
 	requestLayout func()
+	theme         *theme.Theme
 }
 
 func (t *treeContext) markNeedsLayout() {

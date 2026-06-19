@@ -1,0 +1,91 @@
+package ui
+
+import (
+	"image/color"
+
+	"github.com/kpfaulkner/uiframework/geom"
+	"github.com/kpfaulkner/uiframework/render"
+)
+
+// Label is a non-interactive widget that draws a single line of text. Color and
+// font fall back to the theme when not overridden; the text is aligned
+// horizontally per Align and centered vertically within the widget's bounds.
+type Label struct {
+	BaseWidget
+	text  string
+	color color.Color     // nil → theme text color
+	font  render.FontFace // nil → theme font
+	align geom.Alignment  // horizontal alignment within bounds
+}
+
+// LabelOption configures a Label during NewLabel.
+type LabelOption func(*Label)
+
+// LabelColor overrides the text color.
+func LabelColor(c color.Color) LabelOption {
+	return func(l *Label) { l.color = c }
+}
+
+// LabelFont overrides the font face.
+func LabelFont(f render.FontFace) LabelOption {
+	return func(l *Label) { l.font = f }
+}
+
+// LabelAlign sets the horizontal text alignment within the label's bounds.
+func LabelAlign(a geom.Alignment) LabelOption {
+	return func(l *Label) { l.align = a }
+}
+
+// NewLabel returns a Label showing text, configured by opts.
+func NewLabel(text string, opts ...LabelOption) *Label {
+	l := &Label{BaseWidget: NewBase(), text: text, align: geom.AlignStart}
+	for _, o := range opts {
+		o(l)
+	}
+	return l
+}
+
+// SetText replaces the label's text and requests a re-layout (its size changes).
+func (l *Label) SetText(s string) {
+	l.text = s
+	l.Invalidate()
+}
+
+// Text returns the label's current text.
+func (l *Label) Text() string { return l.text }
+
+func (l *Label) face() render.FontFace {
+	if l.font != nil {
+		return l.font
+	}
+	return l.appTheme().Font
+}
+
+func (l *Label) textColor() color.Color {
+	if l.color != nil {
+		return l.color
+	}
+	return l.appTheme().Palette.Text
+}
+
+// MinSize returns the measured size of the text.
+func (l *Label) MinSize() geom.Size {
+	f := l.face()
+	if f == nil {
+		return geom.Size{}
+	}
+	return f.Measure(l.text)
+}
+
+// Draw renders the text aligned within the label's bounds.
+func (l *Label) Draw(c render.Canvas) {
+	f := l.face()
+	if f == nil {
+		return
+	}
+	b := l.Bounds()
+	size := f.Measure(l.text)
+	x, _ := alignSpan(l.align, b.X, b.W, size.W)
+	y := b.Y + (b.H-size.H)/2 // vertically centered
+	c.DrawText(l.text, geom.Point{X: x, Y: y}, f, l.textColor())
+}
