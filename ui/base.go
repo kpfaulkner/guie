@@ -53,6 +53,18 @@ func (b *BaseWidget) Visible() bool { return b.visible }
 // Enabled reports whether the widget is enabled.
 func (b *BaseWidget) Enabled() bool { return b.enabled }
 
+// Focusable reports false by default; focusable widgets override it.
+func (b *BaseWidget) Focusable() bool { return false }
+
+// RequestFocus asks the framework to give this widget keyboard focus. The
+// receiver must be the concrete widget (so pass it in); it is a no-op before
+// the widget is mounted.
+func (b *BaseWidget) RequestFocus(self Widget) {
+	if b.ctx != nil {
+		b.ctx.focus(self)
+	}
+}
+
 // SetVisible sets visibility and requests a re-layout.
 func (b *BaseWidget) SetVisible(v bool) {
 	b.visible = v

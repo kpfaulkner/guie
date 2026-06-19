@@ -21,6 +21,7 @@ type Button struct {
 
 	hover   bool
 	pressed bool
+	focused bool
 
 	// Optional color overrides; nil falls back to the theme.
 	fill    color.Color
@@ -116,12 +117,21 @@ func (b *Button) labelColor() color.Color {
 	return b.appTheme().Palette.OnPrimary
 }
 
-// Draw paints the background, a border, and the centered label.
+// Focusable reports whether the button can take keyboard focus (only when
+// enabled).
+func (b *Button) Focusable() bool { return b.Enabled() }
+
+// Draw paints the background, a border, the centered label, and a focus ring
+// when focused.
 func (b *Button) Draw(c render.Canvas) {
 	pal := b.appTheme().Palette
 	rect := b.Bounds()
 	c.FillRect(rect, b.fillColor())
 	c.StrokeRect(rect, pal.Border, 1)
+	if b.focused {
+		ring := rect.Inset(geom.UniformInsets(2))
+		c.StrokeRect(ring, pal.Accent, 1)
+	}
 
 	if f := b.face(); f != nil {
 		size := f.Measure(b.text)
@@ -131,7 +141,16 @@ func (b *Button) Draw(c render.Canvas) {
 	}
 }
 
-// HandleEvent updates hover/press state and fires OnClick on a completed click.
+// activate invokes the click handler if one is registered.
+func (b *Button) activate() {
+	if b.onClick != nil {
+		b.onClick()
+	}
+}
+
+// HandleEvent updates hover/press/focus state and fires OnClick on a click or
+// on Space/Enter while focused. The actual click is derived by the dispatcher
+// (press and release on the same widget) and delivered as EventClick.
 func (b *Button) HandleEvent(ev *Event) bool {
 	if !b.Enabled() {
 		return false
@@ -150,11 +169,22 @@ func (b *Button) HandleEvent(ev *Event) bool {
 		}
 	case EventPointerUp:
 		if ev.Button == render.MouseLeft {
-			wasPressed := b.pressed
 			b.pressed = false
-			if wasPressed && b.Bounds().Contains(ev.Pos) && b.onClick != nil {
-				b.onClick()
-			}
+			return true
+		}
+	case EventClick:
+		b.activate()
+		return true
+	case EventFocusGained:
+		b.focused = true
+		return true
+	case EventFocusLost:
+		b.focused = false
+		b.pressed = false
+		return true
+	case EventKeyDown:
+		if ev.Key == render.KeySpace || ev.Key == render.KeyEnter {
+			b.activate()
 			return true
 		}
 	}

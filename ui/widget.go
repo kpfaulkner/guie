@@ -42,6 +42,9 @@ type Widget interface {
 	Visible() bool
 	// Enabled reports whether the widget accepts interaction.
 	Enabled() bool
+	// Focusable reports whether the widget can receive keyboard focus. Such
+	// widgets are visited by Tab traversal and focused on click.
+	Focusable() bool
 
 	// mount connects the widget to the tree. The parent calls it when the widget
 	// is added to an already-mounted tree, and containers call it recursively on
@@ -51,11 +54,18 @@ type Widget interface {
 }
 
 // treeContext is state shared by every widget in a mounted tree. It carries the
-// re-layout request and the active theme; later steps add focus management and
-// the event bus.
+// re-layout request, the active theme, and a focus-request hook so widgets can
+// programmatically take focus.
 type treeContext struct {
 	requestLayout func()
+	requestFocus  func(Widget)
 	theme         *theme.Theme
+}
+
+func (t *treeContext) focus(w Widget) {
+	if t != nil && t.requestFocus != nil {
+		t.requestFocus(w)
+	}
 }
 
 func (t *treeContext) markNeedsLayout() {

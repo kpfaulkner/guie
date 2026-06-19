@@ -7,46 +7,89 @@ import (
 	"github.com/kpfaulkner/uiframework/render"
 )
 
-// press simulates a left-button down at down, then up at up, against w.
-func press(w Widget, down, up geom.Point) {
-	d := Event{Type: EventPointerDown, Pos: down, Button: render.MouseLeft}
-	w.HandleEvent(&d)
-	u := Event{Type: EventPointerUp, Pos: up, Button: render.MouseLeft}
-	w.HandleEvent(&u)
+// down/up build InputState snapshots for a left button press/release at pos.
+func downAt(pos geom.Point) render.InputState {
+	return render.InputState{MousePos: pos, MousePressed: ButtonSetOf(render.MouseLeft)}
 }
 
-func TestButtonClickFires(t *testing.T) {
+func upAt(pos geom.Point) render.InputState {
+	return render.InputState{MousePos: pos, MouseReleased: ButtonSetOf(render.MouseLeft)}
+}
+
+// ButtonSetOf is a tiny test helper mirroring render.ButtonSet.Set.
+func ButtonSetOf(b render.MouseButton) render.ButtonSet {
+	return render.ButtonSet(0).Set(b)
+}
+
+// appWithButton returns an App whose root contains a single button with fixed
+// bounds, ready for direct dispatchPointer calls (no layout pass needed).
+func appWithButton(onClick func()) (*App, *Button) {
+	app := NewApp()
+	root := NewContainer()
+	root.SetBounds(geom.Rect{X: 0, Y: 0, W: 200, H: 200})
+	b := NewButton("ok", OnClick(onClick))
+	b.SetBounds(geom.Rect{X: 10, Y: 10, W: 100, H: 30})
+	root.Add(b)
+	app.SetContent(root)
+	// SetContent leaves the manually assigned bounds intact (surface size is 0).
+	return app, b
+}
+
+func TestButtonClickEventFires(t *testing.T) {
 	clicks := 0
 	b := NewButton("ok", OnClick(func() { clicks++ }))
-	b.SetBounds(geom.Rect{X: 0, Y: 0, W: 100, H: 30})
-
-	press(b, geom.Point{X: 10, Y: 10}, geom.Point{X: 20, Y: 15})
+	ev := Event{Type: EventClick, Button: render.MouseLeft}
+	if !b.HandleEvent(&ev) {
+		t.Fatal("button should consume EventClick")
+	}
 	if clicks != 1 {
 		t.Fatalf("expected 1 click, got %d", clicks)
 	}
 }
 
-func TestButtonReleaseOutsideNoClick(t *testing.T) {
+func TestButtonDisabledIgnoresClick(t *testing.T) {
 	clicks := 0
 	b := NewButton("ok", OnClick(func() { clicks++ }))
-	b.SetBounds(geom.Rect{X: 0, Y: 0, W: 100, H: 30})
-
-	// Pressed inside, released outside the bounds → not a click.
-	press(b, geom.Point{X: 10, Y: 10}, geom.Point{X: 200, Y: 200})
+	b.SetEnabled(false)
+	ev := Event{Type: EventClick, Button: render.MouseLeft}
+	if b.HandleEvent(&ev) {
+		t.Fatal("disabled button should not consume events")
+	}
 	if clicks != 0 {
-		t.Fatalf("expected 0 clicks on release outside, got %d", clicks)
+		t.Fatalf("expected 0 clicks when disabled, got %d", clicks)
 	}
 }
 
-func TestButtonDisabledNoClick(t *testing.T) {
+func TestPointerPressReleaseInsideClicks(t *testing.T) {
 	clicks := 0
-	b := NewButton("ok", OnClick(func() { clicks++ }))
-	b.SetBounds(geom.Rect{X: 0, Y: 0, W: 100, H: 30})
-	b.SetEnabled(false)
+	app, _ := appWithButton(func() { clicks++ })
 
-	press(b, geom.Point{X: 10, Y: 10}, geom.Point{X: 20, Y: 15})
+	inside := geom.Point{X: 20, Y: 20}
+	app.dispatchPointer(downAt(inside))
+	app.dispatchPointer(upAt(inside))
+
+	if clicks != 1 {
+		t.Fatalf("press+release inside should click once, got %d", clicks)
+	}
+}
+
+func TestPointerReleaseOutsideNoClick(t *testing.T) {
+	clicks := 0
+	app, _ := appWithButton(func() { clicks++ })
+
+	app.dispatchPointer(downAt(geom.Point{X: 20, Y: 20}))
+	app.dispatchPointer(upAt(geom.Point{X: 180, Y: 180})) // released off the button
+
 	if clicks != 0 {
-		t.Fatalf("expected 0 clicks when disabled, got %d", clicks)
+		t.Fatalf("release outside should not click, got %d", clicks)
+	}
+}
+
+func TestPointerClickFocusesButton(t *testing.T) {
+	app, b := appWithButton(func() {})
+	app.dispatchPointer(downAt(geom.Point{X: 20, Y: 20}))
+	if app.focused != Widget(b) {
+		t.Fatal("pressing a focusable button should focus it")
 	}
 }
 

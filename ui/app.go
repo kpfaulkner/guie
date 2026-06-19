@@ -24,10 +24,12 @@ type App struct {
 	ctx         *treeContext
 	needsLayout bool
 	surfaceSize geom.Size
+	bus         *EventBus
 
-	// pointer dispatch state
+	// pointer/focus dispatch state
 	hovered     Widget // widget currently under the cursor
 	pressTarget Widget // widget that received the active pointer-down (capture)
+	focused     Widget // widget with keyboard focus
 }
 
 // NewApp creates an App with default configuration, then applies opts.
@@ -54,8 +56,10 @@ func NewApp(opts ...AppOption) *App {
 		a.cfg.Background = a.theme.Palette.Background
 	}
 
+	a.bus = newEventBus()
 	a.ctx = &treeContext{
 		requestLayout: func() { a.needsLayout = true },
+		requestFocus:  a.setFocus,
 		theme:         &a.theme,
 	}
 	return a
@@ -63,6 +67,10 @@ func NewApp(opts ...AppOption) *App {
 
 // Theme returns the app's active theme.
 func (a *App) Theme() theme.Theme { return a.theme }
+
+// Events returns the global event bus for subscribing to events across the
+// whole UI.
+func (a *App) Events() *EventBus { return a.bus }
 
 // SetContent installs w as the root of the widget tree. The root is sized to
 // fill the surface. SetContent may be called before or after Run.
@@ -88,17 +96,84 @@ func (a *App) Run() error {
 }
 
 func (a *App) update(in render.InputState) error {
-	// Keep layout current before hit-testing, then dispatch pointer input.
+	// Keep layout current before hit-testing, then dispatch input.
 	a.layoutIfNeeded()
 	a.dispatchPointer(in)
+	a.dispatchKeyboard(in)
 	return nil
 }
 
-// dispatchPointer translates the frame's mouse input into pointer events and
-// routes them to widgets. Hover enter/leave follow the widget under the cursor;
-// a press captures its target so the matching release (and the click test) goes
-// to the same widget. Full bubbling, focus and keyboard handling arrive in
-// step 5.
+// dispatch sends ev to target and bubbles it up through the ancestors until a
+// widget consumes it (returns true). Every dispatched event is also published
+// to the event bus. It returns whether the event was consumed.
+func (a *App) dispatch(target Widget, ev Event) bool {
+	consumed := false
+	for w := target; w != nil; w = w.Parent() {
+		if w.HandleEvent(&ev) {
+			consumed = true
+			break
+		}
+	}
+	a.bus.publish(ev)
+	return consumed
+}
+
+// sendTo delivers ev to a single widget without bubbling (used for targeted
+// enter/leave/focus events) and publishes it to the bus.
+func (a *App) sendTo(w Widget, ev Event) {
+	if w != nil {
+		w.HandleEvent(&ev)
+	}
+	a.bus.publish(ev)
+}
+
+// setFocus moves keyboard focus to w (nil clears focus), sending focus-lost and
+// focus-gained events as appropriate.
+func (a *App) setFocus(w Widget) {
+	if w == a.focused {
+		return
+	}
+	if a.focused != nil {
+		a.sendTo(a.focused, Event{Type: EventFocusLost})
+	}
+	a.focused = w
+	if w != nil {
+		a.sendTo(w, Event{Type: EventFocusGained})
+	}
+}
+
+// moveFocus advances focus to the next (delta=+1) or previous (delta=-1)
+// focusable widget in tree order, wrapping around.
+func (a *App) moveFocus(delta int) {
+	list := appendFocusables(a.root, nil)
+	if len(list) == 0 {
+		a.setFocus(nil)
+		return
+	}
+	idx := -1
+	for i, w := range list {
+		if w == a.focused {
+			idx = i
+			break
+		}
+	}
+	var next int
+	switch {
+	case idx >= 0:
+		next = (idx + delta + len(list)) % len(list)
+	case delta < 0:
+		next = len(list) - 1
+	default:
+		next = 0
+	}
+	a.setFocus(list[next])
+}
+
+// dispatchPointer translates the frame's mouse input into pointer events. Hover
+// enter/leave follow the widget under the cursor; a press captures its target
+// so the matching release goes to it, and a click is derived when the release
+// lands on the same widget. Clicking also moves focus to the nearest focusable
+// widget in the hit chain.
 func (a *App) dispatchPointer(in render.InputState) {
 	if a.root == nil {
 		return
@@ -108,26 +183,74 @@ func (a *App) dispatchPointer(in render.InputState) {
 
 	if hit != a.hovered {
 		if a.hovered != nil {
-			ev := Event{Type: EventPointerLeave, Pos: pos}
-			a.hovered.HandleEvent(&ev)
+			a.sendTo(a.hovered, Event{Type: EventPointerLeave, Pos: pos})
 		}
 		if hit != nil {
-			ev := Event{Type: EventPointerEnter, Pos: pos}
-			hit.HandleEvent(&ev)
+			a.sendTo(hit, Event{Type: EventPointerEnter, Pos: pos})
 		}
 		a.hovered = hit
 	}
 
-	if in.MousePressed.Has(render.MouseLeft) && hit != nil {
-		ev := Event{Type: EventPointerDown, Pos: pos, Button: render.MouseLeft}
-		hit.HandleEvent(&ev)
-		a.pressTarget = hit
+	if (in.WheelDelta.X != 0 || in.WheelDelta.Y != 0) && hit != nil {
+		a.dispatch(hit, Event{Type: EventWheel, Pos: pos, Wheel: in.WheelDelta, Modifiers: in.Modifiers})
+	}
+
+	if in.MousePressed.Has(render.MouseLeft) {
+		a.focusFromPointer(hit)
+		if hit != nil {
+			a.dispatch(hit, Event{Type: EventPointerDown, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
+			a.pressTarget = hit
+		} else {
+			a.pressTarget = nil
+		}
 	}
 
 	if in.MouseReleased.Has(render.MouseLeft) && a.pressTarget != nil {
-		ev := Event{Type: EventPointerUp, Pos: pos, Button: render.MouseLeft}
-		a.pressTarget.HandleEvent(&ev)
+		a.dispatch(a.pressTarget, Event{Type: EventPointerUp, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
+		if a.pressTarget.Bounds().Contains(pos) {
+			a.dispatch(a.pressTarget, Event{Type: EventClick, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
+		}
 		a.pressTarget = nil
+	}
+}
+
+// focusFromPointer moves focus to the nearest focusable widget at or above hit,
+// or clears focus if there is none (e.g. clicking empty space).
+func (a *App) focusFromPointer(hit Widget) {
+	for w := hit; w != nil; w = w.Parent() {
+		if w.Focusable() {
+			a.setFocus(w)
+			return
+		}
+	}
+	a.setFocus(nil)
+}
+
+// dispatchKeyboard routes key and text input to the focused widget. Tab and
+// Shift-Tab move focus instead of being delivered.
+func (a *App) dispatchKeyboard(in render.InputState) {
+	for _, k := range in.KeysPressed {
+		if k == render.KeyTab {
+			if in.Modifiers.Has(render.ModShift) {
+				a.moveFocus(-1)
+			} else {
+				a.moveFocus(1)
+			}
+			continue
+		}
+		if a.focused != nil {
+			a.dispatch(a.focused, Event{Type: EventKeyDown, Key: k, Modifiers: in.Modifiers})
+		}
+	}
+	for _, k := range in.KeysReleased {
+		if a.focused != nil {
+			a.dispatch(a.focused, Event{Type: EventKeyUp, Key: k, Modifiers: in.Modifiers})
+		}
+	}
+	for _, r := range in.Runes {
+		if a.focused != nil {
+			a.dispatch(a.focused, Event{Type: EventText, Rune: r, Modifiers: in.Modifiers})
+		}
 	}
 }
 

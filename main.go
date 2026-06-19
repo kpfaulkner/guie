@@ -8,46 +8,51 @@ import (
 	"github.com/kpfaulkner/uiframework/ui"
 )
 
-// Step-4 demo: real Label and Button widgets, themed and interactive. Click
-// "Click me" to increment the counter; "Reset" sets it back to zero; the third
-// button is disabled. Hover and press change the button colors. Still no
-// EBiten import in application code.
+// Step-5 demo: the full event system. Click or use Tab / Shift+Tab to move
+// focus between the buttons (focused button shows an accent ring), then press
+// Space or Enter to activate the focused button. A global event-bus subscriber
+// watches every click and reports the running total. No EBiten import here.
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — step 4 (label + button)"),
-		ui.WithSize(560, 320),
+		ui.WithTitle("uiframework — step 5 (events)"),
+		ui.WithSize(600, 340),
 	)
 
 	root := ui.NewContainer()
-	root.SetLayout(ui.VBox(14))
+	root.SetLayout(ui.VBox(12))
 	root.SetPadding(geom.UniformInsets(20))
 
-	root.Add(ui.NewLabel("Step 4: Label + interactive Button"))
+	root.Add(ui.NewLabel("Step 5: bubbling, focus, keyboard, event bus"))
+	root.Add(ui.NewLabel("Tab / Shift+Tab to focus, Space/Enter to activate."))
 
 	status := ui.NewLabel("clicks: 0")
 	root.Add(status)
 
-	count := 0
-	render := func() { status.SetText(fmt.Sprintf("clicks: %d", count)) }
+	busLabel := ui.NewLabel("(bus) no events yet")
+	root.Add(busLabel)
 
+	count := 0
 	row := ui.NewContainer()
 	row.SetLayout(ui.HBox(10))
-
-	row.Add(ui.NewButton("Click me", ui.OnClick(func() {
+	row.Add(ui.NewButton("Increment", ui.OnClick(func() {
 		count++
-		render()
+		status.SetText(fmt.Sprintf("clicks: %d", count))
 	})))
 	row.Add(ui.NewButton("Reset", ui.OnClick(func() {
 		count = 0
-		render()
+		status.SetText("clicks: 0")
 	})))
-
 	disabled := ui.NewButton("Disabled")
 	disabled.SetEnabled(false)
 	row.Add(disabled)
-
-	// Center the button row horizontally; it keeps its natural height.
 	root.Add(row, ui.Align(geom.AlignCenter), ui.Weight(1))
+
+	// Global listener: fires for every click anywhere in the UI.
+	busClicks := 0
+	app.Events().Subscribe(ui.EventClick, func(ui.Event) {
+		busClicks++
+		busLabel.SetText(fmt.Sprintf("(bus) observed %d click(s)", busClicks))
+	})
 
 	app.SetContent(root)
 
