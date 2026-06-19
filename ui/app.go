@@ -1,120 +1,82 @@
+// Package ui is the public API of the framework: the App, windows, widgets,
+// layouts, events and styling helpers that applications use. Application code
+// depends only on this package (and geom/render/theme for value types); it
+// never imports EBiten. The App drives the main loop through a render.Driver,
+// keeping the graphics backend an internal detail.
 package ui
 
 import (
-	"image/color"
-
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	ebitenbackend "github.com/kpfaulkner/uiframework/backend/ebiten"
+	"github.com/kpfaulkner/uiframework/render"
+	"github.com/kpfaulkner/uiframework/theme"
 )
 
-// App owns the window stack and drives the Ebiten game loop. It implements
-// ebiten.Game: each frame it polls input into Events, dispatches them to the
-// windows (topmost first), then updates and draws every window.
+// App owns the main loop and top-level configuration. Construct one with
+// NewApp, configure it with options, and start it with Run.
 type App struct {
-	Background color.Color
+	driver render.Driver
+	cfg    render.Config
+	theme  theme.Theme
 
-	width, height int
-	windows       []*Window
-
-	prevCursor    Point
-	hasPrevCursor bool
+	// rootDraw and rootUpdate are temporary step-1 scaffolding: until the
+	// retained widget tree lands (step 2), they expose the frame canvas and
+	// per-frame input directly. They will be replaced by SetContent.
+	rootDraw   func(render.Canvas)
+	rootUpdate func(render.InputState)
 }
 
-// New creates an App with a logical screen size of width x height and applies
-// the window title to the host OS window.
-func New(title string, width, height int) *App {
-	ebiten.SetWindowSize(width, height)
-	ebiten.SetWindowTitle(title)
-	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-	return &App{
-		Background: DefaultBackground,
-		width:      width,
-		height:     height,
+// NewApp creates an App with default configuration, then applies opts.
+func NewApp(opts ...AppOption) *App {
+	a := &App{
+		driver: ebitenbackend.New(),
+		theme:  theme.Default(),
+		cfg: render.Config{
+			Title:     "uiframework",
+			Width:     800,
+			Height:    600,
+			Resizable: true,
+		},
 	}
+	for _, o := range opts {
+		o(a)
+	}
+
+	// Default the theme font and the clear color from the theme if unset.
+	if a.theme.Font == nil {
+		a.theme.Font = ebitenbackend.DefaultFont(a.theme.FontSize)
+	}
+	if a.cfg.Background == nil {
+		a.cfg.Background = a.theme.Palette.Background
+	}
+	return a
 }
 
-// AddWindow pushes w onto the top of the window stack.
-func (a *App) AddWindow(w *Window) {
-	a.windows = append(a.windows, w)
-}
+// Theme returns the app's active theme.
+func (a *App) Theme() theme.Theme { return a.theme }
 
-// Run starts the game loop. It blocks until the window is closed.
+// Run starts the main loop. It blocks until the window is closed or an error
+// occurs.
 func (a *App) Run() error {
-	return ebiten.RunGame(a)
+	return a.driver.Run(a.cfg, render.Hooks{
+		Update: a.update,
+		Draw:   a.draw,
+		Resize: a.resize,
+	})
 }
 
-// Update polls input, dispatches events, and advances every window.
-func (a *App) Update() error {
-	for _, ev := range a.pollEvents() {
-		for i := len(a.windows) - 1; i >= 0; i-- {
-			if a.windows[i].HandleEvent(&ev, Point{}) {
-				a.bringToFront(i)
-				break
-			}
-		}
-	}
-	for _, w := range a.windows {
-		if err := w.Update(); err != nil {
-			return err
-		}
+func (a *App) update(in render.InputState) error {
+	if a.rootUpdate != nil {
+		a.rootUpdate(in)
 	}
 	return nil
 }
 
-// Draw clears the screen and renders every window bottom-to-top.
-func (a *App) Draw(screen *ebiten.Image) {
-	screen.Fill(a.Background)
-	for _, w := range a.windows {
-		w.Draw(screen, Point{})
+func (a *App) draw(c render.Canvas) {
+	if a.rootDraw != nil {
+		a.rootDraw(c)
 	}
 }
 
-// Layout reports the fixed logical screen size to Ebiten.
-func (a *App) Layout(outsideWidth, outsideHeight int) (int, int) {
-	return a.width, a.height
-}
-
-// bringToFront moves the window at index i to the top of the draw/event stack.
-func (a *App) bringToFront(i int) {
-	if i == len(a.windows)-1 {
-		return
-	}
-	w := a.windows[i]
-	a.windows = append(a.windows[:i], a.windows[i+1:]...)
-	a.windows = append(a.windows, w)
-}
-
-// pollEvents converts the current frame's raw Ebiten input into Events.
-func (a *App) pollEvents() []Event {
-	var events []Event
-
-	cx, cy := ebiten.CursorPosition()
-	pos := Point{X: cx, Y: cy}
-	if !a.hasPrevCursor || pos != a.prevCursor {
-		events = append(events, Event{Type: MouseMove, Pos: pos})
-		a.prevCursor = pos
-		a.hasPrevCursor = true
-	}
-
-	for _, btn := range []ebiten.MouseButton{ebiten.MouseButtonLeft, ebiten.MouseButtonMiddle, ebiten.MouseButtonRight} {
-		if inpututil.IsMouseButtonJustPressed(btn) {
-			events = append(events, Event{Type: MouseDown, Pos: pos, Button: btn})
-		}
-		if inpututil.IsMouseButtonJustReleased(btn) {
-			events = append(events, Event{Type: MouseUp, Pos: pos, Button: btn})
-		}
-	}
-
-	if wx, wy := ebiten.Wheel(); wx != 0 || wy != 0 {
-		events = append(events, Event{Type: MouseWheel, Pos: pos, WheelX: wx, WheelY: wy})
-	}
-
-	for _, k := range inpututil.AppendJustPressedKeys(nil) {
-		events = append(events, Event{Type: KeyDown, Pos: pos, Key: k})
-	}
-	for _, k := range inpututil.AppendJustReleasedKeys(nil) {
-		events = append(events, Event{Type: KeyUp, Pos: pos, Key: k})
-	}
-
-	return events
+func (a *App) resize(width, height int) {
+	// Step 2 will re-layout the widget tree against the new surface size.
 }
