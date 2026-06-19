@@ -73,6 +73,14 @@ func (c *canvas) DrawLine(a, b geom.Point, clr color.Color, width float64) {
 	vector.StrokeLine(c.top().target, float32(a.X), float32(a.Y), float32(b.X), float32(b.Y), float32(width), clr, true)
 }
 
+func (c *canvas) FillCircle(center geom.Point, radius float64, clr color.Color) {
+	vector.FillCircle(c.top().target, float32(center.X), float32(center.Y), float32(radius), clr, true)
+}
+
+func (c *canvas) StrokeCircle(center geom.Point, radius float64, clr color.Color, width float64) {
+	vector.StrokeCircle(c.top().target, float32(center.X), float32(center.Y), float32(radius), float32(width), clr, true)
+}
+
 func (c *canvas) DrawText(s string, pos geom.Point, face render.FontFace, clr color.Color) {
 	ff, ok := face.(*fontFace)
 	if !ok || ff == nil {

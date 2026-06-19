@@ -26,6 +26,8 @@ type App struct {
 	surfaceSize geom.Size
 	bus         *EventBus
 
+	overlays []*Popup // open popups, bottom-to-top
+
 	// pointer/focus dispatch state
 	hovered     Widget // widget currently under the cursor
 	pressTarget Widget // widget that received the active pointer-down (capture)
@@ -60,6 +62,8 @@ func NewApp(opts ...AppOption) *App {
 	a.ctx = &treeContext{
 		requestLayout: func() { a.needsLayout = true },
 		requestFocus:  a.setFocus,
+		openPopup:     a.openPopup,
+		closePopup:    a.closePopup,
 		theme:         &a.theme,
 	}
 	return a
@@ -179,7 +183,17 @@ func (a *App) dispatchPointer(in render.InputState) {
 		return
 	}
 	pos := in.MousePos
-	hit := hitTest(a.root, pos)
+
+	// A press outside every open popup dismisses them and is swallowed.
+	if in.MousePressed.Has(render.MouseLeft) && len(a.overlays) > 0 {
+		if _, inPopup := a.overlayHit(pos); !inPopup {
+			a.closeAll()
+			return
+		}
+	}
+
+	// Hit-test popups first (top-most), then the main tree.
+	hit := a.hitTop(pos)
 
 	if hit != a.hovered {
 		if a.hovered != nil {
@@ -189,6 +203,16 @@ func (a *App) dispatchPointer(in render.InputState) {
 			a.sendTo(hit, Event{Type: EventPointerEnter, Pos: pos})
 		}
 		a.hovered = hit
+	}
+
+	// Report movement to the captured widget (for dragging) or, when nothing is
+	// captured, to the hovered widget (so lists/menus can track the cursor row).
+	moveTarget := a.pressTarget
+	if moveTarget == nil {
+		moveTarget = a.hovered
+	}
+	if moveTarget != nil {
+		a.dispatch(moveTarget, Event{Type: EventPointerMove, Pos: pos, Modifiers: in.Modifiers})
 	}
 
 	if (in.WheelDelta.X != 0 || in.WheelDelta.Y != 0) && hit != nil {
@@ -214,6 +238,15 @@ func (a *App) dispatchPointer(in render.InputState) {
 	}
 }
 
+// hitTop returns the widget under pos, checking open popups (top-most first)
+// before the main tree.
+func (a *App) hitTop(pos geom.Point) Widget {
+	if w, ok := a.overlayHit(pos); ok {
+		return w
+	}
+	return hitTest(a.root, pos)
+}
+
 // focusFromPointer moves focus to the nearest focusable widget at or above hit,
 // or clears focus if there is none (e.g. clicking empty space).
 func (a *App) focusFromPointer(hit Widget) {
@@ -230,6 +263,10 @@ func (a *App) focusFromPointer(hit Widget) {
 // Shift-Tab move focus instead of being delivered.
 func (a *App) dispatchKeyboard(in render.InputState) {
 	for _, k := range in.KeysPressed {
+		if k == render.KeyEscape && len(a.overlays) > 0 {
+			a.closeTop()
+			continue
+		}
 		if k == render.KeyTab {
 			if in.Modifiers.Has(render.ModShift) {
 				a.moveFocus(-1)
@@ -258,6 +295,7 @@ func (a *App) draw(c render.Canvas) {
 	if a.root != nil && a.root.Visible() {
 		a.root.Draw(c)
 	}
+	a.drawOverlays(c)
 }
 
 func (a *App) resize(width, height int) {
@@ -273,5 +311,6 @@ func (a *App) layoutIfNeeded() {
 	}
 	a.root.SetBounds(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H})
 	a.root.Layout()
+	a.layoutOverlays()
 	a.needsLayout = false
 }

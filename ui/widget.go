@@ -54,17 +54,31 @@ type Widget interface {
 }
 
 // treeContext is state shared by every widget in a mounted tree. It carries the
-// re-layout request, the active theme, and a focus-request hook so widgets can
-// programmatically take focus.
+// re-layout request, the active theme, focus and popup hooks so widgets can
+// programmatically take focus or open/close overlay popups.
 type treeContext struct {
 	requestLayout func()
 	requestFocus  func(Widget)
+	openPopup     func(*Popup)
+	closePopup    func(*Popup)
 	theme         *theme.Theme
 }
 
 func (t *treeContext) focus(w Widget) {
 	if t != nil && t.requestFocus != nil {
 		t.requestFocus(w)
+	}
+}
+
+func (t *treeContext) open(p *Popup) {
+	if t != nil && t.openPopup != nil {
+		t.openPopup(p)
+	}
+}
+
+func (t *treeContext) close(p *Popup) {
+	if t != nil && t.closePopup != nil {
+		t.closePopup(p)
 	}
 }
 

@@ -13,6 +13,9 @@ const (
 	EventPointerEnter EventType = iota
 	// EventPointerLeave is sent when the cursor moves off a widget.
 	EventPointerLeave
+	// EventPointerMove is sent each frame to the widget capturing the pointer
+	// (the press target), enabling drag interactions.
+	EventPointerMove
 	// EventPointerDown is sent when a mouse button is pressed over a widget.
 	EventPointerDown
 	// EventPointerUp is sent to the press target (pointer capture) when a mouse

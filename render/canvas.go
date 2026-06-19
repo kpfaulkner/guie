@@ -36,6 +36,10 @@ type Canvas interface {
 	StrokeRect(r geom.Rect, c color.Color, width float64)
 	// DrawLine draws a straight line from a to b with the given width.
 	DrawLine(a, b geom.Point, c color.Color, width float64)
+	// FillCircle fills a circle of radius radius centered at center.
+	FillCircle(center geom.Point, radius float64, c color.Color)
+	// StrokeCircle draws the outline of a circle with the given line width.
+	StrokeCircle(center geom.Point, radius float64, c color.Color, width float64)
 
 	// DrawText draws s with its top-left at pos using the given face and color.
 	DrawText(s string, pos geom.Point, face FontFace, c color.Color)
