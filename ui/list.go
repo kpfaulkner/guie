@@ -136,13 +136,12 @@ func (l *List) scrollTo(i int) {
 // Draw paints the background, the visible rows (with hover/selection
 // highlights), and a scrollbar thumb when the content overflows.
 func (l *List) Draw(canvas render.Canvas) {
-	pal := l.appTheme().Palette
 	f := l.face()
 	if f == nil {
 		return
 	}
 	b := l.Bounds()
-	canvas.FillRect(b, pal.Surface)
+	canvas.FillRect(b, l.ColorOf(RoleSurface))
 
 	rh := l.RowHeight()
 	overflow := l.ContentHeight() > b.H
@@ -160,19 +159,19 @@ func (l *List) Draw(canvas render.Canvas) {
 		row := geom.Rect{X: b.X, Y: y, W: rowW, H: rh}
 		switch {
 		case i == l.selected:
-			canvas.FillRect(row, pal.Primary)
+			canvas.FillRect(row, l.ColorOf(RolePrimary))
 		case i == l.hoverRow:
-			canvas.FillRect(row, lighten(pal.Surface, 1.25))
+			canvas.FillRect(row, lighten(l.ColorOf(RoleSurface), 1.25))
 		}
-		textColor := pal.Text
+		textColor := l.ColorOf(RoleText)
 		if i == l.selected {
-			textColor = pal.OnPrimary
+			textColor = l.ColorOf(RoleOnPrimary)
 		}
 		canvas.DrawText(it, geom.Point{X: b.X + listRowPad, Y: y + listRowPad}, f, textColor)
 	}
 	canvas.PopClip()
 
-	canvas.StrokeRect(b, pal.Border, 1)
+	canvas.StrokeRect(b, l.ColorOf(RoleBorder), 1)
 
 	if overflow {
 		l.drawScrollbar(canvas, b)
@@ -180,7 +179,6 @@ func (l *List) Draw(canvas render.Canvas) {
 }
 
 func (l *List) drawScrollbar(canvas render.Canvas, b geom.Rect) {
-	pal := l.appTheme().Palette
 	ch := l.ContentHeight()
 	thumbH := maxF(minThumb, b.H*b.H/ch)
 	var t float64
@@ -188,8 +186,8 @@ func (l *List) drawScrollbar(canvas render.Canvas, b geom.Rect) {
 		t = (l.offset / m) * (b.H - thumbH)
 	}
 	gutter := geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y, W: scrollbarWidth, H: b.H}
-	canvas.FillRect(gutter, pal.Background)
-	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + t, W: scrollbarWidth, H: thumbH}, pal.Accent)
+	canvas.FillRect(gutter, l.ColorOf(RoleBackground))
+	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + t, W: scrollbarWidth, H: thumbH}, l.ColorOf(RoleAccent))
 }
 
 // HandleEvent handles hover tracking, clicking, wheel scrolling and keyboard

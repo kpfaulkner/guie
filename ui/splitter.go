@@ -164,7 +164,6 @@ func (s *SplitPane) Layout() {
 
 // Draw paints each pane (clipped to its area) and the divider.
 func (s *SplitPane) Draw(canvas render.Canvas) {
-	pal := s.appTheme().Palette
 	first, divider, second := s.rects()
 
 	if s.first != nil && s.first.Visible() {
@@ -178,9 +177,9 @@ func (s *SplitPane) Draw(canvas render.Canvas) {
 		canvas.PopClip()
 	}
 
-	col := pal.Border
+	col := s.ColorOf(RoleBorder)
 	if s.hover || s.dragging {
-		col = pal.Accent
+		col = s.ColorOf(RoleAccent)
 	}
 	canvas.FillRect(divider, col)
 }

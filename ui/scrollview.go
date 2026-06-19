@@ -123,9 +123,8 @@ func (s *ScrollView) thumbRect() geom.Rect {
 
 // Draw paints the content (clipped to the viewport) and the scrollbar.
 func (s *ScrollView) Draw(canvas render.Canvas) {
-	pal := s.appTheme().Palette
 	b := s.Bounds()
-	canvas.FillRect(b, pal.Surface)
+	canvas.FillRect(b, s.ColorOf(RoleSurface))
 
 	if s.content != nil {
 		vp := s.viewport()
@@ -136,8 +135,8 @@ func (s *ScrollView) Draw(canvas render.Canvas) {
 
 	// Scrollbar gutter and thumb.
 	gutter := geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y, W: scrollbarWidth, H: b.H}
-	canvas.FillRect(gutter, pal.Background)
-	canvas.FillRect(s.thumbRect(), pal.Accent)
+	canvas.FillRect(gutter, s.ColorOf(RoleBackground))
+	canvas.FillRect(s.thumbRect(), s.ColorOf(RoleAccent))
 }
 
 // HandleEvent scrolls on the wheel and drags the thumb.

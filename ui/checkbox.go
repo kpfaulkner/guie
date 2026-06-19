@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"image/color"
-
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 )
@@ -21,8 +19,7 @@ type Checkbox struct {
 	focused  bool
 	onChange func(bool)
 
-	font  render.FontFace // nil → theme font
-	color color.Color     // label color; nil → theme text
+	font render.FontFace // nil → theme font
 }
 
 // CheckboxOption configures a Checkbox.
@@ -82,7 +79,6 @@ func (c *Checkbox) toggle() { c.SetChecked(!c.checked) }
 
 // Draw renders the box, the check mark when checked, and the label.
 func (c *Checkbox) Draw(canvas render.Canvas) {
-	pal := c.appTheme().Palette
 	f := c.face()
 	if f == nil {
 		return
@@ -92,18 +88,18 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 	box := geom.Rect{X: b.X, Y: b.Y + (b.H-side)/2, W: side, H: side}
 
 	if c.checked {
-		canvas.FillRect(box, pal.Primary)
+		canvas.FillRect(box, c.ColorOf(RolePrimary))
 	} else if c.hover {
-		canvas.FillRect(box, pal.Surface)
+		canvas.FillRect(box, c.ColorOf(RoleSurface))
 	}
-	border := pal.Border
+	border := c.ColorOf(RoleBorder)
 	if c.focused {
-		border = pal.Accent
+		border = c.ColorOf(RoleAccent)
 	}
 	canvas.StrokeRect(box, border, 1)
 
 	if c.checked {
-		col := pal.OnPrimary
+		col := c.ColorOf(RoleOnPrimary)
 		canvas.DrawLine(
 			geom.Point{X: box.X + box.W*0.22, Y: box.Y + box.H*0.52},
 			geom.Point{X: box.X + box.W*0.42, Y: box.Y + box.H*0.72},
@@ -116,12 +112,8 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 		)
 	}
 
-	textColor := c.color
-	if textColor == nil {
-		textColor = pal.Text
-	}
 	ts := f.Measure(c.label)
-	canvas.DrawText(c.label, geom.Point{X: box.X + side + indicatorGap, Y: b.Y + (b.H-ts.H)/2}, f, textColor)
+	canvas.DrawText(c.label, geom.Point{X: box.X + side + indicatorGap, Y: b.Y + (b.H-ts.H)/2}, f, c.ColorOf(RoleText))
 }
 
 // HandleEvent toggles on click or Space/Enter and tracks hover/focus.

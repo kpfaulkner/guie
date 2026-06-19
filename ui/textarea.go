@@ -455,16 +455,15 @@ func (t *TextArea) caretAt(p geom.Point) (int, int) {
 // Draw renders the box, the selection, the visible lines (or placeholder), the
 // caret, and a scrollbar thumb when the content overflows.
 func (t *TextArea) Draw(canvas render.Canvas) {
-	pal := t.appTheme().Palette
 	f := t.face()
 	if f == nil {
 		return
 	}
 	b := t.Bounds()
-	canvas.FillRect(b, pal.Surface)
-	border := pal.Border
+	canvas.FillRect(b, t.ColorOf(RoleSurface))
+	border := t.ColorOf(RoleBorder)
 	if t.focused {
-		border = pal.Accent
+		border = t.ColorOf(RoleAccent)
 	}
 	canvas.StrokeRect(b, border, 1)
 
@@ -473,7 +472,7 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 
 	if t.isEmpty() && !t.focused && t.placeholder != "" {
 		canvas.PushClip(inner)
-		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: inner.Y}, f, pal.TextMuted)
+		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: inner.Y}, f, t.ColorOf(RoleTextMuted))
 		canvas.PopClip()
 		return
 	}
@@ -485,13 +484,13 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 
 	rows := t.rows()
 	canvas.PushClip(inner)
-	t.drawSelectionRows(canvas, inner, lh, rows, pal.Primary)
+	t.drawSelectionRows(canvas, inner, lh, rows, t.ColorOf(RolePrimary))
 	for vi, r := range rows {
 		y := inner.Y + float64(vi)*lh - t.scrollY
 		if y+lh < inner.Y || y > inner.Y+inner.H {
 			continue
 		}
-		canvas.DrawText(string(t.lines[r.lr][r.start:r.end]), geom.Point{X: inner.X, Y: y}, f, pal.Text)
+		canvas.DrawText(string(t.lines[r.lr][r.start:r.end]), geom.Point{X: inner.X, Y: y}, f, t.ColorOf(RoleText))
 	}
 	if t.focused {
 		ci := t.caretVisualIndex(rows)
@@ -501,7 +500,7 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: caretY + 1},
 			geom.Point{X: caretX, Y: caretY + lh - 1},
-			pal.Text, 1,
+			t.ColorOf(RoleText), 1,
 		)
 	}
 	canvas.PopClip()
@@ -595,7 +594,6 @@ func (t *TextArea) clampScroll(viewH float64) {
 }
 
 func (t *TextArea) drawScrollbar(canvas render.Canvas, b geom.Rect, viewH float64) {
-	pal := t.appTheme().Palette
 	ch := t.contentHeight()
 	thumbH := maxF(minThumb, viewH*viewH/ch)
 	var off float64
@@ -603,8 +601,8 @@ func (t *TextArea) drawScrollbar(canvas render.Canvas, b geom.Rect, viewH float6
 		off = (t.scrollY / m) * (b.H - thumbH)
 	}
 	x := b.X + b.W - scrollbarWidth
-	canvas.FillRect(geom.Rect{X: x, Y: b.Y, W: scrollbarWidth, H: b.H}, pal.Background)
-	canvas.FillRect(geom.Rect{X: x, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, pal.Accent)
+	canvas.FillRect(geom.Rect{X: x, Y: b.Y, W: scrollbarWidth, H: b.H}, t.ColorOf(RoleBackground))
+	canvas.FillRect(geom.Rect{X: x, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColorOf(RoleAccent))
 }
 
 // HandleEvent edits the text, manages the selection and scrolls in response to

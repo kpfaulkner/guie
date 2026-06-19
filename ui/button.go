@@ -23,10 +23,7 @@ type Button struct {
 	pressed bool
 	focused bool
 
-	// Optional color overrides; nil falls back to the theme.
-	fill    color.Color
-	textCol color.Color
-	font    render.FontFace
+	font render.FontFace
 }
 
 // ButtonOption configures a Button during NewButton.
@@ -37,14 +34,14 @@ func OnClick(fn func()) ButtonOption {
 	return func(b *Button) { b.onClick = fn }
 }
 
-// ButtonColor overrides the button's base fill color.
+// ButtonColor overrides the button's base fill color (RolePrimary).
 func ButtonColor(c color.Color) ButtonOption {
-	return func(b *Button) { b.fill = c }
+	return func(b *Button) { b.SetColor(RolePrimary, c) }
 }
 
-// ButtonTextColor overrides the label color.
+// ButtonTextColor overrides the label color (RoleOnPrimary).
 func ButtonTextColor(c color.Color) ButtonOption {
-	return func(b *Button) { b.textCol = c }
+	return func(b *Button) { b.SetColor(RoleOnPrimary, c) }
 }
 
 // ButtonFont overrides the label font.
@@ -98,14 +95,10 @@ func (b *Button) MinSize() geom.Size {
 
 // fillColor resolves the background color for the button's current state.
 func (b *Button) fillColor() color.Color {
-	pal := b.appTheme().Palette
 	if !b.Enabled() {
-		return pal.Disabled
+		return b.ColorOf(RoleDisabled)
 	}
-	base := b.fill
-	if base == nil {
-		base = pal.Primary
-	}
+	base := b.ColorOf(RolePrimary)
 	switch {
 	case b.pressed && b.hover:
 		return darken(base, 0.8)
@@ -117,10 +110,7 @@ func (b *Button) fillColor() color.Color {
 }
 
 func (b *Button) labelColor() color.Color {
-	if b.textCol != nil {
-		return b.textCol
-	}
-	return b.appTheme().Palette.OnPrimary
+	return b.ColorOf(RoleOnPrimary)
 }
 
 // Focusable reports whether the button can take keyboard focus (only when
@@ -130,13 +120,12 @@ func (b *Button) Focusable() bool { return b.Enabled() }
 // Draw paints the background, a border, the centered label, and a focus ring
 // when focused.
 func (b *Button) Draw(c render.Canvas) {
-	pal := b.appTheme().Palette
 	rect := b.Bounds()
 	c.FillRect(rect, b.fillColor())
-	c.StrokeRect(rect, pal.Border, 1)
+	c.StrokeRect(rect, b.ColorOf(RoleBorder), 1)
 	if b.focused {
 		ring := rect.Inset(geom.UniformInsets(2))
-		c.StrokeRect(ring, pal.Accent, 1)
+		c.StrokeRect(ring, b.ColorOf(RoleAccent), 1)
 	}
 
 	if f := b.face(); f != nil {

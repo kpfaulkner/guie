@@ -168,7 +168,6 @@ func (t *TabContainer) Layout() {
 
 // Draw paints the tab strip and the active pane.
 func (t *TabContainer) Draw(canvas render.Canvas) {
-	pal := t.appTheme().Palette
 	f := t.face()
 	if f == nil {
 		return
@@ -176,24 +175,24 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	b := t.Bounds()
 	sh := t.stripHeight()
 
-	canvas.FillRect(geom.Rect{X: b.X, Y: b.Y, W: b.W, H: sh}, pal.Surface)
+	canvas.FillRect(geom.Rect{X: b.X, Y: b.Y, W: b.W, H: sh}, t.ColorOf(RoleSurface))
 	for i, tb := range t.tabs {
 		r := t.titleRect(i)
 		switch {
 		case i == t.selected:
-			canvas.FillRect(r, pal.Primary)
+			canvas.FillRect(r, t.ColorOf(RolePrimary))
 		case i == t.hover:
-			canvas.FillRect(r, lighten(pal.Surface, 1.25))
+			canvas.FillRect(r, lighten(t.ColorOf(RoleSurface), 1.25))
 		}
-		col := pal.Text
+		col := t.ColorOf(RoleText)
 		if i == t.selected {
-			col = pal.OnPrimary
+			col = t.ColorOf(RoleOnPrimary)
 		}
 		ts := f.Measure(tb.title)
 		canvas.DrawText(tb.title, geom.Point{X: r.X + tabHPad, Y: r.Y + (r.H-ts.H)/2}, f, col)
 	}
 	// Separator line under the strip.
-	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, pal.Border, 1)
+	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, t.ColorOf(RoleBorder), 1)
 
 	if a := t.active(); a != nil && a.Visible() {
 		cr := t.contentRect()
@@ -203,7 +202,7 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	}
 
 	if t.focused {
-		canvas.StrokeRect(b, pal.Accent, 1)
+		canvas.StrokeRect(b, t.ColorOf(RoleAccent), 1)
 	}
 }
 

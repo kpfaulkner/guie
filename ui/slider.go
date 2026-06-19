@@ -71,20 +71,19 @@ func (s *Slider) track() (x0, x1, y float64) {
 
 // Draw renders the track, the filled portion, and the handle.
 func (s *Slider) Draw(canvas render.Canvas) {
-	pal := s.appTheme().Palette
 	x0, x1, y := s.track()
 	hx := x0 + (x1-x0)*s.value
 
-	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: x1, Y: y}, pal.Border, 3)
-	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: hx, Y: y}, pal.Primary, 3)
+	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: x1, Y: y}, s.ColorOf(RoleBorder), 3)
+	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: hx, Y: y}, s.ColorOf(RolePrimary), 3)
 
-	handle := pal.Primary
+	handle := s.ColorOf(RolePrimary)
 	if s.hover || s.dragging {
-		handle = pal.Accent
+		handle = s.ColorOf(RoleAccent)
 	}
 	canvas.FillCircle(geom.Point{X: hx, Y: y}, sliderHandle, handle)
 	if s.focused {
-		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, pal.Accent, 1)
+		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColorOf(RoleAccent), 1)
 	}
 }
 

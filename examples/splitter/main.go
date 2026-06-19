@@ -39,11 +39,11 @@ func main() {
 	right := ui.VSplit(
 		panel(color.RGBA{0x2b, 0x2b, 0x3a, 0xff}, "Top pane"),
 		panel(color.RGBA{0x24, 0x30, 0x2c, 0xff}, "Bottom pane"),
-		ui.SplitRatio(0.4),
+		ui.SplitRatio(0.8),
 	)
 
 	// Outer: list on the left (30%), the nested split on the right.
-	split := ui.HSplit(list, right, ui.SplitRatio(0.3), ui.SplitMinSizes(80, 120))
+	split := ui.HSplit(list, right, ui.SplitRatio(0.2), ui.SplitMinSizes(80, 120))
 
 	root := ui.NewContainer()
 	root.SetLayout(ui.VBox(0))

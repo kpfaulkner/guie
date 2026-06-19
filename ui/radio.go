@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"image/color"
-
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 )
@@ -53,8 +51,7 @@ type RadioButton struct {
 	hover    bool
 	focused  bool
 
-	font  render.FontFace
-	color color.Color
+	font render.FontFace
 }
 
 // NewRadioButton returns a RadioButton labeled label, registered with group.
@@ -93,7 +90,6 @@ func (r *RadioButton) MinSize() geom.Size {
 
 // Draw renders the circular indicator (filled when selected) and the label.
 func (r *RadioButton) Draw(canvas render.Canvas) {
-	pal := r.appTheme().Palette
 	f := r.face()
 	if f == nil {
 		return
@@ -104,21 +100,18 @@ func (r *RadioButton) Draw(canvas render.Canvas) {
 	center := geom.Point{X: b.X + radius, Y: b.Y + b.H/2}
 
 	if r.hover {
-		canvas.FillCircle(center, radius, pal.Surface)
+		canvas.FillCircle(center, radius, r.ColorOf(RoleSurface))
 	}
-	border := pal.Border
+	border := r.ColorOf(RoleBorder)
 	if r.focused {
-		border = pal.Accent
+		border = r.ColorOf(RoleAccent)
 	}
 	canvas.StrokeCircle(center, radius, border, 1)
 	if r.selected {
-		canvas.FillCircle(center, radius*0.5, pal.Accent)
+		canvas.FillCircle(center, radius*0.5, r.ColorOf(RoleAccent))
 	}
 
-	textColor := r.color
-	if textColor == nil {
-		textColor = pal.Text
-	}
+	textColor := r.ColorOf(RoleText)
 	ts := f.Measure(r.label)
 	canvas.DrawText(r.label, geom.Point{X: b.X + side + indicatorGap, Y: b.Y + (b.H-ts.H)/2}, f, textColor)
 }

@@ -93,22 +93,21 @@ func (d *DropdownCombo) label() string {
 
 // Draw renders the box, current label and a chevron, accented when open/focused.
 func (d *DropdownCombo) Draw(canvas render.Canvas) {
-	pal := d.appTheme().Palette
 	f := d.face()
 	if f == nil {
 		return
 	}
 	b := d.Bounds()
-	canvas.FillRect(b, pal.Surface)
-	border := pal.Border
+	canvas.FillRect(b, d.ColorOf(RoleSurface))
+	border := d.ColorOf(RoleBorder)
 	if d.focused || d.open {
-		border = pal.Accent
+		border = d.ColorOf(RoleAccent)
 	}
 	canvas.StrokeRect(b, border, 1)
 
-	textColor := pal.Text
+	textColor := d.ColorOf(RoleText)
 	if d.selected < 0 {
-		textColor = pal.TextMuted
+		textColor = d.ColorOf(RoleTextMuted)
 	}
 	ts := f.Measure(d.label())
 	canvas.DrawText(d.label(), geom.Point{X: b.X + listRowPad, Y: b.Y + (b.H-ts.H)/2}, f, textColor)
@@ -117,8 +116,8 @@ func (d *DropdownCombo) Draw(canvas render.Canvas) {
 	cx := b.X + b.W - dropdownArrowW/2 - listRowPad
 	cy := b.Y + b.H/2
 	const aw = 4
-	canvas.DrawLine(geom.Point{X: cx - aw, Y: cy - aw/2}, geom.Point{X: cx, Y: cy + aw/2}, pal.Text, 2)
-	canvas.DrawLine(geom.Point{X: cx, Y: cy + aw/2}, geom.Point{X: cx + aw, Y: cy - aw/2}, pal.Text, 2)
+	canvas.DrawLine(geom.Point{X: cx - aw, Y: cy - aw/2}, geom.Point{X: cx, Y: cy + aw/2}, d.ColorOf(RoleText), 2)
+	canvas.DrawLine(geom.Point{X: cx, Y: cy + aw/2}, geom.Point{X: cx + aw, Y: cy - aw/2}, d.ColorOf(RoleText), 2)
 }
 
 // HandleEvent toggles the popup on click/Enter/Space and tracks hover/focus.

@@ -97,22 +97,21 @@ func (m *MenuBar) titleAt(p geom.Point) int {
 
 // Draw paints the bar and its titles, highlighting the hovered/open one.
 func (m *MenuBar) Draw(canvas render.Canvas) {
-	pal := m.appTheme().Palette
 	f := m.face()
 	if f == nil {
 		return
 	}
-	canvas.FillRect(m.Bounds(), pal.Surface)
+	canvas.FillRect(m.Bounds(), m.ColorOf(RoleSurface))
 	for i, t := range m.titles {
 		r := m.titleRect(i)
 		switch {
 		case i == m.openIdx:
-			canvas.FillRect(r, pal.Primary)
+			canvas.FillRect(r, m.ColorOf(RolePrimary))
 		case i == m.hover:
-			canvas.FillRect(r, lighten(pal.Surface, 1.25))
+			canvas.FillRect(r, lighten(m.ColorOf(RoleSurface), 1.25))
 		}
 		ts := f.Measure(t)
-		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: r.Y + (r.H-ts.H)/2}, f, pal.Text)
+		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: r.Y + (r.H-ts.H)/2}, f, m.ColorOf(RoleText))
 	}
 }
 
@@ -208,17 +207,16 @@ func (r *menuRow) MinSize() geom.Size {
 }
 
 func (r *menuRow) Draw(canvas render.Canvas) {
-	pal := r.appTheme().Palette
 	f := r.face()
 	if f == nil {
 		return
 	}
 	b := r.Bounds()
 	if r.hover {
-		canvas.FillRect(b, pal.Accent)
+		canvas.FillRect(b, r.ColorOf(RoleAccent))
 	}
 	s := f.Measure(r.label)
-	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: b.Y + (b.H-s.H)/2}, f, pal.Text)
+	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: b.Y + (b.H-s.H)/2}, f, r.ColorOf(RoleText))
 }
 
 func (r *menuRow) HandleEvent(ev *Event) bool {

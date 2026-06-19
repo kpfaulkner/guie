@@ -13,7 +13,6 @@ import (
 type Label struct {
 	BaseWidget
 	text  string
-	color color.Color     // nil → theme text color
 	font  render.FontFace // nil → theme font
 	align geom.Alignment  // horizontal alignment within bounds
 }
@@ -21,9 +20,9 @@ type Label struct {
 // LabelOption configures a Label during NewLabel.
 type LabelOption func(*Label)
 
-// LabelColor overrides the text color.
+// LabelColor overrides the text color (RoleText).
 func LabelColor(c color.Color) LabelOption {
-	return func(l *Label) { l.color = c }
+	return func(l *Label) { l.SetColor(RoleText, c) }
 }
 
 // LabelFont overrides the font face.
@@ -67,13 +66,6 @@ func (l *Label) face() render.FontFace {
 	return l.appTheme().Font
 }
 
-func (l *Label) textColor() color.Color {
-	if l.color != nil {
-		return l.color
-	}
-	return l.appTheme().Palette.Text
-}
-
 // MinSize returns the measured size of the text.
 func (l *Label) MinSize() geom.Size {
 	f := l.face()
@@ -93,5 +85,5 @@ func (l *Label) Draw(c render.Canvas) {
 	size := f.Measure(l.text)
 	x, _ := alignSpan(l.align, b.X, b.W, size.W)
 	y := b.Y + (b.H-size.H)/2 // vertically centered
-	c.DrawText(l.text, geom.Point{X: x, Y: y}, f, l.textColor())
+	c.DrawText(l.text, geom.Point{X: x, Y: y}, f, l.ColorOf(RoleText))
 }

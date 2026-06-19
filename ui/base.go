@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"image/color"
+
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 	"github.com/kpfaulkner/uiframework/theme"
@@ -14,6 +16,7 @@ type BaseWidget struct {
 	visible bool
 	enabled bool
 	tooltip string
+	colors  map[ColorRole]color.Color // per-widget color overrides
 	parent  Widget
 	ctx     *treeContext
 }

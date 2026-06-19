@@ -55,6 +55,13 @@ func (c *Container) SetBorder(col color.Color, width float64) {
 	c.borderWidth = width
 }
 
+// Background returns the container's fill color (nil means transparent).
+func (c *Container) Background() color.Color { return c.background }
+
+// BorderColor returns the container's border color (nil means no border), and
+// its width.
+func (c *Container) BorderColor() (color.Color, float64) { return c.borderColor, c.borderWidth }
+
 // Add appends a child widget with optional per-child layout parameters,
 // mounting it immediately if the container is already part of a mounted tree.
 func (c *Container) Add(w Widget, opts ...ItemOption) {

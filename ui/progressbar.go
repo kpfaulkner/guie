@@ -33,12 +33,11 @@ func (p *ProgressBar) MinSize() geom.Size { return geom.Size{W: 120, H: progress
 
 // Draw renders the track and the filled portion.
 func (p *ProgressBar) Draw(canvas render.Canvas) {
-	pal := p.appTheme().Palette
 	b := p.Bounds()
-	canvas.FillRect(b, pal.Surface)
+	canvas.FillRect(b, p.ColorOf(RoleSurface))
 	if p.value > 0 {
 		fill := geom.Rect{X: b.X, Y: b.Y, W: b.W * p.value, H: b.H}
-		canvas.FillRect(fill, pal.Primary)
+		canvas.FillRect(fill, p.ColorOf(RolePrimary))
 	}
-	canvas.StrokeRect(b, pal.Border, 1)
+	canvas.StrokeRect(b, p.ColorOf(RoleBorder), 1)
 }

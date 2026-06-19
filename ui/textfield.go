@@ -258,17 +258,16 @@ func (t *TextField) caretIndexAt(absX float64) int {
 // Draw renders the box, the selection highlight, the text (or placeholder) and
 // the caret when focused.
 func (t *TextField) Draw(canvas render.Canvas) {
-	pal := t.appTheme().Palette
 	f := t.face()
 	if f == nil {
 		return
 	}
 	b := t.Bounds()
 
-	canvas.FillRect(b, pal.Surface)
-	border := pal.Border
+	canvas.FillRect(b, t.ColorOf(RoleSurface))
+	border := t.ColorOf(RoleBorder)
 	if t.focused {
-		border = pal.Accent
+		border = t.ColorOf(RoleAccent)
 	}
 	canvas.StrokeRect(b, border, 1)
 
@@ -280,7 +279,7 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	y := inner.Y + (inner.H-lineH)/2
 
 	if len(t.runes) == 0 && !t.focused && t.placeholder != "" {
-		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: y}, f, pal.TextMuted)
+		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: y}, f, t.ColorOf(RoleTextMuted))
 		return
 	}
 
@@ -290,17 +289,17 @@ func (t *TextField) Draw(canvas render.Canvas) {
 		lo, hi := t.selRange()
 		x0 := inner.X - t.scrollX + f.Measure(string(t.runes[:lo])).W
 		x1 := inner.X - t.scrollX + f.Measure(string(t.runes[:hi])).W
-		canvas.FillRect(geom.Rect{X: x0, Y: y, W: x1 - x0, H: lineH}, pal.Primary)
+		canvas.FillRect(geom.Rect{X: x0, Y: y, W: x1 - x0, H: lineH}, t.ColorOf(RolePrimary))
 	}
 
-	canvas.DrawText(string(t.runes), geom.Point{X: inner.X - t.scrollX, Y: y}, f, pal.Text)
+	canvas.DrawText(string(t.runes), geom.Point{X: inner.X - t.scrollX, Y: y}, f, t.ColorOf(RoleText))
 
 	if t.focused {
 		caretX := inner.X - t.scrollX + f.Measure(string(t.runes[:t.caret])).W
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: inner.Y + 2},
 			geom.Point{X: caretX, Y: inner.Y + inner.H - 2},
-			pal.Text, 1,
+			t.ColorOf(RoleText), 1,
 		)
 	}
 }
