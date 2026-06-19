@@ -384,4 +384,17 @@ Grouped by build priority.
 6. **Expand widgets** — second and third waves per the catalog.
 7. **Add Modal windows** - allow modal dialogs
 8. **Add text area widget** - add widget that has multi line text support
+9. **Tabs** — a tabbed container that switches between panes via a tab strip.
+10. **Tooltips** — hover-delayed floating hints anchored to a widget.
+11. **Splitters** — draggable dividers that resize adjacent panes (H/V split panes).
+12. **Tables** — a grid of rows/columns with headers and selectable rows.
+13. **Drag-and-drop** — pick up, drag and drop widgets/data between targets.
+14. **Multi-window** — more than one top-level OS window, each with its own tree.
+15. **Dirty-region redraw** — only repaint changed regions instead of every frame.
+16. **Accessibility hooks** — expose roles/labels/state for assistive technology.
+17. **Text editing enhancements** — soft word-wrap and selection/clipboard for
+    `TextField` and `TextArea`.
+18. **Grid cell-spanning** — per-cell column/row spans in the `Grid` layout.
+19. **High-DPI scaling** — logical vs physical pixels, device scale factor.
+
 Build a tiny example app alongside each step to exercise the new pieces.
