@@ -1,18 +1,28 @@
 package ui
 
 import (
+	"image/color"
+
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 )
 
-// Popup is a transient overlay (dropdown list, menu) drawn above the main
-// widget tree. Its content is positioned at Bounds in surface coordinates.
-// Popups are managed as a stack by the App: opening pushes, and clicking
-// outside all popups (or pressing Escape) dismisses them.
+// scrimColor dims the background behind a modal popup.
+var scrimColor = color.RGBA{R: 0, G: 0, B: 0, A: 0xA0}
+
+// Popup is a transient overlay (dropdown list, menu, dialog) drawn above the
+// main widget tree. Its content is positioned at Bounds in surface coordinates.
+// Popups are managed as a stack by the App.
+//
+// A non-modal popup (dropdown, menu) is dismissed by clicking outside it or
+// pressing Escape. A modal popup (dialog) draws a full-screen scrim, blocks all
+// input to the widgets behind it, and is not dismissed by outside clicks — only
+// programmatically (e.g. by a dialog button) or by Escape.
 type Popup struct {
 	content Widget
 	bounds  geom.Rect
 	onClose func()
+	modal   bool
 }
 
 // NewPopup returns a Popup that shows content at the given absolute bounds.
@@ -87,13 +97,25 @@ func (a *App) layoutOverlays() {
 	}
 }
 
-// drawOverlays paints every popup on top of the main tree, in stack order.
+// drawOverlays paints every popup on top of the main tree, in stack order. A
+// modal popup is preceded by a full-screen scrim.
 func (a *App) drawOverlays(c render.Canvas) {
 	for _, ov := range a.overlays {
+		if ov.modal {
+			c.FillRect(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H}, scrimColor)
+		}
 		if ov.content.Visible() {
 			ov.content.Draw(c)
 		}
 	}
+}
+
+// modalActive returns the top-most popup if it is modal, else nil.
+func (a *App) modalActive() *Popup {
+	if n := len(a.overlays); n > 0 && a.overlays[n-1].modal {
+		return a.overlays[n-1]
+	}
+	return nil
 }
 
 // overlayHit returns the top-most widget under pos within any popup, and
@@ -105,4 +127,72 @@ func (a *App) overlayHit(pos geom.Point) (Widget, bool) {
 		}
 	}
 	return nil, false
+}
+
+const minModalWidth = 240
+
+// ShowModal centers content on screen and shows it as a modal popup: a scrim
+// dims the background and all input behind the dialog is blocked. It returns the
+// Popup handle; close it with Close (or from within content via the framework).
+func (a *App) ShowModal(content Widget) *Popup {
+	p := &Popup{content: content, modal: true}
+	content.mount(nil, a.ctx) // mount first so MinSize can measure text
+	size := content.MinSize()
+	if size.W < minModalWidth {
+		size.W = minModalWidth
+	}
+	x := (a.surfaceSize.W - size.W) / 2
+	y := (a.surfaceSize.H - size.H) / 2
+	p.bounds = geom.Rect{X: x, Y: y, W: size.W, H: size.H}
+	content.SetBounds(p.bounds)
+	content.Layout()
+	a.overlays = append(a.overlays, p)
+	return p
+}
+
+// Close dismisses the popup (calling its onClose). Safe to call from a dialog
+// button handler.
+func (a *App) Close(p *Popup) { a.closePopup(p) }
+
+// DialogButton describes one button in a message dialog: a label and an optional
+// handler run (before the dialog closes) when it is chosen.
+type DialogButton struct {
+	Label   string
+	OnClick func()
+}
+
+// ShowMessage builds and shows a modal dialog with a title, a message and a row
+// of buttons. Each button runs its handler (if any) and closes the dialog. If
+// no buttons are given, a single "OK" button is added.
+func (a *App) ShowMessage(title, message string, buttons ...DialogButton) *Popup {
+	if len(buttons) == 0 {
+		buttons = []DialogButton{{Label: "OK"}}
+	}
+	pal := a.theme.Palette
+
+	panel := NewContainer()
+	panel.SetBackground(pal.Surface)
+	panel.SetBorder(pal.Border, 1)
+	panel.SetLayout(VBox(12))
+	panel.SetPadding(geom.UniformInsets(16))
+
+	panel.Add(NewLabel(title))
+	panel.Add(NewLabel(message, LabelColor(pal.TextMuted)))
+
+	var popup *Popup
+	row := NewContainer()
+	row.SetLayout(HBox(10))
+	for _, b := range buttons {
+		bb := b
+		row.Add(NewButton(bb.Label, OnClick(func() {
+			if bb.OnClick != nil {
+				bb.OnClick()
+			}
+			a.closePopup(popup)
+		})))
+	}
+	panel.Add(row, Align(geom.AlignEnd), Weight(1))
+
+	popup = a.ShowModal(panel)
+	return popup
 }

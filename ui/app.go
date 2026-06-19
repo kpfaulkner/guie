@@ -184,16 +184,28 @@ func (a *App) dispatchPointer(in render.InputState) {
 	}
 	pos := in.MousePos
 
-	// A press outside every open popup dismisses them and is swallowed.
-	if in.MousePressed.Has(render.MouseLeft) && len(a.overlays) > 0 {
-		if _, inPopup := a.overlayHit(pos); !inPopup {
-			a.closeAll()
-			return
+	// Determine the hit target and whether the pointer is inside a popup,
+	// honouring modal popups (which block the background entirely).
+	var hit Widget
+	var inPopup bool
+	if m := a.modalActive(); m != nil {
+		hit = hitTest(m.content, pos)
+		inPopup = hit != nil
+	} else {
+		hit, inPopup = a.overlayHit(pos)
+		if !inPopup {
+			hit = hitTest(a.root, pos)
 		}
 	}
 
-	// Hit-test popups first (top-most), then the main tree.
-	hit := a.hitTop(pos)
+	// A press outside the open popups is swallowed. For a non-modal stack it
+	// also dismisses them; a modal stack stays open (the scrim absorbs clicks).
+	if in.MousePressed.Has(render.MouseLeft) && len(a.overlays) > 0 && !inPopup {
+		if a.modalActive() == nil {
+			a.closeAll()
+		}
+		return
+	}
 
 	if hit != a.hovered {
 		if a.hovered != nil {
@@ -236,15 +248,6 @@ func (a *App) dispatchPointer(in render.InputState) {
 		}
 		a.pressTarget = nil
 	}
-}
-
-// hitTop returns the widget under pos, checking open popups (top-most first)
-// before the main tree.
-func (a *App) hitTop(pos geom.Point) Widget {
-	if w, ok := a.overlayHit(pos); ok {
-		return w
-	}
-	return hitTest(a.root, pos)
 }
 
 // focusFromPointer moves focus to the nearest focusable widget at or above hit,

@@ -382,5 +382,6 @@ Grouped by build priority.
 5. **Event system** — dispatch, hit-testing, focus traversal, callbacks, then
    the optional event bus.
 6. **Expand widgets** — second and third waves per the catalog.
-
+7. **Add Modal windows** - allow modal dialogs
+8. **Add text area widget** - add widget that has multi line text support
 Build a tiny example app alongside each step to exercise the new pieces.

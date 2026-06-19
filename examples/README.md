@@ -12,6 +12,8 @@ go run ./examples/canvas     # a custom widget drawn with the Canvas primitives
 go run ./examples/controls   # TextField, Checkbox, RadioGroup, Slider, ProgressBar
 go run ./examples/scroll     # ScrollView over a tall list (wheel + draggable thumb)
 go run ./examples/showcase   # MenuBar + List + DropdownCombo with popups
+go run ./examples/dialog     # modal dialogs (scrim, blocked background, Esc to close)
+go run ./examples/textarea   # multi-line TextArea: newlines, caret nav, wheel scroll
 ```
 
 What each one exercises:
@@ -26,6 +28,8 @@ What each one exercises:
 | `controls`| `TextField` (typing, caret), `Checkbox`, `RadioButton`/`RadioGroup`, `Slider` → `ProgressBar` |
 | `scroll`  | `ScrollView`: wheel + draggable thumb, interactive widgets inside the viewport |
 | `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection + scroll), `DropdownCombo`, overlay popups |
+| `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal |
+| `textarea`| Multi-line `TextArea`: typing, newlines, arrow-key caret movement, wheel scrolling |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

@@ -16,11 +16,13 @@ import (
 // by attaching a layout manager.
 type Container struct {
 	BaseWidget
-	children   []Widget
-	data       []LayoutData // per-child layout params, parallel to children
-	layout     Layout       // optional; nil means children keep their bounds
-	background color.Color  // optional fill; nil means transparent
-	padding    geom.Insets
+	children    []Widget
+	data        []LayoutData // per-child layout params, parallel to children
+	layout      Layout       // optional; nil means children keep their bounds
+	background  color.Color  // optional fill; nil means transparent
+	padding     geom.Insets
+	borderColor color.Color // optional outline; nil means none
+	borderWidth float64
 }
 
 // NewContainer returns an empty, visible Container.
@@ -44,6 +46,13 @@ func (c *Container) SetBackground(col color.Color) {
 func (c *Container) SetPadding(in geom.Insets) {
 	c.padding = in
 	c.Invalidate()
+}
+
+// SetBorder draws an outline of the given color and width around the container.
+// A nil color removes the border.
+func (c *Container) SetBorder(col color.Color, width float64) {
+	c.borderColor = col
+	c.borderWidth = width
 }
 
 // Add appends a child widget with optional per-child layout parameters,
@@ -123,6 +132,10 @@ func (c *Container) Draw(canvas render.Canvas) {
 		}
 	}
 	canvas.PopClip()
+
+	if c.borderColor != nil && c.borderWidth > 0 {
+		canvas.StrokeRect(c.Bounds(), c.borderColor, c.borderWidth)
+	}
 }
 
 // mount attaches the container and all of its current children to the tree.
