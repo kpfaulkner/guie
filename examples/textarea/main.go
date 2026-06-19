@@ -1,7 +1,9 @@
 // Command textarea demonstrates the multi-line TextArea widget: type across
 // multiple lines (Enter for a new line), navigate with the arrow keys, and
-// scroll with the wheel when the text outgrows the box. A status line reports
-// the line and character counts as you edit.
+// scroll with the wheel when the text outgrows the box. Soft word-wrap is on,
+// so long lines wrap to the width. Select with click+drag or Shift+arrows, and
+// cut/copy/paste with Ctrl+X / Ctrl+C / Ctrl+V (Ctrl+A selects all). A status
+// line reports the line and character counts as you edit.
 //
 // Run with: go run ./examples/textarea
 package main
@@ -34,10 +36,11 @@ func main() {
 	}
 
 	area := ui.NewTextArea(
+		ui.TextAreaWrap(),
 		ui.TextAreaPlaceholder("Start typing your notes here..."),
 		ui.OnTextAreaChange(update),
 	)
-	area.SetText("The quick brown fox\njumps over\nthe lazy dog.")
+	area.SetText("The quick brown fox jumps over the lazy dog, and keeps on running well past the right edge so you can see soft word-wrap in action.\nSecond paragraph.")
 	update(area.Text())
 
 	root.Add(area, ui.Weight(1))

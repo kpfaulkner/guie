@@ -95,3 +95,11 @@ func (b *BaseWidget) appTheme() theme.Theme {
 	}
 	return theme.Default()
 }
+
+// clipboard returns the app clipboard, or nil if the widget is not yet mounted.
+func (b *BaseWidget) clipboard() render.Clipboard {
+	if b.ctx != nil {
+		return b.ctx.clipboard
+	}
+	return nil
+}

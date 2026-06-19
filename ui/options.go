@@ -3,6 +3,7 @@ package ui
 import (
 	"image/color"
 
+	"github.com/kpfaulkner/uiframework/render"
 	"github.com/kpfaulkner/uiframework/theme"
 )
 
@@ -33,4 +34,10 @@ func WithResizable(v bool) AppOption {
 // WithTheme sets the app's theme.
 func WithTheme(t theme.Theme) AppOption {
 	return func(a *App) { a.theme = t }
+}
+
+// WithClipboard supplies a custom clipboard (e.g. an OS-backed one). By default
+// the app uses a simple in-process clipboard.
+func WithClipboard(c render.Clipboard) AppOption {
+	return func(a *App) { a.clipboard = c }
 }

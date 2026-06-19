@@ -63,6 +63,7 @@ func TestTextAreaDeleteJoinsLines(t *testing.T) {
 	ta := NewTextArea()
 	ta.SetText("ab\ncd")
 	ta.caretRow, ta.caretCol = 0, 2 // end of first line
+	ta.collapse()                   // no selection
 	taKey(ta, render.KeyDelete)
 	if ta.Text() != "abcd" {
 		t.Fatalf("delete at line end should join: got %q", ta.Text())
@@ -71,8 +72,10 @@ func TestTextAreaDeleteJoinsLines(t *testing.T) {
 
 func TestTextAreaVerticalCaretMovement(t *testing.T) {
 	ta := NewTextArea()
+	NewApp().SetContent(ta) // mount so the font is available for x-preserving moves
 	ta.SetText("long line\nx")
 	ta.caretRow, ta.caretCol = 0, 9 // end of "long line"
+	ta.collapse()                   // no selection
 	taKey(ta, render.KeyDown)       // move to short line; col clamps
 	if ta.caretRow != 1 || ta.caretCol != 1 {
 		t.Fatalf("Down should clamp column to short line: got %d,%d", ta.caretRow, ta.caretCol)
@@ -87,6 +90,7 @@ func TestTextAreaArrowsAcrossLineBoundary(t *testing.T) {
 	ta := NewTextArea()
 	ta.SetText("ab\ncd")
 	ta.caretRow, ta.caretCol = 1, 0 // start of second line
+	ta.collapse()                   // no selection
 	taKey(ta, render.KeyLeft)       // should wrap to end of first line
 	if ta.caretRow != 0 || ta.caretCol != 2 {
 		t.Fatalf("Left at line start should move to prev line end, got %d,%d", ta.caretRow, ta.caretCol)

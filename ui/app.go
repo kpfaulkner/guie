@@ -16,9 +16,10 @@ import (
 // configuration. Construct one with NewApp, give it content with SetContent,
 // and start it with Run.
 type App struct {
-	driver render.Driver
-	cfg    render.Config
-	theme  theme.Theme
+	driver    render.Driver
+	cfg       render.Config
+	theme     theme.Theme
+	clipboard render.Clipboard
 
 	root        Widget
 	ctx         *treeContext
@@ -57,6 +58,9 @@ func NewApp(opts ...AppOption) *App {
 	if a.cfg.Background == nil {
 		a.cfg.Background = a.theme.Palette.Background
 	}
+	if a.clipboard == nil {
+		a.clipboard = &memClipboard{}
+	}
 
 	a.bus = newEventBus()
 	a.ctx = &treeContext{
@@ -65,9 +69,16 @@ func NewApp(opts ...AppOption) *App {
 		openPopup:     a.openPopup,
 		closePopup:    a.closePopup,
 		theme:         &a.theme,
+		clipboard:     a.clipboard,
 	}
 	return a
 }
+
+// memClipboard is the default in-process Clipboard (no OS integration).
+type memClipboard struct{ text string }
+
+func (c *memClipboard) ReadText() string   { return c.text }
+func (c *memClipboard) WriteText(s string) { c.text = s }
 
 // Theme returns the app's active theme.
 func (a *App) Theme() theme.Theme { return a.theme }

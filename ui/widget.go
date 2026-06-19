@@ -62,6 +62,7 @@ type treeContext struct {
 	openPopup     func(*Popup)
 	closePopup    func(*Popup)
 	theme         *theme.Theme
+	clipboard     render.Clipboard
 }
 
 func (t *treeContext) focus(w Widget) {

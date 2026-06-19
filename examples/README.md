@@ -31,7 +31,7 @@ What each one exercises:
 | `scroll`  | `ScrollView`: wheel + draggable thumb, interactive widgets inside the viewport |
 | `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection + scroll), `DropdownCombo`, overlay popups |
 | `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal |
-| `textarea`| Multi-line `TextArea`: typing, newlines, arrow-key caret movement, wheel scrolling |
+| `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap, selection, cut/copy/paste, scrolling |
 | `tabs`    | `TabContainer`: tab strip, click/Left-Right to switch, panes keep their state |
 | `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows |
 

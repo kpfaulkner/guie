@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 )
@@ -8,17 +10,40 @@ import (
 // textFieldPadding is the inner padding around a text field's content.
 var textFieldPadding = geom.Insets{Top: 5, Right: 8, Bottom: 5, Left: 8}
 
+// caretIndexForX returns the caret index in line whose boundary is nearest the
+// local x coordinate (x measured from the start of the text).
+func caretIndexForX(line []rune, x float64, f render.FontFace) int {
+	if x <= 0 || f == nil {
+		return 0
+	}
+	prev := 0.0
+	for i := 1; i <= len(line); i++ {
+		w := f.Measure(string(line[:i])).W
+		if x < (prev+w)/2 {
+			return i - 1
+		}
+		prev = w
+	}
+	return len(line)
+}
+
 // TextField is a single-line text input. It is focusable and edits its content
-// in response to typed runes and the usual editing keys (Backspace, Delete,
-// Left/Right, Home/End). Enter invokes OnSubmit. The view scrolls horizontally
-// to keep the caret visible.
+// in response to typed runes and editing keys (Backspace, Delete, Left/Right,
+// Home/End). Enter invokes OnSubmit. The view scrolls horizontally to keep the
+// caret visible.
+//
+// It supports a selection: click and drag, or hold Shift while moving the
+// caret, to select a range; Ctrl+A selects all. Typing, Backspace/Delete and
+// inserting replace the selection.
 type TextField struct {
 	BaseWidget
-	runes   []rune
-	caret   int // caret index in runes (0..len)
-	focused bool
-	hover   bool
-	scrollX float64
+	runes    []rune
+	caret    int // caret index (0..len)
+	anchor   int // selection anchor; equal to caret means no selection
+	focused  bool
+	hover    bool
+	dragging bool
+	scrollX  float64
 
 	placeholder string
 	onChange    func(string)
@@ -55,6 +80,7 @@ func (t *TextField) Text() string { return string(t.runes) }
 func (t *TextField) SetText(s string) {
 	t.runes = []rune(s)
 	t.caret = len(t.runes)
+	t.anchor = t.caret
 	t.fireChange()
 }
 
@@ -88,24 +114,80 @@ func (t *TextField) fireChange() {
 	}
 }
 
+// --- selection helpers ---
+
+func (t *TextField) hasSelection() bool { return t.anchor != t.caret }
+
+// selRange returns the selection bounds [lo, hi) in order.
+func (t *TextField) selRange() (lo, hi int) {
+	if t.anchor <= t.caret {
+		return t.anchor, t.caret
+	}
+	return t.caret, t.anchor
+}
+
+func (t *TextField) deleteSelection() {
+	lo, hi := t.selRange()
+	t.runes = append(t.runes[:lo], t.runes[hi:]...)
+	t.caret = lo
+	t.anchor = lo
+}
+
+// setCaret moves the caret, optionally extending the selection (keeping the
+// anchor); otherwise it collapses the selection.
+func (t *TextField) setCaret(pos int, extend bool) {
+	if pos < 0 {
+		pos = 0
+	}
+	if pos > len(t.runes) {
+		pos = len(t.runes)
+	}
+	t.caret = pos
+	if !extend {
+		t.anchor = pos
+	}
+}
+
+func (t *TextField) selectAll() {
+	t.anchor = 0
+	t.caret = len(t.runes)
+}
+
+// --- editing ---
+
 func (t *TextField) insert(r rune) {
+	if t.hasSelection() {
+		t.deleteSelection()
+	}
 	t.runes = append(t.runes, 0)
 	copy(t.runes[t.caret+1:], t.runes[t.caret:])
 	t.runes[t.caret] = r
 	t.caret++
+	t.anchor = t.caret
 	t.fireChange()
 }
 
 func (t *TextField) deleteBack() {
+	if t.hasSelection() {
+		t.deleteSelection()
+		t.fireChange()
+		return
+	}
 	if t.caret == 0 {
 		return
 	}
 	t.runes = append(t.runes[:t.caret-1], t.runes[t.caret:]...)
 	t.caret--
+	t.anchor = t.caret
 	t.fireChange()
 }
 
 func (t *TextField) deleteForward() {
+	if t.hasSelection() {
+		t.deleteSelection()
+		t.fireChange()
+		return
+	}
 	if t.caret >= len(t.runes) {
 		return
 	}
@@ -113,7 +195,62 @@ func (t *TextField) deleteForward() {
 	t.fireChange()
 }
 
-// Draw renders the box, the text (or placeholder), and the caret when focused.
+// insertString inserts s at the caret, replacing any selection.
+func (t *TextField) insertString(s string) {
+	if s == "" {
+		return
+	}
+	if t.hasSelection() {
+		t.deleteSelection()
+	}
+	rs := []rune(s)
+	out := make([]rune, 0, len(t.runes)+len(rs))
+	out = append(out, t.runes[:t.caret]...)
+	out = append(out, rs...)
+	out = append(out, t.runes[t.caret:]...)
+	t.runes = out
+	t.caret += len(rs)
+	t.anchor = t.caret
+	t.fireChange()
+}
+
+func (t *TextField) selectedText() string {
+	lo, hi := t.selRange()
+	return string(t.runes[lo:hi])
+}
+
+func (t *TextField) copySelection() {
+	if cb := t.clipboard(); cb != nil && t.hasSelection() {
+		cb.WriteText(t.selectedText())
+	}
+}
+
+func (t *TextField) cutSelection() {
+	if !t.hasSelection() {
+		return
+	}
+	t.copySelection()
+	t.deleteSelection()
+	t.fireChange()
+}
+
+func (t *TextField) paste() {
+	cb := t.clipboard()
+	if cb == nil {
+		return
+	}
+	// A single-line field flattens any newlines from the pasted text.
+	t.insertString(strings.ReplaceAll(cb.ReadText(), "\n", " "))
+}
+
+// caretIndexAt maps an absolute x coordinate to a caret index.
+func (t *TextField) caretIndexAt(absX float64) int {
+	inner := t.Bounds().Inset(textFieldPadding)
+	return caretIndexForX(t.runes, absX-inner.X+t.scrollX, t.face())
+}
+
+// Draw renders the box, the selection highlight, the text (or placeholder) and
+// the caret when focused.
 func (t *TextField) Draw(canvas render.Canvas) {
 	pal := t.appTheme().Palette
 	f := t.face()
@@ -142,6 +279,14 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	}
 
 	t.updateScroll(f, inner.W)
+
+	if t.hasSelection() {
+		lo, hi := t.selRange()
+		x0 := inner.X - t.scrollX + f.Measure(string(t.runes[:lo])).W
+		x1 := inner.X - t.scrollX + f.Measure(string(t.runes[:hi])).W
+		canvas.FillRect(geom.Rect{X: x0, Y: y, W: x1 - x0, H: lineH}, pal.Primary)
+	}
+
 	canvas.DrawText(string(t.runes), geom.Point{X: inner.X - t.scrollX, Y: y}, f, pal.Text)
 
 	if t.focused {
@@ -168,7 +313,7 @@ func (t *TextField) updateScroll(f render.FontFace, width float64) {
 	}
 }
 
-// HandleEvent edits the text in response to keys and typed runes.
+// HandleEvent edits the text and manages the selection in response to input.
 func (t *TextField) HandleEvent(ev *Event) bool {
 	if !t.Enabled() {
 		return false
@@ -180,12 +325,26 @@ func (t *TextField) HandleEvent(ev *Event) bool {
 	case EventPointerLeave:
 		t.hover = false
 		return true
+	case EventPointerDown:
+		idx := t.caretIndexAt(ev.Pos.X)
+		t.caret = idx
+		t.anchor = idx
+		t.dragging = true
+		return true
+	case EventPointerMove:
+		if t.dragging {
+			t.caret = t.caretIndexAt(ev.Pos.X) // extend (anchor stays)
+			return true
+		}
+	case EventPointerUp:
+		t.dragging = false
+		return true
 	case EventFocusGained:
 		t.focused = true
-		t.caret = len(t.runes)
 		return true
 	case EventFocusLost:
 		t.focused = false
+		t.dragging = false
 		return true
 	case EventText:
 		if ev.Rune >= 0x20 && ev.Rune != 0x7f {
@@ -193,29 +352,42 @@ func (t *TextField) HandleEvent(ev *Event) bool {
 			return true
 		}
 	case EventKeyDown:
-		return t.handleKey(ev.Key)
+		return t.handleKey(ev.Key, ev.Modifiers)
 	}
 	return false
 }
 
-func (t *TextField) handleKey(k render.Key) bool {
+func (t *TextField) handleKey(k render.Key, mods render.ModifierSet) bool {
+	extend := mods.Has(render.ModShift)
+	if mods.Has(render.ModControl) {
+		switch k {
+		case render.KeyA:
+			t.selectAll()
+			return true
+		case render.KeyC:
+			t.copySelection()
+			return true
+		case render.KeyX:
+			t.cutSelection()
+			return true
+		case render.KeyV:
+			t.paste()
+			return true
+		}
+	}
 	switch k {
 	case render.KeyBackspace:
 		t.deleteBack()
 	case render.KeyDelete:
 		t.deleteForward()
 	case render.KeyLeft:
-		if t.caret > 0 {
-			t.caret--
-		}
+		t.moveLeft(extend)
 	case render.KeyRight:
-		if t.caret < len(t.runes) {
-			t.caret++
-		}
+		t.moveRight(extend)
 	case render.KeyHome:
-		t.caret = 0
+		t.setCaret(0, extend)
 	case render.KeyEnd:
-		t.caret = len(t.runes)
+		t.setCaret(len(t.runes), extend)
 	case render.KeyEnter:
 		if t.onSubmit != nil {
 			t.onSubmit(string(t.runes))
@@ -224,4 +396,22 @@ func (t *TextField) handleKey(k render.Key) bool {
 		return false
 	}
 	return true
+}
+
+func (t *TextField) moveLeft(extend bool) {
+	if !extend && t.hasSelection() {
+		lo, _ := t.selRange()
+		t.caret, t.anchor = lo, lo
+		return
+	}
+	t.setCaret(t.caret-1, extend)
+}
+
+func (t *TextField) moveRight(extend bool) {
+	if !extend && t.hasSelection() {
+		_, hi := t.selRange()
+		t.caret, t.anchor = hi, hi
+		return
+	}
+	t.setCaret(t.caret+1, extend)
 }
