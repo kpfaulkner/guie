@@ -46,6 +46,9 @@ type Widget interface {
 	// widgets are visited by Tab traversal and focused on click.
 	Focusable() bool
 
+	// Tooltip returns the hover hint text for the widget, or "" for none.
+	Tooltip() string
+
 	// mount connects the widget to the tree. The parent calls it when the widget
 	// is added to an already-mounted tree, and containers call it recursively on
 	// their children. It is implemented by BaseWidget and unexported, so every

@@ -17,6 +17,8 @@ go run ./examples/textarea   # multi-line TextArea: newlines, caret nav, wheel s
 go run ./examples/tabs       # TabContainer: switch panes via the tab strip
 go run ./examples/table      # Table: header + weighted columns, selectable scrollable rows
 go run ./examples/fonts      # adjust font size at runtime (App.SetFont) + per-widget font
+go run ./examples/tooltips   # hover tooltips (SetTooltip) with a rest delay
+go run ./examples/splitter   # SplitPane: draggable dividers, nested splits
 ```
 
 What each one exercises:
@@ -36,6 +38,8 @@ What each one exercises:
 | `tabs`    | `TabContainer`: tab strip, click/Left-Right to switch, panes keep their state |
 | `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows |
 | `fonts`   | Runtime font sizing via `App.SetFont` + `ui.DefaultFont`, plus per-widget `SetFont` |
+| `tooltips`| Hover tooltips via `SetTooltip`, with a rest delay and on-screen clamping |
+| `splitter`| `SplitPane`/`HSplit`/`VSplit`: draggable dividers, ratio + min sizes, nested |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

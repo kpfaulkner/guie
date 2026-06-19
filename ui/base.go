@@ -13,6 +13,7 @@ type BaseWidget struct {
 	bounds  geom.Rect
 	visible bool
 	enabled bool
+	tooltip string
 	parent  Widget
 	ctx     *treeContext
 }
@@ -55,6 +56,13 @@ func (b *BaseWidget) Enabled() bool { return b.enabled }
 
 // Focusable reports false by default; focusable widgets override it.
 func (b *BaseWidget) Focusable() bool { return false }
+
+// Tooltip returns the widget's hover hint text (empty by default).
+func (b *BaseWidget) Tooltip() string { return b.tooltip }
+
+// SetTooltip sets the hover hint text shown after the pointer rests on the
+// widget. An empty string disables it.
+func (b *BaseWidget) SetTooltip(s string) { b.tooltip = s }
 
 // RequestFocus asks the framework to give this widget keyboard focus. The
 // receiver must be the concrete widget (so pass it in); it is a no-op before

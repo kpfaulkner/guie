@@ -33,6 +33,12 @@ type App struct {
 	hovered     Widget // widget currently under the cursor
 	pressTarget Widget // widget that received the active pointer-down (capture)
 	focused     Widget // widget with keyboard focus
+
+	// tooltip state (hover-delay timed in Update ticks)
+	lastPointer  geom.Point
+	tooltipTicks int
+	tooltipText  string
+	tooltipPos   geom.Point
 }
 
 // NewApp creates an App with default configuration, then applies opts.
@@ -236,6 +242,8 @@ func (a *App) dispatchPointer(in render.InputState) {
 		a.hovered = hit
 	}
 
+	a.updateTooltip(pos)
+
 	// Report movement to the captured widget (for dragging) or, when nothing is
 	// captured, to the hovered widget (so lists/menus can track the cursor row).
 	moveTarget := a.pressTarget
@@ -251,6 +259,7 @@ func (a *App) dispatchPointer(in render.InputState) {
 	}
 
 	if in.MousePressed.Has(render.MouseLeft) {
+		a.hideTooltip()
 		a.focusFromPointer(hit)
 		if hit != nil {
 			a.dispatch(hit, Event{Type: EventPointerDown, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
@@ -318,6 +327,7 @@ func (a *App) draw(c render.Canvas) {
 		a.root.Draw(c)
 	}
 	a.drawOverlays(c)
+	a.drawTooltip(c)
 }
 
 func (a *App) resize(width, height int) {
