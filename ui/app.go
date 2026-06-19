@@ -83,6 +83,14 @@ func (c *memClipboard) WriteText(s string) { c.text = s }
 // Theme returns the app's active theme.
 func (a *App) Theme() theme.Theme { return a.theme }
 
+// SetFont changes the default text face at runtime and triggers a re-layout.
+// Widgets that don't override their font pick up the change on the next frame.
+// Build a face with ui.DefaultFont(size) or ui.LoadFont(...).
+func (a *App) SetFont(f render.FontFace) {
+	a.theme.Font = f
+	a.needsLayout = true
+}
+
 // Events returns the global event bus for subscribing to events across the
 // whole UI.
 func (a *App) Events() *EventBus { return a.bus }

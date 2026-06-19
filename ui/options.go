@@ -41,3 +41,14 @@ func WithTheme(t theme.Theme) AppOption {
 func WithClipboard(c render.Clipboard) AppOption {
 	return func(a *App) { a.clipboard = c }
 }
+
+// WithFont sets the default text face used by widgets that don't override it.
+func WithFont(f render.FontFace) AppOption {
+	return func(a *App) { a.theme.Font = f }
+}
+
+// WithFontSize sets the size of the default bundled font. It has no effect if a
+// font face is supplied via WithFont or WithTheme.
+func WithFontSize(size float64) AppOption {
+	return func(a *App) { a.theme.FontSize = size }
+}

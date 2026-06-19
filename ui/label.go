@@ -51,6 +51,12 @@ func (l *Label) SetText(s string) {
 	l.Invalidate()
 }
 
+// SetFont overrides the label's font face (nil falls back to the theme font).
+func (l *Label) SetFont(f render.FontFace) {
+	l.font = f
+	l.Invalidate()
+}
+
 // Text returns the label's current text.
 func (l *Label) Text() string { return l.text }
 

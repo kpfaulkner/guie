@@ -68,3 +68,13 @@ func DefaultFont(size float64) render.FontFace {
 	}
 	return newFace(src, size)
 }
+
+// NewFontFace parses a TrueType/OpenType font from ttf and returns a
+// render.FontFace at the given size.
+func NewFontFace(ttf []byte, size float64) (render.FontFace, error) {
+	src, err := text.NewGoTextFaceSource(bytes.NewReader(ttf))
+	if err != nil {
+		return nil, err
+	}
+	return newFace(src, size), nil
+}

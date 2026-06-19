@@ -91,6 +91,12 @@ func (t *TextField) face() render.FontFace {
 	return t.appTheme().Font
 }
 
+// SetFont overrides the field's font face (nil falls back to the theme font).
+func (t *TextField) SetFont(f render.FontFace) {
+	t.font = f
+	t.Invalidate()
+}
+
 // Focusable reports whether the field can take focus (only when enabled).
 func (t *TextField) Focusable() bool { return t.Enabled() }
 

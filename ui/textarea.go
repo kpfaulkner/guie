@@ -179,6 +179,12 @@ func (t *TextArea) face() render.FontFace {
 	return t.appTheme().Font
 }
 
+// SetFont overrides the area's font face (nil falls back to the theme font).
+func (t *TextArea) SetFont(f render.FontFace) {
+	t.font = f
+	t.Invalidate()
+}
+
 // Focusable reports whether the area can take focus (only when enabled).
 func (t *TextArea) Focusable() bool { return t.Enabled() }
 

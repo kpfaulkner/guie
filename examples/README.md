@@ -16,6 +16,7 @@ go run ./examples/dialog     # modal dialogs (scrim, blocked background, Esc to 
 go run ./examples/textarea   # multi-line TextArea: newlines, caret nav, wheel scroll
 go run ./examples/tabs       # TabContainer: switch panes via the tab strip
 go run ./examples/table      # Table: header + weighted columns, selectable scrollable rows
+go run ./examples/fonts      # adjust font size at runtime (App.SetFont) + per-widget font
 ```
 
 What each one exercises:
@@ -34,6 +35,7 @@ What each one exercises:
 | `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap, selection, cut/copy/paste, scrolling |
 | `tabs`    | `TabContainer`: tab strip, click/Left-Right to switch, panes keep their state |
 | `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows |
+| `fonts`   | Runtime font sizing via `App.SetFont` + `ui.DefaultFont`, plus per-widget `SetFont` |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

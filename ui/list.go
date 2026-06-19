@@ -60,6 +60,12 @@ func (l *List) face() render.FontFace {
 	return l.appTheme().Font
 }
 
+// SetFont overrides the list's font face (nil falls back to the theme font).
+func (l *List) SetFont(f render.FontFace) {
+	l.font = f
+	l.Invalidate()
+}
+
 // RowHeight returns the pixel height of a single row.
 func (l *List) RowHeight() float64 {
 	f := l.face()

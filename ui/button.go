@@ -70,6 +70,12 @@ func (b *Button) SetText(s string) {
 // SetOnClick replaces the click handler.
 func (b *Button) SetOnClick(fn func()) { b.onClick = fn }
 
+// SetFont overrides the button's label font (nil falls back to the theme font).
+func (b *Button) SetFont(f render.FontFace) {
+	b.font = f
+	b.Invalidate()
+}
+
 func (b *Button) face() render.FontFace {
 	if b.font != nil {
 		return b.font

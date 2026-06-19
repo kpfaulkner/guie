@@ -52,6 +52,12 @@ func (m *MenuBar) face() render.FontFace {
 	return m.appTheme().Font
 }
 
+// SetFont overrides the menu bar's font face (nil falls back to the theme font).
+func (m *MenuBar) SetFont(f render.FontFace) {
+	m.font = f
+	m.Invalidate()
+}
+
 // MinSize returns the total title width and one row tall.
 func (m *MenuBar) MinSize() geom.Size {
 	f := m.face()

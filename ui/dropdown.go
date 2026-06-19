@@ -61,6 +61,12 @@ func (d *DropdownCombo) face() render.FontFace {
 	return d.appTheme().Font
 }
 
+// SetFont overrides the dropdown's font face (nil falls back to the theme font).
+func (d *DropdownCombo) SetFont(f render.FontFace) {
+	d.font = f
+	d.Invalidate()
+}
+
 // Focusable reports whether the dropdown can take focus (only when enabled).
 func (d *DropdownCombo) Focusable() bool { return d.Enabled() }
 

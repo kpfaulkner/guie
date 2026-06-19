@@ -80,6 +80,12 @@ func (t *Table) face() render.FontFace {
 	return t.appTheme().Font
 }
 
+// SetFont overrides the table's font face (nil falls back to the theme font).
+func (t *Table) SetFont(f render.FontFace) {
+	t.font = f
+	t.Invalidate()
+}
+
 // Focusable reports whether the table can take focus (only when enabled).
 func (t *Table) Focusable() bool { return t.Enabled() }
 

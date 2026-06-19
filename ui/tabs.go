@@ -69,6 +69,12 @@ func (t *TabContainer) face() render.FontFace {
 	return t.appTheme().Font
 }
 
+// SetFont overrides the tab strip's font face (nil falls back to the theme font).
+func (t *TabContainer) SetFont(f render.FontFace) {
+	t.font = f
+	t.Invalidate()
+}
+
 // Focusable reports whether the tabs can take focus (only when enabled).
 func (t *TabContainer) Focusable() bool { return t.Enabled() }
 
