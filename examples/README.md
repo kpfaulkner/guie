@@ -20,6 +20,7 @@ go run ./examples/fonts      # adjust font size at runtime (App.SetFont) + per-w
 go run ./examples/tooltips   # hover tooltips (SetTooltip) with a rest delay
 go run ./examples/splitter   # SplitPane: draggable dividers, nested splits
 go run ./examples/colors     # per-widget color overrides (SetColor / ColorOf, roles)
+go run ./examples/images     # Image widget (scaled) + image buttons (ui.LoadImage)
 ```
 
 What each one exercises:
@@ -42,6 +43,7 @@ What each one exercises:
 | `tooltips`| Hover tooltips via `SetTooltip`, with a rest delay and on-screen clamping |
 | `splitter`| `SplitPane`/`HSplit`/`VSplit`: draggable dividers, ratio + min sizes, nested |
 | `colors`  | Per-widget color overrides via `SetColor`/`ColorOf` and `ColorRole`s |
+| `images`  | `Image` widget (fit modes) + image buttons via `ui.LoadImage`/`ButtonImage` |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

@@ -7,16 +7,20 @@ import (
 	"github.com/kpfaulkner/uiframework/render"
 )
 
-// buttonPadding is the space reserved around a button's label, used by MinSize.
+// buttonPadding is the space reserved around a button's content, used by MinSize.
 var buttonPadding = geom.Insets{Top: 6, Right: 14, Bottom: 6, Left: 14}
 
+// buttonIconGap is the space between a button's icon and its label.
+const buttonIconGap = 6
+
 // Button is a clickable widget that draws a themed background and a centered
-// label, reacting to hover and press. Click handling is delivered through the
-// pointer events dispatched by the App: a click fires when the pointer is
-// released over the button after being pressed on it.
+// label and/or icon, reacting to hover and press. Click handling is delivered
+// through the pointer events dispatched by the App: a click fires when the
+// pointer is released over the button after being pressed on it.
 type Button struct {
 	BaseWidget
 	text    string
+	icon    render.Image // optional; drawn before the label
 	onClick func()
 
 	hover   bool
@@ -44,6 +48,12 @@ func ButtonFont(f render.FontFace) ButtonOption {
 	return func(b *Button) { b.font = f }
 }
 
+// ButtonImage sets an icon drawn before the label. With an empty text the
+// button shows just the image.
+func ButtonImage(img render.Image) ButtonOption {
+	return func(b *Button) { b.icon = img }
+}
+
 // NewButton returns a Button showing text, configured by opts.
 func NewButton(text string, opts ...ButtonOption) *Button {
 	b := &Button{BaseWidget: NewBase(), text: text}
@@ -69,6 +79,33 @@ func (b *Button) SetFont(f render.FontFace) {
 	b.Invalidate()
 }
 
+// SetImage sets (or clears, with nil) the button's icon and requests a re-layout.
+func (b *Button) SetImage(img render.Image) {
+	b.icon = img
+	b.Invalidate()
+}
+
+// contentSize returns the combined icon+label size (excluding padding).
+func (b *Button) contentSize() geom.Size {
+	var iconW, iconH float64
+	if b.icon != nil {
+		s := b.icon.Size()
+		iconW, iconH = s.W, s.H
+	}
+	var textW, textH float64
+	if b.text != "" {
+		if f := b.face(); f != nil {
+			s := f.Measure(b.text)
+			textW, textH = s.W, s.H
+		}
+	}
+	gap := 0.0
+	if iconW > 0 && textW > 0 {
+		gap = buttonIconGap
+	}
+	return geom.Size{W: iconW + gap + textW, H: maxF(iconH, textH)}
+}
+
 func (b *Button) face() render.FontFace {
 	if b.font != nil {
 		return b.font
@@ -76,16 +113,12 @@ func (b *Button) face() render.FontFace {
 	return b.appTheme().Font
 }
 
-// MinSize returns the label size plus the button's internal padding.
+// MinSize returns the icon+label size plus the button's internal padding.
 func (b *Button) MinSize() geom.Size {
-	f := b.face()
-	if f == nil {
-		return geom.Size{}
-	}
-	s := f.Measure(b.text)
+	c := b.contentSize()
 	return geom.Size{
-		W: s.W + buttonPadding.Left + buttonPadding.Right,
-		H: s.H + buttonPadding.Top + buttonPadding.Bottom,
+		W: c.W + buttonPadding.Left + buttonPadding.Right,
+		H: c.H + buttonPadding.Top + buttonPadding.Bottom,
 	}
 }
 
@@ -113,8 +146,8 @@ func (b *Button) labelColor() color.Color {
 // enabled).
 func (b *Button) Focusable() bool { return b.Enabled() }
 
-// Draw paints the background, a border, the centered label, and a focus ring
-// when focused.
+// Draw paints the background, a border, the centered icon and/or label, and a
+// focus ring when focused.
 func (b *Button) Draw(c render.Canvas) {
 	rect := b.Bounds()
 	c.FillRect(rect, b.fillColor())
@@ -124,11 +157,25 @@ func (b *Button) Draw(c render.Canvas) {
 		c.StrokeRect(ring, b.ColorOf(RoleAccent), 1)
 	}
 
-	if f := b.face(); f != nil {
-		size := f.Measure(b.text)
-		x := rect.X + (rect.W-size.W)/2
-		y := rect.Y + (rect.H-size.H)/2
-		c.DrawText(b.text, geom.Point{X: x, Y: y}, f, b.labelColor())
+	content := b.contentSize()
+	x := rect.X + (rect.W-content.W)/2 // left edge of the icon+label group
+
+	if b.icon != nil {
+		s := b.icon.Size()
+		dst := geom.Rect{X: x, Y: rect.Y + (rect.H-s.H)/2, W: s.W, H: s.H}
+		c.DrawImage(b.icon, dst)
+		x += s.W
+		if b.text != "" {
+			x += buttonIconGap
+		}
+	}
+
+	if b.text != "" {
+		if f := b.face(); f != nil {
+			size := f.Measure(b.text)
+			y := rect.Y + (rect.H-size.H)/2
+			c.DrawText(b.text, geom.Point{X: x, Y: y}, f, b.labelColor())
+		}
 	}
 }
 
