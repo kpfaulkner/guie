@@ -170,6 +170,95 @@ func (t *TextArea) SetText(s string) {
 	t.fireChange()
 }
 
+// --- rune-offset addressing (for find/replace and programmatic selection) ---
+//
+// Offsets index the text as returned by Text(): each '\n' between lines counts
+// as one rune.
+
+// posToOffset converts a (row, col) caret position to a rune offset.
+func (t *TextArea) posToOffset(row, col int) int {
+	off := 0
+	for i := 0; i < row && i < len(t.lines); i++ {
+		off += len(t.lines[i]) + 1 // +1 for the newline
+	}
+	return off + col
+}
+
+// offsetToPos converts a rune offset to a (row, col) position, clamped to range.
+func (t *TextArea) offsetToPos(off int) (int, int) {
+	if off < 0 {
+		off = 0
+	}
+	for i := range t.lines {
+		if off <= len(t.lines[i]) {
+			return i, off
+		}
+		off -= len(t.lines[i]) + 1
+	}
+	last := len(t.lines) - 1
+	return last, len(t.lines[last])
+}
+
+// CaretOffset returns the caret position as a rune offset into Text().
+func (t *TextArea) CaretOffset() int { return t.posToOffset(t.caretRow, t.caretCol) }
+
+// SelectionRange returns the current selection as rune offsets [start, end) into
+// Text(); start == end when there is no selection.
+func (t *TextArea) SelectionRange() (start, end int) {
+	sr, sc, er, ec := t.selRange()
+	return t.posToOffset(sr, sc), t.posToOffset(er, ec)
+}
+
+// SelectRange selects the text between rune offsets start and end (order
+// independent) and places the caret at the end. The selected range is scrolled
+// into view on the next frame.
+func (t *TextArea) SelectRange(start, end int) {
+	if start > end {
+		start, end = end, start
+	}
+	sr, sc := t.offsetToPos(start)
+	er, ec := t.offsetToPos(end)
+	t.anchorRow, t.anchorCol = sr, sc
+	t.caretRow, t.caretCol = er, ec
+	t.Invalidate()
+}
+
+// Find searches for sub starting at rune offset from. If found, it selects the
+// match and returns its offset and true; otherwise it returns -1 and false.
+func (t *TextArea) Find(sub string, from int) (int, bool) {
+	if sub == "" {
+		return -1, false
+	}
+	hay := []rune(t.Text())
+	needle := []rune(sub)
+	idx := runeIndexFrom(hay, needle, from)
+	if idx < 0 {
+		return -1, false
+	}
+	t.SelectRange(idx, idx+len(needle))
+	return idx, true
+}
+
+// runeIndexFrom returns the index of needle in hay at or after from, or -1.
+func runeIndexFrom(hay, needle []rune, from int) int {
+	if from < 0 {
+		from = 0
+	}
+	for i := from; i+len(needle) <= len(hay); i++ {
+		match := true
+		for j := range needle {
+			if hay[i+j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
 func (t *TextArea) face() render.FontFace {
 	if t.font != nil {
 		return t.font

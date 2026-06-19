@@ -125,6 +125,32 @@ func TestMenuBarItemRunsAndCloses(t *testing.T) {
 	}
 }
 
+func TestMenuActionCanOpenDialog(t *testing.T) {
+	// A menu item whose action opens its own popup (e.g. a dialog) must not have
+	// that popup torn down when the menu closes.
+	app := NewApp()
+	mb := NewMenuBar()
+	var dlg *Popup
+	mb.AddMenu("File", NewMenuItem("Open", func() {
+		dlg = app.ShowModal(NewContainer())
+	}))
+	app.SetContent(mb)
+	app.resize(400, 400)
+	mb.SetBounds(geom.Rect{X: 0, Y: 0, W: 200, H: 28})
+
+	mb.openMenu(0)
+	panel := app.overlays[0].content.(*Container)
+	item := panel.Children()[0]
+	item.HandleEvent(&Event{Type: EventClick})
+
+	if len(app.overlays) != 1 {
+		t.Fatalf("after the menu item runs, only its dialog should be open, got %d overlays", len(app.overlays))
+	}
+	if app.overlays[0] != dlg {
+		t.Fatal("the surviving overlay should be the dialog the action opened")
+	}
+}
+
 func TestEscapeClosesPopup(t *testing.T) {
 	dd := NewDropdown([]string{"x", "y"})
 	app := NewApp()

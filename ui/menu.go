@@ -161,10 +161,12 @@ func (m *MenuBar) openMenu(i int) {
 	for _, it := range m.menus[i] {
 		action := it.Action
 		row := newMenuRow(it.Label, func() {
+			// Close the menu first, so an action that opens its own popup (a
+			// dialog) isn't torn down along with the menu's overlay.
+			m.ctx.close(m.popup)
 			if action != nil {
 				action()
 			}
-			m.ctx.close(m.popup)
 		})
 		row.font = m.font
 		panel.Add(row)

@@ -223,7 +223,13 @@ func (a *App) setFocus(w Widget) {
 // moveFocus advances focus to the next (delta=+1) or previous (delta=-1)
 // focusable widget in tree order, wrapping around.
 func (a *App) moveFocus(delta int) {
-	list := appendFocusables(a.root, nil)
+	// While a modal is open, confine Tab traversal to the modal's content so
+	// focus can't leak to the blocked background.
+	scope := a.root
+	if m := a.modalActive(); m != nil {
+		scope = m.content
+	}
+	list := appendFocusables(scope, nil)
 	if len(list) == 0 {
 		a.setFocus(nil)
 		return
