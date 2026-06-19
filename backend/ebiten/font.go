@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/kpfaulkner/uiframework/geom"
 	"github.com/kpfaulkner/uiframework/render"
 	"golang.org/x/image/font/gofont/goregular"
 )
@@ -22,6 +23,12 @@ type fontFace struct {
 
 // Metrics returns the vertical extents of the face.
 func (f *fontFace) Metrics() render.FontMetrics { return f.metrics }
+
+// Measure returns the rendered size of s in this face.
+func (f *fontFace) Measure(s string) geom.Size {
+	w, h := text.Measure(s, f.face, f.metrics.LineHeight)
+	return geom.Size{W: w, H: h}
+}
 
 var (
 	defaultSourceOnce sync.Once

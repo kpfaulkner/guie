@@ -61,11 +61,14 @@ type FontMetrics struct {
 }
 
 // FontFace is an opaque, backend-specific font handle at a particular size.
-// Construct one via the backend (or the theme/font helpers); widgets only read
-// its metrics and pass it to Canvas text calls.
+// Construct one via the backend (or the theme/font helpers); widgets read its
+// metrics, measure strings for layout, and pass it to Canvas text calls.
 type FontFace interface {
 	// Metrics returns the vertical extents of the face.
 	Metrics() FontMetrics
+	// Measure returns the rendered size of s in this face. It does not require a
+	// frame, so widgets may call it from MinSize during layout.
+	Measure(s string) geom.Size
 }
 
 // Image is an opaque, backend-specific bitmap handle.

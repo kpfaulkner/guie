@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 
@@ -9,10 +10,9 @@ import (
 	"github.com/kpfaulkner/uiframework/ui"
 )
 
-// textWidget is a minimal leaf widget used by the step-2 demo to exercise the
-// retained tree and draw traversal. It shows how a custom widget is built:
-// embed ui.BaseWidget and override Draw. (Real Label/Button widgets arrive in
-// step 4.)
+// textWidget is a minimal leaf widget used by the demo. It reports its size via
+// the font so the layout engine can measure it. (Real Label/Button widgets
+// arrive in step 4.)
 type textWidget struct {
 	ui.BaseWidget
 	str   string
@@ -24,43 +24,58 @@ func newText(s string, font render.FontFace, c color.Color) *textWidget {
 	return &textWidget{BaseWidget: ui.NewBase(), str: s, font: font, color: c}
 }
 
+func (t *textWidget) MinSize() geom.Size { return t.font.Measure(t.str) }
+
 func (t *textWidget) Draw(c render.Canvas) {
 	b := t.Bounds()
 	c.DrawText(t.str, geom.Point{X: b.X, Y: b.Y}, t.font, t.color)
 }
 
-// Step-2 demo: a retained widget tree drawn top-down. A transparent root holds
-// a surface panel; the panel holds three text widgets, one of which overflows
-// the panel's content area to demonstrate clipping. Still no EBiten import.
+// panel is a colored box with a single centered label, built from a Stack.
+func panel(bg color.Color, label string, font render.FontFace, txt color.Color) *ui.Container {
+	c := ui.NewContainer()
+	c.SetBackground(bg)
+	c.SetLayout(ui.NewStack())
+	c.Add(newText(label, font, txt), ui.Align(geom.AlignCenter))
+	return c
+}
+
+// Step-3 demo: a VBox root holds a title, a weighted HBox row of two panels,
+// and a 3-column grid of cells. Resize the window — everything reflows because
+// layout re-runs on resize. Still no EBiten import.
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("uiframework — step 2"),
-		ui.WithSize(640, 400),
+		ui.WithTitle("uiframework — step 3 (layouts)"),
+		ui.WithSize(720, 480),
 	)
 	th := app.Theme()
 	pal := th.Palette
 
 	root := ui.NewContainer()
+	root.SetLayout(ui.VBox(12))
+	root.SetPadding(geom.UniformInsets(16))
 
-	panel := ui.NewContainer()
-	panel.SetBackground(pal.Surface)
-	panel.SetPadding(geom.UniformInsets(12))
-	panel.SetBounds(geom.Rect{X: 40, Y: 40, W: 360, H: 280})
+	title := newText("Step 3: layout engine (Box / Grid / Stack)", th.Font, pal.Text)
+	root.Add(title) // weight 0 → natural height, stretched across width
 
-	title := newText("Step 2: retained widget tree", th.Font, pal.Text)
-	title.SetBounds(geom.Rect{X: 56, Y: 60, W: 320, H: 24})
+	// Weighted row: panelB is twice as wide as panelA.
+	row := ui.NewContainer()
+	row.SetLayout(ui.HBox(12))
+	row.Add(panel(pal.Surface, "HBox weight 1", th.Font, pal.Text), ui.Weight(1))
+	row.Add(panel(pal.Primary, "HBox weight 2", th.Font, pal.OnPrimary), ui.Weight(2))
+	root.Add(row, ui.Weight(2))
 
-	body := newText("Containers draw children and clip them.", th.Font, pal.TextMuted)
-	body.SetBounds(geom.Rect{X: 56, Y: 96, W: 320, H: 24})
-
-	// Bounds run past the panel's right edge to show the content-area clip.
-	overflow := newText("This long line is clipped to the panel >>>>>>>>>>>>>>>>>>>>", th.Font, pal.Accent)
-	overflow.SetBounds(geom.Rect{X: 56, Y: 140, W: 600, H: 24})
-
-	panel.Add(title)
-	panel.Add(body)
-	panel.Add(overflow)
-	root.Add(panel)
+	// A 3-column grid of colored cells that fills the remaining height.
+	grid := ui.NewContainer()
+	grid.SetLayout(ui.NewGrid(3, 8))
+	cellColors := []color.Color{
+		color.RGBA{0x8a, 0x4a, 0x4a, 0xff}, color.RGBA{0x4a, 0x8a, 0x5a, 0xff}, color.RGBA{0x4a, 0x5a, 0x8a, 0xff},
+		color.RGBA{0x8a, 0x7a, 0x4a, 0xff}, color.RGBA{0x6a, 0x4a, 0x8a, 0xff}, color.RGBA{0x4a, 0x8a, 0x8a, 0xff},
+	}
+	for i, cc := range cellColors {
+		grid.Add(panel(cc, fmt.Sprintf("cell %d", i+1), th.Font, pal.Text))
+	}
+	root.Add(grid, ui.Weight(3))
 
 	app.SetContent(root)
 

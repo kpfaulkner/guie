@@ -85,12 +85,10 @@ func (c *canvas) DrawText(s string, pos geom.Point, face render.FontFace, clr co
 }
 
 func (c *canvas) MeasureText(s string, face render.FontFace) geom.Size {
-	ff, ok := face.(*fontFace)
-	if !ok || ff == nil {
+	if face == nil {
 		return geom.Size{}
 	}
-	w, h := text.Measure(s, ff.face, ff.metrics.LineHeight)
-	return geom.Size{W: w, H: h}
+	return face.Measure(s)
 }
 
 func (c *canvas) DrawImage(img render.Image, dst geom.Rect) {

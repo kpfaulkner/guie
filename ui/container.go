@@ -17,13 +17,21 @@ import (
 type Container struct {
 	BaseWidget
 	children   []Widget
-	background color.Color // optional fill; nil means transparent
+	data       []LayoutData // per-child layout params, parallel to children
+	layout     Layout       // optional; nil means children keep their bounds
+	background color.Color  // optional fill; nil means transparent
 	padding    geom.Insets
 }
 
 // NewContainer returns an empty, visible Container.
 func NewContainer() *Container {
 	return &Container{BaseWidget: NewBase()}
+}
+
+// SetLayout sets the layout manager that positions the children.
+func (c *Container) SetLayout(l Layout) {
+	c.layout = l
+	c.Invalidate()
 }
 
 // SetBackground sets the fill color drawn behind the children. Nil is transparent.
@@ -38,10 +46,15 @@ func (c *Container) SetPadding(in geom.Insets) {
 	c.Invalidate()
 }
 
-// Add appends a child widget, mounting it immediately if the container is
-// already part of a mounted tree.
-func (c *Container) Add(w Widget) {
+// Add appends a child widget with optional per-child layout parameters,
+// mounting it immediately if the container is already part of a mounted tree.
+func (c *Container) Add(w Widget, opts ...ItemOption) {
+	d := defaultLayoutData()
+	for _, o := range opts {
+		o(&d)
+	}
 	c.children = append(c.children, w)
+	c.data = append(c.data, d)
 	if c.ctx != nil {
 		w.mount(c, c.ctx)
 	}
@@ -51,30 +64,47 @@ func (c *Container) Add(w Widget) {
 // Children returns the container's child widgets.
 func (c *Container) Children() []Widget { return c.children }
 
+// items pairs each child with its layout data for the layout manager.
+func (c *Container) items() []Item {
+	items := make([]Item, len(c.children))
+	for i, ch := range c.children {
+		items[i] = Item{Widget: ch, Data: c.data[i]}
+	}
+	return items
+}
+
 // ContentRect returns the area available to children: Bounds inset by padding.
 func (c *Container) ContentRect() geom.Rect {
 	return c.Bounds().Inset(c.padding)
 }
 
-// MinSize returns the size needed to enclose every child plus padding. With no
-// layout manager yet, it takes the largest child extents on each axis.
+// MinSize returns the size needed to enclose the children plus padding. With a
+// layout manager it defers to the layout's measurement; otherwise it takes the
+// largest child extents on each axis.
 func (c *Container) MinSize() geom.Size {
-	var w, h float64
-	for _, ch := range c.children {
-		m := ch.MinSize()
-		w = math.Max(w, m.W)
-		h = math.Max(h, m.H)
+	var content geom.Size
+	if c.layout != nil {
+		content = c.layout.Measure(c.items())
+	} else {
+		for _, ch := range c.children {
+			m := ch.MinSize()
+			content.W = math.Max(content.W, m.W)
+			content.H = math.Max(content.H, m.H)
+		}
 	}
 	return geom.Size{
-		W: w + c.padding.Left + c.padding.Right,
-		H: h + c.padding.Top + c.padding.Bottom,
+		W: content.W + c.padding.Left + c.padding.Right,
+		H: content.H + c.padding.Top + c.padding.Bottom,
 	}
 }
 
-// Layout gives each child a chance to lay out. Without a layout manager
-// (step 3) children keep their assigned bounds; nested containers still
-// recurse so their own children are positioned.
+// Layout arranges the children via the layout manager (if any), then recurses
+// so nested containers position their own children. Without a layout manager
+// children keep their assigned bounds.
 func (c *Container) Layout() {
+	if c.layout != nil {
+		c.layout.Arrange(c.items(), c.ContentRect())
+	}
 	for _, ch := range c.children {
 		ch.Layout()
 	}
