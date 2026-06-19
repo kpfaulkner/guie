@@ -278,9 +278,10 @@ func (a *App) dispatchPointer(in render.InputState) {
 		}
 	}
 
-	// A press outside the open popups is swallowed. For a non-modal stack it
-	// also dismisses them; a modal stack stays open (the scrim absorbs clicks).
-	if in.MousePressed.Has(render.MouseLeft) && len(a.overlays) > 0 && !inPopup {
+	// A press (any button) outside the open popups is swallowed. For a non-modal
+	// stack it also dismisses them; a modal stack stays open (the scrim absorbs
+	// clicks).
+	if in.MousePressed != 0 && len(a.overlays) > 0 && !inPopup {
 		if a.modalActive() == nil {
 			a.closeAll()
 		}
@@ -313,25 +314,42 @@ func (a *App) dispatchPointer(in render.InputState) {
 		a.dispatch(hit, Event{Type: EventWheel, Pos: pos, Wheel: in.WheelDelta, Modifiers: in.Modifiers})
 	}
 
-	if in.MousePressed.Has(render.MouseLeft) {
-		a.hideTooltip()
-		a.focusFromPointer(hit)
-		if hit != nil {
-			a.dispatch(hit, Event{Type: EventPointerDown, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
+	// Presses: the first button down captures the pointer (and moves focus);
+	// further buttons are delivered to the same captured widget.
+	for _, btn := range mouseButtons {
+		if !in.MousePressed.Has(btn) {
+			continue
+		}
+		if a.pressTarget == nil {
+			a.hideTooltip()
+			a.focusFromPointer(hit)
 			a.pressTarget = hit
-		} else {
-			a.pressTarget = nil
+		}
+		if a.pressTarget != nil {
+			a.dispatch(a.pressTarget, Event{Type: EventPointerDown, Pos: pos, Button: btn, Modifiers: in.Modifiers})
 		}
 	}
 
-	if in.MouseReleased.Has(render.MouseLeft) && a.pressTarget != nil {
-		a.dispatch(a.pressTarget, Event{Type: EventPointerUp, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
-		if a.pressTarget.Bounds().Contains(pos) {
-			a.dispatch(a.pressTarget, Event{Type: EventClick, Pos: pos, Button: render.MouseLeft, Modifiers: in.Modifiers})
+	// Releases: deliver to the captured widget, deriving a click when the release
+	// lands within its bounds. Capture is held until all buttons are up.
+	if a.pressTarget != nil {
+		for _, btn := range mouseButtons {
+			if !in.MouseReleased.Has(btn) {
+				continue
+			}
+			a.dispatch(a.pressTarget, Event{Type: EventPointerUp, Pos: pos, Button: btn, Modifiers: in.Modifiers})
+			if a.pressTarget.Bounds().Contains(pos) {
+				a.dispatch(a.pressTarget, Event{Type: EventClick, Pos: pos, Button: btn, Modifiers: in.Modifiers})
+			}
 		}
-		a.pressTarget = nil
+		if in.MouseDown == 0 {
+			a.pressTarget = nil
+		}
 	}
 }
+
+// mouseButtons is the dispatch order for pointer buttons.
+var mouseButtons = []render.MouseButton{render.MouseLeft, render.MouseMiddle, render.MouseRight}
 
 // focusFromPointer moves focus to the nearest focusable widget at or above hit,
 // or clears focus if there is none (e.g. clicking empty space).

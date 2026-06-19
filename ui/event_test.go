@@ -7,9 +7,14 @@ import (
 	"github.com/kpfaulkner/uiframework/render"
 )
 
-// down/up build InputState snapshots for a left button press/release at pos.
+// down/up build InputState snapshots for a left button press/release at pos. A
+// press reports the button as both "just pressed" and "currently held".
 func downAt(pos geom.Point) render.InputState {
-	return render.InputState{MousePos: pos, MousePressed: ButtonSetOf(render.MouseLeft)}
+	return render.InputState{
+		MousePos:     pos,
+		MousePressed: ButtonSetOf(render.MouseLeft),
+		MouseDown:    ButtonSetOf(render.MouseLeft),
+	}
 }
 
 func upAt(pos geom.Point) render.InputState {
@@ -93,6 +98,46 @@ func TestPointerClickFocusesButton(t *testing.T) {
 	app.dispatchPointer(downAt(geom.Point{X: 20, Y: 20}))
 	if app.focused != Widget(b) {
 		t.Fatal("pressing a focusable button should focus it")
+	}
+}
+
+// recPad records the button of pointer-down and click events it receives.
+type recPad struct {
+	BaseWidget
+	downs  []render.MouseButton
+	clicks []render.MouseButton
+}
+
+func (r *recPad) HandleEvent(ev *Event) bool {
+	switch ev.Type {
+	case EventPointerDown:
+		r.downs = append(r.downs, ev.Button)
+		return true
+	case EventClick:
+		r.clicks = append(r.clicks, ev.Button)
+		return true
+	}
+	return false
+}
+
+func TestPointerDispatchesAllButtons(t *testing.T) {
+	app := NewApp()
+	rec := &recPad{BaseWidget: NewBase()}
+	app.SetContent(rec)
+	rec.SetBounds(geom.Rect{X: 0, Y: 0, W: 100, H: 100})
+	pos := geom.Point{X: 10, Y: 10}
+
+	for _, btn := range []render.MouseButton{render.MouseRight, render.MouseMiddle} {
+		app.dispatchPointer(render.InputState{MousePos: pos, MousePressed: ButtonSetOf(btn), MouseDown: ButtonSetOf(btn)})
+		app.dispatchPointer(render.InputState{MousePos: pos, MouseReleased: ButtonSetOf(btn)})
+	}
+
+	want := []render.MouseButton{render.MouseRight, render.MouseMiddle}
+	if len(rec.downs) != 2 || rec.downs[0] != want[0] || rec.downs[1] != want[1] {
+		t.Fatalf("downs = %v, want %v", rec.downs, want)
+	}
+	if len(rec.clicks) != 2 || rec.clicks[0] != want[0] || rec.clicks[1] != want[1] {
+		t.Fatalf("clicks = %v, want %v", rec.clicks, want)
 	}
 }
 
