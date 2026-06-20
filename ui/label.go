@@ -7,9 +7,10 @@ import (
 	"github.com/kpfaulkner/guie/render"
 )
 
-// Label is a non-interactive widget that draws a single line of text. Color and
-// font fall back to the theme when not overridden; the text is aligned
-// horizontally per Align and centered vertically within the widget's bounds.
+// Label is a non-interactive widget that draws text. Color and font fall back
+// to the theme when not overridden; the text is aligned horizontally per Align
+// and centered vertically within the widget's bounds. Embedded newlines render
+// as multiple stacked lines (use TextArea for editable multi-line text).
 type Label struct {
 	BaseWidget
 	text  string
@@ -81,8 +82,5 @@ func (l *Label) Draw(c render.Canvas) {
 	if f == nil {
 		return
 	}
-	b := l.Bounds()
-	size := f.Measure(l.text)
-	x, _ := alignSpan(l.align, b.X, b.W, size.W)
-	c.DrawText(l.text, geom.Point{X: x, Y: vCenterY(f, b.Y, b.H)}, f, l.ColorOf(RoleText))
+	drawText(c, l.text, l.Bounds(), l.align, f, l.ColorOf(RoleText))
 }
