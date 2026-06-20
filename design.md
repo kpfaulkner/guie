@@ -410,6 +410,46 @@ feel native, for a later date:
 
 ---
 
+## ARM / RASPBERRY PI (TBD)
+
+**guie itself needs zero code changes for ARM** — everything platform-specific
+lives behind the EBiten seam, and the one `runtime.GOOS` check correctly yields
+`ModPrimary = Ctrl` on Linux. Getting it onto a Pi is entirely an "EBiten builds
+and runs here" exercise, not a framework one. Findings (verified by cross-compile
+attempts from a Windows dev box):
+
+- **CGo is required on Linux.** Unlike Windows/macOS, there is no CGo-free path:
+  `CGO_ENABLED=0` fails because EBiten's Linux backend pulls in GLFW (OpenGL /
+  X11) via CGo. So a C compiler and the target's dev headers are mandatory.
+- **Build natively on the Pi (recommended).** Install Go for arm64, then the
+  EBiten Linux build deps via apt (`libgl1-mesa-dev xorg-dev libasound2-dev
+  libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev`), then
+  `go build`. CGo "just works" because the compiler and headers are local.
+- **Cross-compiling is fiddly.** `GOOS=linux GOARCH=arm64 CGO_ENABLED=1` needs an
+  ARM cross C toolchain (e.g. `CC="zig cc -target aarch64-linux-gnu"`) *plus* a
+  sysroot of the Pi's X11/GL/ALSA headers. Doable for CI, not worth it for a
+  one-off — prefer the native build.
+- **Architecture.** Use 64-bit Raspberry Pi OS → `GOARCH=arm64`. 32-bit is
+  `GOARCH=arm GOARM=7`; Pi Zero/1 are ARMv6 (`GOARM=6`) and realistically too
+  slow to bother with.
+- **Runtime needs a GPU + display.** EBiten requires OpenGL (~2.1 / GLES). A
+  **Pi 4/5** on Raspberry Pi OS Desktop with the modern Mesa V3D driver and X11
+  should run it; older Pis with the legacy Broadcom driver are dicey. Headless
+  won't work without `Xvfb` + software GL (llvmpipe), which is slow.
+- **Performance is the real risk, and it links to task 15.** guie does a full
+  redraw every frame at 60 TPS (dirty-region redraw, plan item 15, is not done).
+  Fine for simple UIs on a Pi 4/5; sluggish on weaker hardware or busy screens.
+  The Pi is the use case that would actually justify implementing task 15; a
+  cheap interim lever is lowering the tick rate.
+- **Touch input.** The official Pi touchscreen usually presents as mouse events
+  through the OS, so basic tap/drag works as-is. True multitouch/gestures aren't
+  wired — guie's input layer only polls mouse, not EBiten touches. A later
+  nicety, not a blocker.
+- **Visual verification.** Can't be checked headlessly — rendering and
+  performance should be eyeballed on real Pi hardware.
+
+---
+
 ## IMPLEMENTATION PLAN
 
 1. **Skeleton & backend seam** — `geom` types, `render.Canvas`/`Input`
