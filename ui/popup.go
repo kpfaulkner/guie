@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"strings"
 
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
@@ -181,7 +182,11 @@ func (a *App) ShowMessage(title, message string, buttons ...DialogButton) *Popup
 	panel.SetPadding(geom.UniformInsets(16))
 
 	panel.Add(NewLabel(title))
-	panel.Add(NewLabel(message, LabelColor(pal.TextMuted)))
+	// Label is single-line, so render a multi-line message as one Label per line
+	// rather than passing an embedded newline (which would overlap when drawn).
+	for _, line := range strings.Split(message, "\n") {
+		panel.Add(NewLabel(line, LabelColor(pal.TextMuted)))
+	}
 
 	var popup *Popup
 	row := NewContainer()
