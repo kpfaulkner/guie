@@ -361,12 +361,52 @@ Grouped by build priority.
 
 ## OPEN QUESTIONS / TBD
 
-- High-DPI / scaling strategy (logical vs physical pixels).
-- Clipboard and IME support for text fields.
+- High-DPI / scaling strategy (logical vs physical pixels). *(Done — device
+  scale factor wired through the loop + canvas; see MACOS/CROSS-PLATFORM POLISH.)*
+- Clipboard and IME support for text fields. *(Clipboard works in-process;
+  OS-backed clipboard + IME still TBD — see MACOS/CROSS-PLATFORM POLISH.)*
 - Animation/transition primitives (timeline vs per-frame).
 - Persistence of window size/position.
 - Testing approach (headless backend implementing `Canvas`/`Input` for unit
   tests of layout and event dispatch without a real window).
+
+---
+
+## MACOS / CROSS-PLATFORM POLISH (TBD)
+
+The framework runs on macOS as-is (EBiten is cross-platform; guie has no
+OS-specific code beyond one `runtime.GOOS` check in the backend). Two
+foundational pieces are already done: the **primary shortcut modifier**
+(`ModPrimary` — ⌘ on macOS, Ctrl elsewhere; used by `TextField`/`TextArea`) and
+**HiDPI/Retina scaling** (device scale factor wired through the loop + canvas, so
+rendering is crisp while widgets stay logical). Remaining niceties to make it
+feel native, for a later date:
+
+- **OS clipboard integration.** The default `Clipboard` is in-process
+  (`memClipboard`), so copy/paste works within a guie app but not with other
+  apps. Add an OS-backed `render.Clipboard` (per-platform, injected via
+  `ui.WithClipboard`) so ⌘C/⌘V exchange text system-wide. Cross-platform, not
+  mac-only — but most expected on macOS.
+- **Native top menu bar.** macOS apps put menus in the global menu bar with the
+  app name, not in an in-surface `MenuBar` widget. A native menu bridge would be
+  backend-specific and sizeable; the in-surface menu works everywhere in the
+  meantime.
+- **Standard macOS shortcuts beyond clipboard.** Word-jump is ⌥←/⌥→ (Option),
+  line start/end is ⌘←/⌘→, and ⌘↑/⌘↓ go to document start/end. Today navigation
+  assumes the Windows/Linux convention. Generalise text navigation to honour the
+  platform's modifier map (extend the `ModPrimary` idea to a small per-platform
+  shortcut table).
+- **HiDPI mid-run scale changes.** Dragging a window between monitors of
+  different DPI is picked up on the next frame, but cached scaled glyph state
+  isn't pre-warmed (minor; see `internals.md` §16).
+- **Window controls / chrome conventions.** Traffic-light buttons, title bar
+  behaviour, full-screen handling — currently whatever EBiten provides; revisit
+  if a more native window experience is wanted.
+- **Retina visual verification.** The HiDPI path is the standard EBiten recipe
+  and passes build/test, but crispness should be eyeballed on real Retina
+  hardware (`go run ./examples/showcase`) — can't be checked headlessly.
+- **Trackpad / gesture input.** Smooth/inertial two-finger scroll and pinch are
+  not surfaced beyond `WheelDelta`; native-feeling scrolling could be added.
 
 ---
 
