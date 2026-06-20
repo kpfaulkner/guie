@@ -47,6 +47,8 @@ type App struct {
 	frameCbs []func(dt float64)
 	anims    []*Animation
 
+	accels []accelerator // global keyboard shortcuts
+
 	// pointer/focus dispatch state
 	hovered     Widget     // widget currently under the cursor
 	pressTarget Widget     // widget that received the active pointer-down (capture)
@@ -329,6 +331,16 @@ func (a *App) dispatchPointer(in render.InputState) {
 		a.dispatch(hit, Event{Type: EventWheel, Pos: pos, Wheel: in.WheelDelta, Modifiers: in.Modifiers})
 	}
 
+	// A right-press over a widget that has a context menu opens it at the cursor
+	// instead of dispatching a normal press.
+	if in.MousePressed.Has(render.MouseRight) && !inPopup {
+		if t := contextTarget(hit); t != nil {
+			a.hideTooltip()
+			a.ShowContextMenu(pos, t.ContextMenu()...)
+			return
+		}
+	}
+
 	// Presses: the first button down captures the pointer (and moves focus);
 	// further buttons are delivered to the same captured widget.
 	for _, btn := range mouseButtons {
@@ -392,6 +404,10 @@ func (a *App) dispatchKeyboard(in render.InputState) {
 			} else {
 				a.moveFocus(1)
 			}
+			continue
+		}
+		// Global accelerators take precedence over the focused widget.
+		if a.runAccelerator(k, in.Modifiers) {
 			continue
 		}
 		if a.focused != nil {

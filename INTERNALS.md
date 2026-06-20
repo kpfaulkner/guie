@@ -437,7 +437,11 @@ nothing to scroll. This bit `ScrollView` once and is now a deliberate invariant.
    get moves, and self-drawing multi-row widgets (List/Table/Menu) can track the
    cursor row.
 6. Wheel → `hit` (bubbles).
-7. Press → focus the nearest focusable in the hit chain, dispatch `PointerDown`,
+7. **Right-press** over a widget with a context menu (found by walking up the hit
+   chain via `contextTarget`) opens that menu at the cursor and consumes the
+   press — see §11. Widgets without one fall through to normal press handling
+   (so e.g. paint's right-drag-erase still works).
+8. Press → focus the nearest focusable in the hit chain, dispatch `PointerDown`,
    set the capture target.
 8. Release → `PointerUp` to the capture target; if released within its bounds,
    also dispatch a derived `Click`. (So *click derivation* lives in the
@@ -453,9 +457,29 @@ in the hit chain (clicking empty space clears focus).
 
 ### 10.5 Keyboard (`dispatchKeyboard`)
 
-Per `KeysPressed`: `Escape` closes the top popup; `Tab` moves focus; otherwise
-`KeyDown` → focused widget (bubbles). `KeysReleased` → `KeyUp`; `Runes` →
-`Text`. Modifiers (Shift/Ctrl/...) ride on every event.
+Per `KeysPressed`: `Escape` closes the top popup; `Tab` moves focus; then
+**global accelerators** are checked (§10.8); otherwise `KeyDown` → focused widget
+(bubbles). `KeysReleased` → `KeyUp`; `Runes` → `Text`. Modifiers (Shift/Ctrl/...)
+ride on every event.
+
+### 10.8 Accelerators & context menus (`ui/accelerator.go`)
+
+- **Accelerators.** `App.AddAccelerator(key, mods, action)` registers a global
+  chord, checked in `dispatchKeyboard` *before* the focused widget — so it takes
+  precedence (don't bind chords a focused widget needs, like Primary+C, unless
+  intended). Matching is exact over a **normalized** modifier set (`normalizeMods`
+  keeps only Primary/Shift/Alt and drops the redundant concrete Control/Meta
+  bit), so an accelerator registered with `ModPrimary` fires for Ctrl+key on
+  Windows/Linux and Cmd+key on macOS, but Primary+Shift+key does *not* fire a
+  Primary-only binding.
+- **Context menus.** Any widget gets one via `BaseWidget.SetContextMenu(items…)`
+  (stored like the tooltip; exposed through the new `Widget.ContextMenu()` method,
+  defaulted by `BaseWidget`). On a right-press the dispatcher finds the nearest
+  hit-chain widget with a menu and calls `App.ShowContextMenu(at, items…)`, which
+  opens a non-modal popup (built by the shared `menuPanel` helper, also used by
+  `MenuBar`) at the cursor, clamped on-screen. Choosing a row runs its action
+  after closing the menu (so an action that opens a dialog isn't torn down with
+  it); clicking elsewhere or Escape dismisses it.
 
 ### 10.6 Event bus (`ui/bus.go`)
 
@@ -489,8 +513,10 @@ stack drawn above the root.
   Escape close it). Non-modal popups (dropdown list, menu) dismiss on
   outside-click.
 - **Built on this**: `DropdownCombo` opens a `List` popup below itself;
-  `MenuBar` opens a `Container` of `menuRow`s; `App.ShowModal`/`ShowMessage`
-  center a panel as a modal dialog. `DialogButton` wraps an action + auto-close.
+  `MenuBar` opens a `Container` of `menuRow`s; `App.ShowContextMenu` opens the
+  same kind of menu at the cursor on right-click (§10.8); `App.ShowModal`/
+  `ShowMessage` center a panel as a modal dialog. `DialogButton` wraps an action
+  + auto-close.
 
 (There is no in-surface "window" layer yet; multi-window is parked because
 EBiten is single-window — see §16.)

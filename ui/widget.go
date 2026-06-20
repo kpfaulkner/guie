@@ -49,6 +49,11 @@ type Widget interface {
 	// Tooltip returns the hover hint text for the widget, or "" for none.
 	Tooltip() string
 
+	// ContextMenu returns the items shown when the widget is right-clicked, or
+	// nil for none. The framework walks up from the hit widget to find the first
+	// with a non-nil menu and shows it at the cursor.
+	ContextMenu() []MenuItem
+
 	// mount connects the widget to the tree. self is the widget's own interface
 	// identity (so containers record the correct parent even when a widget type
 	// embeds another), parent is its parent (nil for the root). The parent calls

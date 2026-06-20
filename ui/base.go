@@ -12,14 +12,15 @@ import (
 // implementations shared by all widgets. Embed it in a concrete widget and
 // override Draw, Layout and MinSize (and, later, event handling) as needed.
 type BaseWidget struct {
-	bounds  geom.Rect
-	visible bool
-	enabled bool
-	tooltip string
-	colors  map[ColorRole]color.Color // per-widget color overrides
-	self    Widget                    // this widget's interface identity
-	parent  Widget
-	ctx     *treeContext
+	bounds      geom.Rect
+	visible     bool
+	enabled     bool
+	tooltip     string
+	contextMenu []MenuItem                // shown on right-click, empty for none
+	colors      map[ColorRole]color.Color // per-widget color overrides
+	self        Widget                    // this widget's interface identity
+	parent      Widget
+	ctx         *treeContext
 }
 
 // NewBase returns a BaseWidget that is visible and enabled. Concrete widgets
@@ -67,6 +68,16 @@ func (b *BaseWidget) Tooltip() string { return b.tooltip }
 // SetTooltip sets the hover hint text shown after the pointer rests on the
 // widget. An empty string disables it.
 func (b *BaseWidget) SetTooltip(s string) { b.tooltip = s }
+
+// ContextMenu returns the items shown when the widget is right-clicked (nil for
+// none).
+func (b *BaseWidget) ContextMenu() []MenuItem { return b.contextMenu }
+
+// SetContextMenu sets the items shown in a popup menu when the widget is
+// right-clicked. Pass no items to clear it. The framework shows the menu at the
+// cursor automatically; an item whose Action opens a dialog works because the
+// menu closes before the action runs.
+func (b *BaseWidget) SetContextMenu(items ...MenuItem) { b.contextMenu = items }
 
 // RequestFocus asks the framework to give this widget keyboard focus. It is a
 // no-op before the widget is mounted.

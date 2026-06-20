@@ -4,6 +4,9 @@
 // hover between titles once one is open); click the dropdown to open its popup;
 // click outside or press Escape to dismiss popups.
 //
+// It also demonstrates keyboard accelerators (Ctrl/Cmd+N, Ctrl/Cmd+S,
+// Ctrl/Cmd+Shift+S) and a context menu — right-click the list.
+//
 // Run with: go run ./examples/showcase
 package main
 
@@ -12,6 +15,7 @@ import (
 	"log"
 
 	"github.com/kpfaulkner/guie/geom"
+	"github.com/kpfaulkner/guie/render"
 	"github.com/kpfaulkner/guie/ui"
 )
 
@@ -52,6 +56,12 @@ func main() {
 	fruits := []string{"Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Kiwi", "Lemon", "Mango"}
 	list := ui.NewList(fruits)
 	list.OnSelect(func(i int) { say(fmt.Sprintf("List: %s", fruits[i])) })
+	// Right-click the list for a context menu acting on the current selection.
+	list.SetContextMenu(
+		ui.NewMenuItem("Select first", func() { list.SetSelected(0) }),
+		ui.NewMenuItem("Select last", func() { list.SetSelected(len(fruits) - 1) }),
+		ui.NewMenuItem("Show selection", func() { say(fmt.Sprintf("Selected: %s", fruits[list.Selected()])) }),
+	)
 	content.Add(list, ui.Weight(1))
 
 	right := ui.NewContainer()
@@ -61,7 +71,7 @@ func main() {
 	dd := ui.NewDropdown(colors, ui.DropdownPlaceholder("choose a color"))
 	dd.OnSelect(func(i int) { say("Dropdown: " + colors[i]) })
 	right.Add(dd, ui.Align(geom.AlignStart))
-	right.Add(ui.NewLabel("(click outside or Esc to close popups)"), ui.Weight(1))
+	right.Add(ui.NewLabel("(right-click the list · try Ctrl/Cmd+N, +S, +Shift+S)"), ui.Weight(1))
 	content.Add(right, ui.Weight(1))
 
 	root.Add(content, ui.Weight(1))
@@ -72,6 +82,18 @@ func main() {
 	statusBar.SetPadding(geom.UniformInsets(8))
 	statusBar.Add(status)
 	root.Add(statusBar)
+
+	// Keyboard accelerators (Cmd on macOS, Ctrl elsewhere via ModPrimary).
+	primary := func(extra ...render.Modifier) render.ModifierSet {
+		m := render.ModPrimary
+		for _, e := range extra {
+			m |= e
+		}
+		return render.ModifierSet(m)
+	}
+	app.AddAccelerator(render.KeyN, primary(), func() { say("Accelerator: New (Ctrl/Cmd+N)") })
+	app.AddAccelerator(render.KeyS, primary(), func() { say("Accelerator: Save (Ctrl/Cmd+S)") })
+	app.AddAccelerator(render.KeyS, primary(render.ModShift), func() { say("Accelerator: Save As (Ctrl/Cmd+Shift+S)") })
 
 	app.SetContent(root)
 

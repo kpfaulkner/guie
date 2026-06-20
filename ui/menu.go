@@ -3,7 +3,36 @@ package ui
 import (
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
+
+// menuPanel builds a bordered surface panel of clickable rows for items, using
+// font (nil → theme font). run is invoked with each item's action when its row
+// is clicked; callers use it to close the owning popup before running the
+// action. It returns the panel and the content size the popup should use.
+func menuPanel(th theme.Theme, font render.FontFace, items []MenuItem, run func(action func())) (*Container, geom.Size) {
+	f := font
+	if f == nil {
+		f = th.Font
+	}
+	rowH := f.Measure("Ag").H + 2*menuRowPad
+	var w float64
+	for _, it := range items {
+		w = maxF(w, f.Measure(it.Label).W)
+	}
+	panel := NewContainer()
+	panel.SetBackground(th.Palette.Surface)
+	panel.SetBorder(th.Palette.Border, 1)
+	panel.SetCornerRadius(th.CornerRadius)
+	panel.SetLayout(VBox(0))
+	for _, it := range items {
+		action := it.Action
+		row := newMenuRow(it.Label, func() { run(action) })
+		row.font = font
+		panel.Add(row)
+	}
+	return panel, geom.Size{W: w + 2*menuRowPad, H: rowH * float64(len(items))}
+}
 
 const (
 	menuTitlePad = 12
@@ -146,34 +175,17 @@ func (m *MenuBar) openMenu(i int) {
 		m.ctx.close(m.popup)
 	}
 
-	f := m.face()
-	rowH := f.Measure("Ag").H + 2*menuRowPad
-	var w float64
-	for _, it := range m.menus[i] {
-		w = maxF(w, f.Measure(it.Label).W)
-	}
-
-	panel := NewContainer()
-	panel.SetBackground(m.appTheme().Palette.Surface)
-	panel.SetBorder(m.appTheme().Palette.Border, 1)
-	panel.SetCornerRadius(m.appTheme().CornerRadius)
-	panel.SetLayout(VBox(0))
-	for _, it := range m.menus[i] {
-		action := it.Action
-		row := newMenuRow(it.Label, func() {
-			// Close the menu first, so an action that opens its own popup (a
-			// dialog) isn't torn down along with the menu's overlay.
-			m.ctx.close(m.popup)
-			if action != nil {
-				action()
-			}
-		})
-		row.font = m.font
-		panel.Add(row)
-	}
+	panel, sz := menuPanel(m.appTheme(), m.font, m.menus[i], func(action func()) {
+		// Close the menu first, so an action that opens its own popup (a dialog)
+		// isn't torn down along with the menu's overlay.
+		m.ctx.close(m.popup)
+		if action != nil {
+			action()
+		}
+	})
 
 	tr := m.titleRect(i)
-	bounds := geom.Rect{X: tr.X, Y: tr.Y + tr.H, W: w + 2*menuRowPad, H: rowH * float64(len(m.menus[i]))}
+	bounds := geom.Rect{X: tr.X, Y: tr.Y + tr.H, W: sz.W, H: sz.H}
 	m.popup = NewPopup(panel, bounds, func() { m.openIdx = -1; m.popup = nil })
 	m.ctx.open(m.popup)
 	m.openIdx = i
