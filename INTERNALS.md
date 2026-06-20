@@ -139,8 +139,13 @@ macOS, Ctrl+C on Windows/Linux).
 
 `Clipboard{ ReadText() string; WriteText(string) }`. The default is an
 in-process implementation in `ui` (`memClipboard`); apps can inject an
-OS-backed one via `ui.WithClipboard`. This keeps the core dependency-free and
-cross-platform; the design's OPEN QUESTIONS flagged clipboard as TBD.
+OS-backed one via `ui.WithClipboard`. An OS-backed implementation ships in the
+opt-in top-level `clipboard` package (`clipboard.New() (render.Clipboard,
+error)`), backed by `golang.design/x/clipboard`. It lives in its own package —
+not wired in by default — so the core `ui`/`render` packages stay
+dependency-free and cross-platform; only apps that import `clipboard` pull in
+the platform dependency. CGo-free on Windows; reuses the CGo/X11 toolchain
+EBiten already requires on macOS/Linux (no external `xclip` binary).
 
 ---
 
@@ -666,7 +671,7 @@ per-row hover via the pointer-move-to-hovered dispatch (§10.3).
 - **Grid** has no cell spanning.
 - **No accessibility** bridge (EBiten surfaces have no OS a11y tree to feed).
 - **Clipboard** default is in-process; OS integration is opt-in via
-  `WithClipboard`.
+  `WithClipboard` using the `clipboard` package (§3.6).
 - **IME / complex text input** is not handled (relies on `AppendInputChars`).
 - **Coordinates are absolute**; a widget that overflows its parent's bounds
   won't be found by `hitTest` through the parent (the parent's bounds gate the

@@ -363,8 +363,10 @@ Grouped by build priority.
 
 - High-DPI / scaling strategy (logical vs physical pixels). *(Done — device
   scale factor wired through the loop + canvas; see MACOS/CROSS-PLATFORM POLISH.)*
-- Clipboard and IME support for text fields. *(Clipboard works in-process;
-  OS-backed clipboard + IME still TBD — see MACOS/CROSS-PLATFORM POLISH.)*
+- Clipboard and IME support for text fields. *(Done for clipboard — an
+  OS-backed clipboard ships in the opt-in `clipboard` package, injected via
+  `ui.WithClipboard`; see `examples/clipboard`. IME still TBD — see
+  MACOS/CROSS-PLATFORM POLISH.)*
 - Animation/transition primitives (timeline vs per-frame). *(Done — per-frame
   hook `App.OnFrame` plus `App.Animate`/`App.Tween` with easings; see
   `internals.md` §11a and `examples/animation`.)*
@@ -384,11 +386,14 @@ foundational pieces are already done: the **primary shortcut modifier**
 rendering is crisp while widgets stay logical). Remaining niceties to make it
 feel native, for a later date:
 
-- **OS clipboard integration.** The default `Clipboard` is in-process
-  (`memClipboard`), so copy/paste works within a guie app but not with other
-  apps. Add an OS-backed `render.Clipboard` (per-platform, injected via
-  `ui.WithClipboard`) so ⌘C/⌘V exchange text system-wide. Cross-platform, not
-  mac-only — but most expected on macOS.
+- **OS clipboard integration.** *(Done.)* The default `Clipboard` is still the
+  in-process `memClipboard`, but apps can now opt into system-wide copy/paste by
+  passing `ui.WithClipboard(cb)` where `cb` comes from the new `clipboard`
+  package (`clipboard.New()`). It is a separate, opt-in package so the core
+  `ui`/`render` packages stay dependency-free; it's backed by
+  `golang.design/x/clipboard` (CGo-free on Windows; uses the same CGo/X11
+  toolchain EBiten already needs on macOS/Linux — no external `xclip` binary).
+  See `examples/clipboard`.
 - **Native top menu bar.** macOS apps put menus in the global menu bar with the
   app name, not in an in-surface `MenuBar` widget. A native menu bridge would be
   backend-specific and sizeable; the in-surface menu works everywhere in the
