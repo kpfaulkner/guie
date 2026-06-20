@@ -365,7 +365,9 @@ Grouped by build priority.
   scale factor wired through the loop + canvas; see MACOS/CROSS-PLATFORM POLISH.)*
 - Clipboard and IME support for text fields. *(Clipboard works in-process;
   OS-backed clipboard + IME still TBD — see MACOS/CROSS-PLATFORM POLISH.)*
-- Animation/transition primitives (timeline vs per-frame).
+- Animation/transition primitives (timeline vs per-frame). *(Done — per-frame
+  hook `App.OnFrame` plus `App.Animate`/`App.Tween` with easings; see
+  `internals.md` §11a and `examples/animation`.)*
 - Persistence of window size/position.
 - Testing approach (headless backend implementing `Canvas`/`Input` for unit
   tests of layout and event dispatch without a real window).

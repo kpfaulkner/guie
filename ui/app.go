@@ -43,6 +43,10 @@ type App struct {
 
 	overlays []*Popup // open popups, bottom-to-top
 
+	// per-frame hooks and running animations (advanced each frame in update)
+	frameCbs []func(dt float64)
+	anims    []*Animation
+
 	// pointer/focus dispatch state
 	hovered     Widget     // widget currently under the cursor
 	pressTarget Widget     // widget that received the active pointer-down (capture)
@@ -176,6 +180,9 @@ func (a *App) update(in render.InputState) error {
 	if a.quit.Load() {
 		return render.ErrTerminated
 	}
+	// Run frame callbacks and animations first, so any value changes they make
+	// are laid out and drawn this same frame.
+	a.advanceFrame(nominalFrameDelta)
 	// Keep layout current before hit-testing, then dispatch input.
 	a.layoutIfNeeded()
 	a.dispatchPointer(in)

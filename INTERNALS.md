@@ -497,6 +497,36 @@ EBiten is single-window — see §16.)
 
 ---
 
+## 11a. Frame hook & animations (`ui/animation.go`)
+
+The App drives per-frame work from `update`, before layout and dispatch, so any
+value changes are laid out and drawn the same frame:
+
+- **`App.OnFrame(func(dt float64))`** — register callbacks run once per frame with
+  the per-frame delta. `dt` is a **fixed** `nominalFrameDelta` (1/60 s). EBiten
+  ticks `Update` at a constant TPS (catching up under load), so a fixed step is
+  both wall-clock-accurate and deterministic for tests — the same rationale as
+  tooltip tick-timing (§13). Real elapsed time is deliberately *not* used.
+- **`App.Animate(duration, ease, apply)`** and **`App.Tween(duration, from, to,
+  ease, set)`** — start an `*Animation`. Each frame `advanceFrame` adds `dt` to
+  the animation's elapsed time, computes `t∈[0,1]`, applies `ease`, and calls
+  `apply(t)` (Tween maps `t` to `from→to`). On completion `apply` is called once
+  with `t=1` and `OnDone` fires; `Stop()` cancels (no `OnDone`). `Done()` reports
+  finished-or-stopped. Easings: `Linear`, `EaseIn`, `EaseOut`, `EaseInOut`
+  (custom `Easing` funcs may overshoot for spring-like motion).
+- **Reentrancy:** `advanceFrame` snapshots the active list and collects newly
+  started animations into a fresh slice, so an `apply`/`OnDone` that starts or
+  stops animations is safe; new ones first advance the next frame.
+
+Animations don't need to mark the tree dirty to show: the App redraws every
+frame, so a tweened paint property is visible immediately; a tweened layout-
+affecting property still calls `Invalidate` through its setter and re-lays-out
+the same frame. Widgets can already be animated via their public setters from
+app code; exposing the animator to widgets internally (through `treeContext`) is
+a straightforward future extension. See `examples/animation`.
+
+---
+
 ## 12. Color system (`ui/color.go`)
 
 Every widget resolves the colors it draws through **roles**, not the palette
