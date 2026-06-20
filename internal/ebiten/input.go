@@ -1,11 +1,17 @@
 package ebitenbackend
 
 import (
+	"runtime"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
 )
+
+// primaryIsMeta reports whether the platform's primary shortcut modifier is the
+// Meta/Command key (macOS) rather than Control (everywhere else).
+var primaryIsMeta = runtime.GOOS == "darwin"
 
 var mouseButtons = []struct {
 	eb ebiten.MouseButton
@@ -62,17 +68,22 @@ func mapKeys(keys []ebiten.Key) []render.Key {
 
 func pollModifiers() render.ModifierSet {
 	var m render.ModifierSet
+	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl)
+	meta := ebiten.IsKeyPressed(ebiten.KeyMeta)
 	if ebiten.IsKeyPressed(ebiten.KeyShift) {
 		m |= render.ModifierSet(render.ModShift)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
+	if ctrl {
 		m |= render.ModifierSet(render.ModControl)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyAlt) {
 		m |= render.ModifierSet(render.ModAlt)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyMeta) {
+	if meta {
 		m |= render.ModifierSet(render.ModMeta)
+	}
+	if (primaryIsMeta && meta) || (!primaryIsMeta && ctrl) {
+		m |= render.ModifierSet(render.ModPrimary)
 	}
 	return m
 }

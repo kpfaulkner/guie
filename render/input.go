@@ -35,6 +35,12 @@ const (
 	ModAlt
 	// ModMeta is the Meta/Command/Windows modifier.
 	ModMeta
+	// ModPrimary is the platform's primary shortcut modifier: Command (Meta) on
+	// macOS, Control on every other platform. Widgets test ModPrimary for
+	// clipboard and selection shortcuts (copy/cut/paste/select-all) so they
+	// follow the host platform's convention. The backend sets it alongside the
+	// concrete ModControl/ModMeta bit it stands in for.
+	ModPrimary
 )
 
 // ModifierSet is a bitset of active keyboard modifiers.

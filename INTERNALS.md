@@ -102,7 +102,13 @@ Opaque bitmap handle; only `Size()`.
 
 `ButtonSet`/`ModifierSet` are bitsets with `Set`/`Has`. `Key`, `MouseButton`,
 `Modifier` are framework-defined enums (the backend maps native codes onto
-them; unmapped keys become `KeyUnknown`).
+them; unmapped keys become `KeyUnknown`). Besides the concrete `ModShift`/
+`ModControl`/`ModAlt`/`ModMeta`, there is a synthetic **`ModPrimary`** — the
+platform's primary shortcut modifier, which the backend sets to Command (Meta)
+on macOS and Control elsewhere (`primaryIsMeta = runtime.GOOS == "darwin"`),
+alongside the concrete bit. Widgets test `ModPrimary` for clipboard/select-all
+shortcuts (`TextField`/`TextArea`) so chords follow the host convention (⌘C on
+macOS, Ctrl+C on Windows/Linux).
 
 ### 3.5 Loop seam (`render/driver.go`)
 
@@ -131,17 +137,28 @@ Package name `ebitenbackend`. The only place that touches EBiten.
 
 `canvas` wraps an `*ebiten.Image` and implements `render.Canvas`.
 
+- **HiDPI scaling.** The canvas carries a `scale` (device scale factor) bound
+  each frame by `reset(surface, scale)`. Framework coordinates are **logical**
+  pixels; the surface is **physical** pixels. Every draw multiplies its
+  coordinates (and line widths / radii) by `scale`, so widgets stay
+  device-independent while rendering happens at native resolution — crisp on
+  Retina. `Size()` reports the logical size (physical ÷ scale). See §4.5 for how
+  the scale reaches here and §19/`design.md` task 19 for the overall HiDPI model.
 - **Clip stack via sub-images.** The canvas holds a stack of `clipEntry{target
-  *ebiten.Image, rect geom.Rect}`. `PushClip(r)` intersects `r` with the current
-  clip, takes `base.SubImage(intRect)` as the new target, and pushes it. Drawing
-  goes to the top-of-stack target, so anything outside the clip is discarded by
-  EBiten's sub-image bounds. `reset(surface)` rebinds for a new frame.
+  *ebiten.Image, rect geom.Rect}` where `rect` is **logical**. `PushClip(r)`
+  intersects `r` (logical) with the current clip, then takes
+  `base.SubImage(phys(clip))` — `clip` scaled to physical pixel bounds — as the
+  new target and pushes it. Drawing goes to the top-of-stack target, so anything
+  outside the clip is discarded by EBiten's sub-image bounds.
 - Shapes use `ebiten/v2/vector` (`FillRect`, `StrokeRect`, `StrokeLine`,
   `FillCircle`, `StrokeCircle`) — note `vector.FillRect` (not the deprecated
   `DrawFilledRect`).
-- Text uses `ebiten/v2/text/v2`; `DrawText` translates to `pos` and color-scales;
-  `MeasureText` delegates to the face's `Measure`.
-- `toImageRect` rounds a float `Rect` outward to integer pixel bounds.
+- Text uses `ebiten/v2/text/v2`; `DrawText` translates to `pos×scale` and
+  color-scales, **rasterizing glyphs at physical size** (a shallow copy of the
+  face at `Size×scale`) so text stays sharp; `MeasureText` delegates to the
+  face's `Measure`, which stays at logical size so layout is unaffected.
+- `toImageRect` rounds a float `Rect` outward to integer pixel bounds;
+  `scaleRect`/`phys` map a logical rect to physical coords / pixel bounds.
 
 ### 4.2 Fonts (`font.go`)
 
@@ -177,8 +194,12 @@ Package name `ebitenbackend`. The only place that touches EBiten.
     stops cleanly and `RunGame` returns nil. Other errors propagate.
   - `Draw(screen)` rebinds the canvas to `screen`, clears to the background, then
     calls `hooks.Draw`.
-  - `Layout(outsideW, outsideH)` returns the logical size = device size (1:1, no
-    HiDPI scaling yet) and calls `hooks.Resize` when the size changes.
+  - `LayoutF(outsideW, outsideH)` (with `Layout` kept as the integer fallback)
+    reads `ebiten.Monitor().DeviceScaleFactor()`, reports the **logical**
+    (device-independent) size to `hooks.Resize` when it changes, and returns the
+    **physical** surface size (`outside × scale`) so EBiten maps the offscreen
+    surface 1:1 to the window's physical pixels — the basis for crisp HiDPI
+    rendering. The scale is handed to the canvas each `Draw` (§4.1).
 
 **Tick model (important):** EBiten calls `Update` at a fixed TPS (default 60),
 decoupled from render FPS. The framework relies on this for time-based behaviour
@@ -561,7 +582,12 @@ per-row hover via the pointer-move-to-hovered dispatch (§10.3).
   could be added (parked).
 - **Full redraw every frame.** No dirty-region optimization; fine for typical
   UIs and simplest against EBiten's model.
-- **HiDPI** is 1:1 logical=physical; no device scale factor yet.
+- **HiDPI** is handled: the driver sizes the offscreen surface to
+  logical×`DeviceScaleFactor` and the canvas scales all drawing (including
+  physical-size glyph rasterization), so rendering is crisp on Retina while
+  widgets work in logical pixels. Not yet covered: reacting to the scale factor
+  changing mid-run when a window is dragged between monitors of different DPI
+  (the next frame picks it up, but cached scaled state isn't pre-warmed).
 - **Grid** has no cell spanning.
 - **No accessibility** bridge (EBiten surfaces have no OS a11y tree to feed).
 - **Clipboard** default is in-process; OS integration is opt-in via

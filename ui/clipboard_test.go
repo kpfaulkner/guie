@@ -17,10 +17,10 @@ func TestTextFieldCopyPasteBetweenFields(t *testing.T) {
 
 	src.SetText("hello")
 	src.selectAll()
-	ctrlKey(src, render.KeyC)
+	primaryKey(src, render.KeyC)
 
 	dst.SetText("") // caret at 0
-	ctrlKey(dst, render.KeyV)
+	primaryKey(dst, render.KeyV)
 	if dst.Text() != "hello" {
 		t.Fatalf("paste should copy text across fields, got %q", dst.Text())
 	}
@@ -33,7 +33,7 @@ func TestTextFieldCutClearsAndStores(t *testing.T) {
 
 	tf.SetText("abc")
 	tf.selectAll()
-	ctrlKey(tf, render.KeyX)
+	primaryKey(tf, render.KeyX)
 	if tf.Text() != "" {
 		t.Fatalf("cut should remove the selected text, got %q", tf.Text())
 	}
@@ -48,7 +48,7 @@ func TestTextFieldPasteFlattensNewlines(t *testing.T) {
 	app.SetContent(tf)
 
 	app.clipboard.WriteText("a\nb")
-	ctrlKey(tf, render.KeyV)
+	primaryKey(tf, render.KeyV)
 	if tf.Text() != "a b" {
 		t.Fatalf("a single-line field should flatten newlines on paste, got %q", tf.Text())
 	}
@@ -60,14 +60,14 @@ func TestTextAreaCopyPasteMultiline(t *testing.T) {
 	app.SetContent(ta)
 
 	ta.SetText("ab\ncd")
-	ctrlKey(ta, render.KeyA)
-	ctrlKey(ta, render.KeyC)
+	primaryKey(ta, render.KeyA)
+	primaryKey(ta, render.KeyC)
 	if app.clipboard.ReadText() != "ab\ncd" {
 		t.Fatalf("copy should store the multi-line selection, got %q", app.clipboard.ReadText())
 	}
 
 	ta.SetText("") // caret at (0,0)
-	ctrlKey(ta, render.KeyV)
+	primaryKey(ta, render.KeyV)
 	if ta.Text() != "ab\ncd" {
 		t.Fatalf("paste should restore the multi-line text, got %q", ta.Text())
 	}

@@ -37,17 +37,24 @@ func (d *Driver) Run(cfg render.Config, hooks render.Hooks) error {
 		canvas: newCanvas(),
 		width:  cfg.Width,
 		height: cfg.Height,
+		scale:  1,
 	}
 	return ebiten.RunGame(g)
 }
 
 // game is the internal ebiten.Game that drives the framework's hooks. It is the
 // bridge between EBiten's Update/Draw/Layout model and the render.Hooks model.
+//
+// width/height track the last reported logical size (device-independent
+// pixels); scale is the current device scale factor. The framework works in
+// logical pixels, while the offscreen surface is sized in physical pixels so
+// rendering stays crisp on HiDPI displays — the canvas bridges the two.
 type game struct {
 	hooks         render.Hooks
 	bg            color.Color
 	canvas        *canvas
 	width, height int
+	scale         float64
 	sized         bool
 }
 
@@ -67,9 +74,11 @@ func (g *game) Update() error {
 	return nil
 }
 
-// Draw clears the surface to the background color and runs the Draw hook.
+// Draw clears the surface to the background color and runs the Draw hook. The
+// canvas is bound with the current device scale so logical draw coordinates map
+// to the physical-resolution surface.
 func (g *game) Draw(screen *ebiten.Image) {
-	g.canvas.reset(screen)
+	g.canvas.reset(screen, g.scale)
 	if g.bg != nil {
 		screen.Fill(g.bg)
 	}
@@ -78,15 +87,35 @@ func (g *game) Draw(screen *ebiten.Image) {
 	}
 }
 
-// Layout maps the host window size to the logical surface size (1:1 for now)
-// and notifies the framework when the size changes, including once at startup.
-func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	if !g.sized || outsideWidth != g.width || outsideHeight != g.height {
-		g.width, g.height = outsideWidth, outsideHeight
+// layout records the device scale factor, notifies the framework of any change
+// to the logical surface size (including once at startup), and returns the
+// physical surface size. Sizing the surface to logical×scale makes EBiten map
+// it 1:1 to the window's physical pixels, so rendering is crisp on HiDPI/Retina
+// displays. The logical size reported to the framework stays device-independent.
+func (g *game) layout(outsideWidth, outsideHeight float64) (float64, float64) {
+	g.scale = ebiten.Monitor().DeviceScaleFactor()
+	if g.scale <= 0 {
+		g.scale = 1
+	}
+	w, h := int(outsideWidth), int(outsideHeight)
+	if !g.sized || w != g.width || h != g.height {
+		g.width, g.height = w, h
 		g.sized = true
 		if g.hooks.Resize != nil {
-			g.hooks.Resize(outsideWidth, outsideHeight)
+			g.hooks.Resize(w, h)
 		}
 	}
-	return outsideWidth, outsideHeight
+	return outsideWidth * g.scale, outsideHeight * g.scale
+}
+
+// LayoutF is the floating-point layout EBiten prefers when implemented, giving
+// fractional device scale factors (e.g. 1.25× or 1.5×) full precision.
+func (g *game) LayoutF(outsideWidth, outsideHeight float64) (float64, float64) {
+	return g.layout(outsideWidth, outsideHeight)
+}
+
+// Layout satisfies ebiten.Game; EBiten calls LayoutF instead when present.
+func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
+	w, h := g.layout(float64(outsideWidth), float64(outsideHeight))
+	return int(w), int(h)
 }

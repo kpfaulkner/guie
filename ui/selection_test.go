@@ -12,8 +12,8 @@ func shiftKey(w Widget, k render.Key) {
 	w.HandleEvent(&ev)
 }
 
-func ctrlKey(w Widget, k render.Key) {
-	ev := Event{Type: EventKeyDown, Key: k, Modifiers: render.ModifierSet(render.ModControl)}
+func primaryKey(w Widget, k render.Key) {
+	ev := Event{Type: EventKeyDown, Key: k, Modifiers: render.ModifierSet(render.ModPrimary)}
 	w.HandleEvent(&ev)
 }
 
@@ -45,7 +45,7 @@ func TestTextFieldShiftSelectsAndTypingReplaces(t *testing.T) {
 func TestTextFieldSelectAllAndDelete(t *testing.T) {
 	tf := NewTextField()
 	tf.SetText("erase me")
-	ctrlKey(tf, render.KeyA)
+	primaryKey(tf, render.KeyA)
 	lo, hi := tf.selRange()
 	if lo != 0 || hi != len([]rune("erase me")) {
 		t.Fatalf("Ctrl+A should select all, got [%d,%d)", lo, hi)
@@ -99,7 +99,7 @@ func TestTextAreaShiftSelectAcrossLinesAndReplace(t *testing.T) {
 func TestTextAreaSelectAll(t *testing.T) {
 	ta := NewTextArea()
 	ta.SetText("ab\ncd\nef")
-	ctrlKey(ta, render.KeyA)
+	primaryKey(ta, render.KeyA)
 	sr, sc, er, ec := ta.selRange()
 	if sr != 0 || sc != 0 || er != 2 || ec != 2 {
 		t.Fatalf("Ctrl+A should select all, got (%d,%d)..(%d,%d)", sr, sc, er, ec)

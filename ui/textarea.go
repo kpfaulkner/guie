@@ -745,7 +745,7 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 
 func (t *TextArea) handleKey(k render.Key, mods render.ModifierSet) bool {
 	extend := mods.Has(render.ModShift)
-	if mods.Has(render.ModControl) {
+	if mods.Has(render.ModPrimary) {
 		switch k {
 		case render.KeyA:
 			t.selectAll()
