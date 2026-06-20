@@ -23,6 +23,18 @@ func LoadImage(path string) (render.Image, error) {
 	return LoadImageBytes(data)
 }
 
+// NewRenderTarget allocates an offscreen drawing surface of the given pixel
+// size whose contents persist between frames. Draw into it via its Canvas,
+// blit it with Canvas.DrawImage like any render.Image, and call Dispose when
+// done. It returns nil for non-positive dimensions.
+//
+// Use it to avoid re-issuing expensive, slowly-changing draw calls every frame:
+// render such content into a target once and blit the target each frame. See
+// the paint example for a worked use.
+func NewRenderTarget(width, height int) render.RenderTarget {
+	return ebitenbackend.NewRenderTarget(width, height)
+}
+
 // ImageFit controls how an Image widget scales its picture within its bounds.
 type ImageFit int
 

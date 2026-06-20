@@ -189,18 +189,26 @@ func (c *canvas) MeasureText(s string, face render.FontFace) geom.Size {
 	return face.Measure(s)
 }
 
+// ebitenImager is implemented by backend image types that wrap an *ebiten.Image
+// (both imageHandle and renderTarget), so DrawImage can blit either.
+type ebitenImager interface{ ebitenImage() *ebiten.Image }
+
 func (c *canvas) DrawImage(img render.Image, dst geom.Rect) {
-	ih, ok := img.(*imageHandle)
-	if !ok || ih == nil {
+	ei, ok := img.(ebitenImager)
+	if !ok {
 		return
 	}
-	src := ih.img.Bounds()
+	src := ei.ebitenImage()
+	if src == nil {
+		return
+	}
+	b := src.Bounds()
 	op := &ebiten.DrawImageOptions{}
-	if src.Dx() > 0 && src.Dy() > 0 {
-		op.GeoM.Scale(dst.W*c.scale/float64(src.Dx()), dst.H*c.scale/float64(src.Dy()))
+	if b.Dx() > 0 && b.Dy() > 0 {
+		op.GeoM.Scale(dst.W*c.scale/float64(b.Dx()), dst.H*c.scale/float64(b.Dy()))
 	}
 	op.GeoM.Translate(dst.X*c.scale, dst.Y*c.scale)
-	c.top().target.DrawImage(ih.img, op)
+	c.top().target.DrawImage(src, op)
 }
 
 func (c *canvas) SubCanvas(r geom.Rect) render.Canvas {

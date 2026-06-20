@@ -30,13 +30,20 @@ type stroke struct {
 }
 
 // sketchpad is a custom widget: it captures the pointer on press and records the
-// drag path, then draws the accumulated strokes.
+// drag path. Finished strokes are baked once into an offscreen render target
+// (the "layer") and the whole layer is blitted each frame; only the in-progress
+// stroke is re-drawn live. This keeps per-frame cost roughly constant no matter
+// how much has been drawn — instead of re-issuing every stroke's draw calls
+// every frame, which grew without bound.
 type sketchpad struct {
 	ui.BaseWidget
 	strokes []*stroke
 	cur     *stroke
 	color   color.Color
 	width   float64
+
+	layer   render.RenderTarget // baked, completed strokes (nil until first Draw)
+	layerSz geom.Size           // logical size the layer was built for
 }
 
 func newSketchpad() *sketchpad {
@@ -46,6 +53,36 @@ func newSketchpad() *sketchpad {
 func (s *sketchpad) Clear() {
 	s.strokes = nil
 	s.cur = nil
+	if s.layer != nil {
+		s.layer.Clear(canvasColor)
+	}
+}
+
+// ensureLayer (re)builds the offscreen layer when missing or when the widget's
+// size changed, re-baking every stroke into it. During normal drawing the layer
+// is updated incrementally (one segment per new point), so this full rebake only
+// runs on first use and on resize.
+func (s *sketchpad) ensureLayer() {
+	b := s.Bounds()
+	if b.W <= 0 || b.H <= 0 {
+		return
+	}
+	if s.layer != nil && s.layerSz == b.Size() {
+		return
+	}
+	if s.layer != nil {
+		s.layer.Dispose()
+	}
+	s.layer = ui.NewRenderTarget(int(b.W), int(b.H))
+	s.layerSz = b.Size()
+	if s.layer == nil {
+		return
+	}
+	s.layer.Clear(canvasColor)
+	lc := s.layer.Canvas()
+	for _, st := range s.strokes {
+		drawStroke(lc, st, b.Min())
+	}
 }
 
 func (s *sketchpad) HandleEvent(ev *ui.Event) bool {
@@ -57,14 +94,31 @@ func (s *sketchpad) HandleEvent(ev *ui.Event) bool {
 		}
 		s.cur = &stroke{pts: []geom.Point{ev.Pos}, color: col, width: w}
 		s.strokes = append(s.strokes, s.cur)
+		// Bake the starting dot straight into the layer.
+		s.paint(func(c render.Canvas, off geom.Point) {
+			c.FillCircle(sub(ev.Pos, off), w/2, col)
+		})
 		return true
 	case ui.EventPointerMove:
 		if s.cur != nil {
-			s.cur.pts = append(s.cur.pts, ev.Pos)
+			// Skip points within ~1px of the last (slow drag / sub-pixel jitter).
+			last := s.cur.pts[len(s.cur.pts)-1]
+			dx, dy := ev.Pos.X-last.X, ev.Pos.Y-last.Y
+			if dx*dx+dy*dy >= 1 {
+				s.cur.pts = append(s.cur.pts, ev.Pos)
+				// Bake just the new segment, once. The layer therefore always
+				// holds the full drawing, so Draw is a single blit and per-frame
+				// cost (and allocation) stays flat no matter how long the stroke.
+				cur := s.cur
+				s.paint(func(c render.Canvas, off geom.Point) {
+					c.DrawLine(sub(last, off), sub(ev.Pos, off), cur.color, cur.width)
+					c.FillCircle(sub(ev.Pos, off), cur.width/2, cur.color)
+				})
+			}
 		}
 		return true
 	case ui.EventPointerUp:
-		s.cur = nil
+		s.cur = nil // nothing to flush: the stroke is already fully baked
 		return true
 	}
 	return false
@@ -72,21 +126,41 @@ func (s *sketchpad) HandleEvent(ev *ui.Event) bool {
 
 func (s *sketchpad) Draw(c render.Canvas) {
 	b := s.Bounds()
-	c.FillRect(b, canvasColor)
+	s.ensureLayer()
 	c.PushClip(b)
-	for _, st := range s.strokes {
-		if len(st.pts) == 1 {
-			c.FillCircle(st.pts[0], st.width/2, st.color)
-			continue
-		}
-		for i := 1; i < len(st.pts); i++ {
-			c.DrawLine(st.pts[i-1], st.pts[i], st.color, st.width)
-			// round the joins so the stroke looks smooth
-			c.FillCircle(st.pts[i], st.width/2, st.color)
-		}
+	if s.layer != nil {
+		c.DrawImage(s.layer, b) // the whole drawing, in one blit
+	} else {
+		c.FillRect(b, canvasColor)
 	}
 	c.PopClip()
 	c.StrokeRect(b, s.ColorOf(ui.RoleBorder), 1)
+}
+
+// paint runs draw against the layer's canvas in widget-local coordinates (off is
+// the widget's top-left), if the layer exists.
+func (s *sketchpad) paint(draw func(c render.Canvas, off geom.Point)) {
+	if s.layer == nil {
+		return
+	}
+	draw(s.layer.Canvas(), s.Bounds().Min())
+}
+
+// sub translates p into a coordinate space whose origin is off.
+func sub(p, off geom.Point) geom.Point { return geom.Point{X: p.X - off.X, Y: p.Y - off.Y} }
+
+// drawStroke renders a whole stroke onto c (used to re-bake on resize), with
+// points translated by -off.
+func drawStroke(c render.Canvas, st *stroke, off geom.Point) {
+	if len(st.pts) == 1 {
+		c.FillCircle(sub(st.pts[0], off), st.width/2, st.color)
+		return
+	}
+	for i := 1; i < len(st.pts); i++ {
+		c.DrawLine(sub(st.pts[i-1], off), sub(st.pts[i], off), st.color, st.width)
+		// round the joins so the stroke looks smooth
+		c.FillCircle(sub(st.pts[i], off), st.width/2, st.color)
+	}
 }
 
 // solidImage builds an 18x18 swatch of a solid color.

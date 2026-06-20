@@ -86,3 +86,30 @@ type Image interface {
 	// Size returns the pixel dimensions of the image.
 	Size() geom.Size
 }
+
+// RenderTarget is an offscreen drawing surface whose contents persist between
+// frames. It is itself a render.Image, so it can be blitted onto a Canvas with
+// DrawImage, and it hands out its own Canvas for drawing into it.
+//
+// It exists so callers can draw expensive, slowly-changing content once and
+// then cheaply blit the result every frame, instead of re-issuing every draw
+// call each frame. (A drawing app, for example, bakes finished strokes into a
+// target and only re-draws the in-progress stroke live.)
+//
+// A target is sized in pixels at 1:1 (logical = physical); when blitted on a
+// HiDPI surface it is scaled like any other image, so content drawn into it is
+// at logical resolution. Targets are not safe for concurrent use and must be
+// used only on the UI goroutine.
+type RenderTarget interface {
+	Image
+	// Canvas returns a Canvas that draws into this target. The returned canvas
+	// starts with a full-surface clip stack; existing pixels are preserved
+	// (drawing is additive), so callers may accumulate content across frames.
+	Canvas() Canvas
+	// Clear fills the entire target with c. Use a fully transparent color to
+	// erase to nothing.
+	Clear(c color.Color)
+	// Dispose releases the target's backing resources. The target must not be
+	// used afterwards.
+	Dispose()
+}

@@ -44,9 +44,11 @@ type App struct {
 	overlays []*Popup // open popups, bottom-to-top
 
 	// pointer/focus dispatch state
-	hovered     Widget // widget currently under the cursor
-	pressTarget Widget // widget that received the active pointer-down (capture)
-	focused     Widget // widget with keyboard focus
+	hovered     Widget     // widget currently under the cursor
+	pressTarget Widget     // widget that received the active pointer-down (capture)
+	focused     Widget     // widget with keyboard focus
+	prevPointer geom.Point // cursor pos at the previous frame
+	havePrev    bool       // whether prevPointer has been set
 
 	// tooltip state (hover-delay timed in Update ticks)
 	lastPointer  geom.Point
@@ -302,13 +304,19 @@ func (a *App) dispatchPointer(in render.InputState) {
 
 	// Report movement to the captured widget (for dragging) or, when nothing is
 	// captured, to the hovered widget (so lists/menus can track the cursor row).
+	// Only on actual movement: holding the pointer still must not flood widgets
+	// with a redundant move event every frame (which, e.g., would make a drawing
+	// widget append duplicate points 60×/sec while stationary).
+	moved := !a.havePrev || pos != a.prevPointer
 	moveTarget := a.pressTarget
 	if moveTarget == nil {
 		moveTarget = a.hovered
 	}
-	if moveTarget != nil {
+	if moved && moveTarget != nil {
 		a.dispatch(moveTarget, Event{Type: EventPointerMove, Pos: pos, Modifiers: in.Modifiers})
 	}
+	a.prevPointer = pos
+	a.havePrev = true
 
 	if (in.WheelDelta.X != 0 || in.WheelDelta.Y != 0) && hit != nil {
 		a.dispatch(hit, Event{Type: EventWheel, Pos: pos, Wheel: in.WheelDelta, Modifiers: in.Modifiers})

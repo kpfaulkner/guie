@@ -84,9 +84,24 @@ Opaque, backend-specific, **fixed-size** handle. Exposes `Metrics()` and
 `Measure(s) geom.Size`. `Measure` is deliberately frame-independent so widgets
 can call it from `MinSize()` during layout (not just during `Draw`).
 
-### 3.3 `Image` (`render/canvas.go`)
+### 3.3 `Image` & `RenderTarget` (`render/canvas.go`)
 
-Opaque bitmap handle; only `Size()`.
+`Image` is an opaque bitmap handle; only `Size()`.
+
+`RenderTarget` is an **offscreen drawing surface whose contents persist between
+frames**. It embeds `Image` (so it can be blitted with `Canvas.DrawImage`) and
+adds `Canvas()` (a canvas that draws *into* the target, additively), `Clear(c)`,
+and `Dispose()`. It exists so callers can draw expensive, slowly-changing
+content once and cheaply blit the result each frame instead of re-issuing every
+draw call per frame. Backend impl is `renderTarget` in `internal/ebiten/image.go`
+(an `*ebiten.Image` plus a persistent `canvas` bound at scale 1); created via
+`ui.NewRenderTarget(w, h)` → `ebitenbackend.NewRenderTarget`. `DrawImage` blits
+either an `imageHandle` or a `renderTarget` through the shared `ebitenImager`
+interface. The target draws at 1:1 (logical=physical), so on a HiDPI surface its
+contents are upscaled like any bitmap (a noted limitation; a future option could
+size it to physical pixels). The paint example uses this: finished strokes are
+baked into a target and only the in-progress stroke is drawn live, so per-frame
+cost is roughly constant regardless of how much has been drawn.
 
 ### 3.4 Input (`render/input.go`)
 
@@ -581,7 +596,11 @@ per-row hover via the pointer-move-to-hovered dispatch (§10.3).
   is out of scope without a different backend. An in-surface "window" layer
   could be added (parked).
 - **Full redraw every frame.** No dirty-region optimization; fine for typical
-  UIs and simplest against EBiten's model.
+  UIs and simplest against EBiten's model. Apps with expensive, slowly-changing
+  content can opt into caching it themselves via `render.RenderTarget`
+  (`ui.NewRenderTarget`) — draw once, blit each frame (§3.3). This is also the
+  building block a future framework-level dirty-region pass (design task 15)
+  would use.
 - **HiDPI** is handled: the driver sizes the offscreen surface to
   logical×`DeviceScaleFactor` and the canvas scales all drawing (including
   physical-size glyph rasterization), so rendering is crisp on Retina while
