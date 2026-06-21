@@ -72,6 +72,22 @@ func TestColorPickerKeyboard(t *testing.T) {
 	}
 }
 
+func TestColorPickerAlphaChannel(t *testing.T) {
+	// Initial alpha is read from the value.
+	p := NewColorPicker(ColorPickerValue(color.NRGBA{R: 255, A: 128}))
+	if got := color.NRGBAModel.Convert(p.Color()).(color.NRGBA); !near8(got.A, 128) {
+		t.Fatalf("alpha should round-trip, got A=%d", got.A)
+	}
+
+	// Channel 3 is alpha; dragging it to 0 makes the color fully transparent.
+	p.SetBounds(geom.Rect{X: 0, Y: 0, W: 220, H: 170})
+	tr := p.trackRect(3)
+	p.HandleEvent(&Event{Type: EventPointerDown, Pos: geom.Point{X: tr.X, Y: tr.Y + tr.H/2}})
+	if got := color.NRGBAModel.Convert(p.Color()).(color.NRGBA); got.A != 0 {
+		t.Fatalf("dragging alpha to the left should give A=0, got %d", got.A)
+	}
+}
+
 func TestColorPickerSetColorFiresOnChange(t *testing.T) {
 	p := NewColorPicker(ColorPickerValue(color.NRGBA{R: 255, A: 255}))
 	calls := 0

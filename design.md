@@ -360,8 +360,9 @@ Grouped by build priority.
 - **DatePicker** — inline month calendar over `time.Time`, with a **DateField**
   popup variant (collapsed control + dropdown calendar). *(Done — `internals.md`
   §13d, `examples/datepicker`.)*
-- **ColorPicker** — HSV picker (swatch + hue/saturation/value sliders). *(Done —
-  `internals.md` §13e, `examples/colorpicker`.)*
+- **ColorPicker** — HSV+alpha picker (swatch + hue/saturation/value/alpha
+  sliders, transparency shown over a checkerboard). *(Done — `internals.md`
+  §13e, `examples/colorpicker`.)*
 - **Toast** — transient, auto-dismissing notifications raised via
   `App.ShowToast` (info/success/warning/error). *(Done — see `internals.md`
   §13b and `examples/tree`.)*

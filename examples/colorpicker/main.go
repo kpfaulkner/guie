@@ -1,7 +1,7 @@
-// Command colorpicker demonstrates the ColorPicker: an HSV picker with a preview
-// swatch (showing the hex value) over hue/saturation/value gradient sliders.
-// Drag or click a track to change a channel; the chosen color is applied to a
-// panel on the right so you can see it in context.
+// Command colorpicker demonstrates the ColorPicker: a preview swatch (showing
+// the hex value) over hue/saturation/value/alpha gradient sliders. Drag or click
+// a track to change a channel; the chosen color (including its transparency) is
+// applied to a panel on the right so you can see it in context.
 //
 // Run with: go run ./examples/colorpicker
 package main
@@ -17,7 +17,7 @@ import (
 func main() {
 	app := ui.NewApp(
 		ui.WithTitle("guie — color picker"),
-		ui.WithSize(440, 240),
+		ui.WithSize(440, 280),
 	)
 
 	// A panel whose background follows the picker.

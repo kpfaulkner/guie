@@ -742,15 +742,17 @@ An inline month calendar over `time.Time`, self-drawn like `List`/`Tree`.
 
 An HSV color picker, self-drawn. It avoids a 2D saturation/value area (which the
 `Canvas` can't gradient-fill cheaply, and which would force a per-frame strip
-grid or a GPU `RenderTarget`) in favour of a preview swatch over **three 1D
-gradient sliders** for hue, saturation and value.
+grid or a GPU `RenderTarget`) in favour of a preview swatch over **four 1D
+gradient sliders** for hue, saturation, value and alpha.
 
-- **Model.** `h`, `s`, `v` in `[0,1]`; `Color()`/`SetColor` convert via
-  `hsvToRGB`/`rgbToHSV`. Output is opaque (no alpha channel edited).
+- **Model.** `h`, `s`, `v`, `a` in `[0,1]`; `Color()`/`SetColor` convert via
+  `hsvToRGB`/`rgbToHSV` and carry alpha (`alphaOf`/`to8`).
 - **Tracks.** Each track is painted as ~`width/3` `FillRect` strips evaluated
-  through `gradientColor` (hue varies hue; the sat/value tracks reflect the
-  current other channels), so they update live and cost only a few dozen rects
-  each — headless-safe, no offscreen surface.
+  through `gradientColor` (hue varies hue; sat/value reflect the current other
+  channels; the alpha track is the current color at varying opacity), so they
+  update live and cost only a few dozen rects each — headless-safe, no offscreen
+  surface. The alpha track and the preview swatch are drawn over a light/dark
+  `drawCheckerboard` so transparency is visible.
 - **Input.** Drag/click a track sets that channel (`trackAt` resolves the row,
   the active channel is held for the drag); while focused, Up/Down pick the
   active channel and Left/Right nudge it by `cpKeyStep`. `setChannel` clamps and
@@ -842,7 +844,7 @@ no preedit or candidate-window API — see §16).
 | `Spinner` | spinner.go | indeterminate busy indicator (animated dot ring) |
 | `DatePicker` | date.go | inline month calendar over `time.Time`, month nav, click + keyboard |
 | `DateField` | date_field.go | collapsed date control; opens a `DatePicker` popup (like `DropdownCombo`) |
-| `ColorPicker` | color_picker.go | HSV picker: preview swatch + hue/sat/value gradient sliders |
+| `ColorPicker` | color_picker.go | HSV+alpha picker: preview swatch + hue/sat/value/alpha gradient sliders |
 | `TabContainer` | tabs.go | tab strip; all panes mounted (keep state), only active shown |
 | `SplitPane` | splitter.go | draggable divider, ratio + min sizes, nests |
 | `Image` | image.go | displays `render.Image` with `FitContain/Stretch/None` |
