@@ -29,10 +29,23 @@ func main() {
 	})
 	chosen.SetText("Selected: " + cal.Value().Format("Mon 2 Jan 2006"))
 
+	// The popup variant: a compact field that drops the calendar down on click.
+	field := ui.NewDateField(ui.DateFieldPlaceholder("Click to pick a date"))
+	field.OnChange(func(d time.Time) {
+		chosen.SetText("Selected: " + d.Format("Mon 2 Jan 2006"))
+		cal.SetValue(d)
+	})
+
+	fieldRow := ui.NewContainer()
+	fieldRow.SetLayout(ui.HBox(8))
+	fieldRow.Add(ui.NewLabel("Popup field:"))
+	fieldRow.Add(field)
+
 	root := ui.NewContainer()
 	root.SetLayout(ui.VBox(12))
 	root.SetPadding(geom.UniformInsets(16))
-	root.Add(ui.NewLabel("Pick a date:"))
+	root.Add(fieldRow)
+	root.Add(ui.NewLabel("Inline calendar:"))
 	root.Add(cal, ui.Weight(1), ui.Align(geom.AlignStretch))
 	root.Add(chosen)
 

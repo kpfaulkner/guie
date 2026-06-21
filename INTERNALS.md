@@ -729,6 +729,33 @@ An inline month calendar over `time.Time`, self-drawn like `List`/`Tree`.
   the wheel steps months; Left/Right move ±1 day, Up/Down ±1 week, PageUp/
   PageDown ±1 month (all via `SetValue`, so the view follows the selection).
   Selected day filled `RolePrimary`; today outlined `RoleAccent`; hover lightened.
+- **`DateField` (`ui/date_field.go`)** is the popup counterpart, built exactly
+  like `DropdownCombo` (§11): a collapsed control drawing the formatted date (or
+  a placeholder) plus a small calendar glyph; click/Enter/Space opens a
+  `DatePicker` in a non-modal popup positioned below it. The popup picker is
+  given the field's resolved font (so `MinSize` works pre-mount) and its
+  `OnChange` sets the field value and closes the popup; outside-click/Escape
+  dismiss via the overlay layer. `Value()` returns the date and whether one is
+  set (it can start empty, showing the placeholder).
+
+## 13e. ColorPicker (`ui/color_picker.go`)
+
+An HSV color picker, self-drawn. It avoids a 2D saturation/value area (which the
+`Canvas` can't gradient-fill cheaply, and which would force a per-frame strip
+grid or a GPU `RenderTarget`) in favour of a preview swatch over **three 1D
+gradient sliders** for hue, saturation and value.
+
+- **Model.** `h`, `s`, `v` in `[0,1]`; `Color()`/`SetColor` convert via
+  `hsvToRGB`/`rgbToHSV`. Output is opaque (no alpha channel edited).
+- **Tracks.** Each track is painted as ~`width/3` `FillRect` strips evaluated
+  through `gradientColor` (hue varies hue; the sat/value tracks reflect the
+  current other channels), so they update live and cost only a few dozen rects
+  each — headless-safe, no offscreen surface.
+- **Input.** Drag/click a track sets that channel (`trackAt` resolves the row,
+  the active channel is held for the drag); while focused, Up/Down pick the
+  active channel and Left/Right nudge it by `cpKeyStep`. `setChannel` clamps and
+  fires `OnChange(color.Color)` only on a real change. The swatch shows the hex
+  value in a luminance-chosen black/white (`contrastColor`).
 
 ---
 
@@ -814,6 +841,8 @@ no preedit or candidate-window API — see §16).
 | `ProgressBar` | progressbar.go | non-interactive fill |
 | `Spinner` | spinner.go | indeterminate busy indicator (animated dot ring) |
 | `DatePicker` | date.go | inline month calendar over `time.Time`, month nav, click + keyboard |
+| `DateField` | date_field.go | collapsed date control; opens a `DatePicker` popup (like `DropdownCombo`) |
+| `ColorPicker` | color_picker.go | HSV picker: preview swatch + hue/sat/value gradient sliders |
 | `TabContainer` | tabs.go | tab strip; all panes mounted (keep state), only active shown |
 | `SplitPane` | splitter.go | draggable divider, ratio + min sizes, nests |
 | `Image` | image.go | displays `render.Image` with `FitContain/Stretch/None` |

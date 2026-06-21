@@ -357,8 +357,11 @@ Grouped by build priority.
   (min/max/step/decimals). *(Done — `internals.md` §13c, `examples/widgets2`.)*
 - **Spinner** — indeterminate busy/activity indicator. *(Done — `internals.md`
   §13c, `examples/widgets2`.)*
-- **DatePicker** — inline month calendar over `time.Time`. *(Done —
-  `internals.md` §13d, `examples/datepicker`.)*
+- **DatePicker** — inline month calendar over `time.Time`, with a **DateField**
+  popup variant (collapsed control + dropdown calendar). *(Done — `internals.md`
+  §13d, `examples/datepicker`.)*
+- **ColorPicker** — HSV picker (swatch + hue/saturation/value sliders). *(Done —
+  `internals.md` §13e, `examples/colorpicker`.)*
 - **Toast** — transient, auto-dismissing notifications raised via
   `App.ShowToast` (info/success/warning/error). *(Done — see `internals.md`
   §13b and `examples/tree`.)*

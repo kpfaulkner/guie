@@ -29,6 +29,7 @@ go run ./examples/tree       # Tree (expand/collapse/keyboard) + Toast notificat
 go run ./examples/ime        # inline IME preedit rendering (simulated composition)
 go run ./examples/widgets2   # numeric Stepper + busy Spinner
 go run ./examples/datepicker # inline month calendar (DatePicker)
+go run ./examples/colorpicker # HSV color picker (swatch + H/S/V sliders)
 ```
 
 What each one exercises:
@@ -59,7 +60,8 @@ What each one exercises:
 | `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
 | `ime`     | Inline IME preedit drawn underlined at the caret via `EventComposition`; uses a simulated composition since EBiten exposes no real IME |
 | `widgets2`| `Stepper` (min/max/step/decimals, buttons + arrows + wheel, `OnChange`) and the indeterminate busy `Spinner` (`Start`/`Stop`) |
-| `datepicker`| `DatePicker` inline calendar: month nav (arrows/wheel), click + keyboard day selection, `OnChange(time.Time)` |
+| `datepicker`| `DatePicker` inline calendar + `DateField` popup variant: month nav, click + keyboard day selection, `OnChange(time.Time)` |
+| `colorpicker`| `ColorPicker`: HSV swatch + hue/saturation/value gradient sliders, `OnChange(color.Color)` |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.
