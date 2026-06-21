@@ -13,7 +13,7 @@ library for rendering, windowing and input.
 using this framework should never need to know EBiten exists. They do not
 import it, do not implement `ebiten.Game`, and do not see `*ebiten.Image` or
 `ebiten` input types in any public API. The framework owns the main loop and
-exposes its own abstractions for drawing surfaces, colors, input and events. If
+exposes its own abstractions for drawing surfaces, colours, input and events. If
 we ever swap the rendering backend, application code should not change.
 
 Features that should be available:
@@ -39,7 +39,7 @@ Features that should be available:
 | Layout        | Layout managers (HBox / VBox / Grid / Flex). Widgets resize with parent. |
 | Architecture  | Retained widget tree — persistent, stateful widget objects.              |
 | API style     | Struct + methods, constructed via functional options.                    |
-| Theming       | Simple named color palette + a default font, to start.                   |
+| Theming       | Simple named colour palette + a default font, to start.                   |
 | Events        | Callbacks as the primary API; optional event bus for global listening.   |
 | Main loop     | Framework owns the loop. EBiten fully abstracted away.                    |
 | Fonts         | Bundle a default TTF so apps work out of the box; allow custom fonts.    |
@@ -276,7 +276,7 @@ Event types (initial): `Click`, `DoubleClick`, `PointerDown/Up/Move`,
 
 ## THEMING & COLOUR CONTROL
 
-Start simple: a named color palette plus a default font, with per-widget
+Start simple: a named colour palette plus a default font, with per-widget
 overrides so any window or widget colour can be controlled individually.
 
 ```go
@@ -305,8 +305,8 @@ type Theme struct {
 - A `DefaultTheme()` ships with the library (light palette + bundled font).
 - Theme lives on the `App`; widgets read it during `Draw`.
 - **Window and widget colour control**: every widget accepts colour overrides
-  via options/setters (`ui.WithBackground(c)`, `ui.WithTextColor(c)`,
-  `ui.WithBorderColor(c)`); a window has its own background colour. Unset
+  via options/setters (`ui.WithBackground(c)`, `ui.WithTextColour(c)`,
+  `ui.WithBorderColour(c)`); a window has its own background colour. Unset
   colours fall back to the theme palette.
 - Room to grow into multiple themes / dark mode later without API churn.
 
@@ -360,9 +360,9 @@ Grouped by build priority.
 - **DatePicker** — inline month calendar over `time.Time`, with a **DateField**
   popup variant (collapsed control + dropdown calendar). *(Done — `internals.md`
   §13d, `examples/datepicker`.)*
-- **ColorPicker** — HSV+alpha picker (swatch + hue/saturation/value/alpha
+- **ColourPicker** — HSV+alpha picker (swatch + hue/saturation/value/alpha
   sliders, transparency shown over a checkerboard). *(Done — `internals.md`
-  §13e, `examples/colorpicker`.)*
+  §13e, `examples/colourpicker`.)*
 - **Toast** — transient, auto-dismissing notifications raised via
   `App.ShowToast` (info/success/warning/error). *(Done — see `internals.md`
   §13b and `examples/tree`.)*

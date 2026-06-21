@@ -262,7 +262,7 @@ func (t *Tree) Draw(canvas render.Canvas) {
 		return
 	}
 	b := t.Bounds()
-	canvas.FillRect(b, t.ColorOf(RoleSurface))
+	canvas.FillRect(b, t.ColourOf(RoleSurface))
 
 	rows := t.rows()
 	rh := t.RowHeight()
@@ -281,26 +281,26 @@ func (t *Tree) Draw(canvas render.Canvas) {
 		row := geom.Rect{X: b.X, Y: y, W: rowW, H: rh}
 		switch {
 		case r.node == t.selected:
-			canvas.FillRect(row, t.ColorOf(RolePrimary))
+			canvas.FillRect(row, t.ColourOf(RolePrimary))
 		case r.node == t.hover:
-			canvas.FillRect(row, lighten(t.ColorOf(RoleSurface), 1.25))
+			canvas.FillRect(row, lighten(t.ColourOf(RoleSurface), 1.25))
 		}
 
-		textColor := t.ColorOf(RoleText)
+		textColour := t.ColourOf(RoleText)
 		if r.node == t.selected {
-			textColor = t.ColorOf(RoleOnPrimary)
+			textColour = t.ColourOf(RoleOnPrimary)
 		}
 
 		indent := b.X + treeRowPad + float64(r.depth)*treeIndent
 		if !r.node.Leaf() {
-			t.drawChevron(canvas, indent, y, rh, r.node.expanded, textColor)
+			t.drawChevron(canvas, indent, y, rh, r.node.expanded, textColour)
 		}
 		labelX := indent + treeChevron + treeGap
-		canvas.DrawText(r.node.Label, geom.Point{X: labelX, Y: vCenterY(f, y, rh)}, f, textColor)
+		canvas.DrawText(r.node.Label, geom.Point{X: labelX, Y: vCenterY(f, y, rh)}, f, textColour)
 	}
 	canvas.PopClip()
 
-	canvas.StrokeRect(b, t.ColorOf(RoleBorder), 1)
+	canvas.StrokeRect(b, t.ColourOf(RoleBorder), 1)
 
 	if overflow {
 		t.drawScrollbar(canvas, b, rh*float64(len(rows)))
@@ -331,8 +331,8 @@ func (t *Tree) drawScrollbar(canvas render.Canvas, b geom.Rect, contentH float64
 		off = (t.offset / m) * (b.H - thumbH)
 	}
 	gutter := geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y, W: scrollbarWidth, H: b.H}
-	canvas.FillRect(gutter, t.ColorOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColorOf(RoleAccent))
+	canvas.FillRect(gutter, t.ColourOf(RoleBackground))
+	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColourOf(RoleAccent))
 }
 
 // chevronHit reports whether absolute x falls within the chevron column for a

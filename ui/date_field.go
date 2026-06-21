@@ -149,25 +149,25 @@ func (f *DateField) Draw(canvas render.Canvas) {
 	}
 	b := f.Bounds()
 	rad := f.cornerRadius()
-	canvas.FillRoundRect(b, rad, f.ColorOf(RoleSurface))
-	border := f.ColorOf(RoleBorder)
+	canvas.FillRoundRect(b, rad, f.ColourOf(RoleSurface))
+	border := f.ColourOf(RoleBorder)
 	if f.focused || f.open {
-		border = f.ColorOf(RoleAccent)
+		border = f.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRoundRect(b, rad, border, 1)
 
-	textColor := f.ColorOf(RoleText)
+	textColour := f.ColourOf(RoleText)
 	if !f.hasValue {
-		textColor = f.ColorOf(RoleTextMuted)
+		textColour = f.ColourOf(RoleTextMuted)
 	}
-	canvas.DrawText(f.label(), geom.Point{X: b.X + dateFieldHPadding, Y: vCenterY(face, b.Y, b.H)}, face, textColor)
+	canvas.DrawText(f.label(), geom.Point{X: b.X + dateFieldHPadding, Y: vCenterY(face, b.Y, b.H)}, face, textColour)
 
 	f.drawCalendarGlyph(canvas, b)
 }
 
 // drawCalendarGlyph draws a small calendar icon in the right padding.
 func (f *DateField) drawCalendarGlyph(canvas render.Canvas, b geom.Rect) {
-	col := f.ColorOf(RoleText)
+	col := f.ColourOf(RoleText)
 	s := float64(dateFieldIcon)
 	x := b.X + b.W - dateFieldHPadding - s
 	y := b.Y + (b.H-s)/2

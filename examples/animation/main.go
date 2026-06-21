@@ -3,7 +3,7 @@
 //   - OnFrame: a label shows elapsed time, accumulated from the per-frame dt.
 //   - Tween:   buttons animate a ProgressBar to a target value with different
 //     easings; "Bounce" chains two tweens via OnDone; "Stop" cancels whatever
-//     is running. A second tween animates a colored bar's width via a custom
+//     is running. A second tween animates a coloured bar's width via a custom
 //     widget so you can see motion, not just a number.
 //
 // Run with: go run ./examples/animation
@@ -38,13 +38,13 @@ func (b *bar) MinSize() geom.Size { return geom.Size{W: 80, H: 28} }
 
 func (b *bar) Draw(c render.Canvas) {
 	r := b.Bounds()
-	c.FillRoundRect(r, 6, b.ColorOf(ui.RoleSurface))
+	c.FillRoundRect(r, 6, b.ColourOf(ui.RoleSurface))
 	if b.frac > 0 {
 		fr := r
 		fr.W = r.W * b.frac
 		c.FillRoundRect(fr, 6, b.fill)
 	}
-	c.StrokeRoundRect(r, 6, b.ColorOf(ui.RoleBorder), 1)
+	c.StrokeRoundRect(r, 6, b.ColourOf(ui.RoleBorder), 1)
 }
 
 func main() {
@@ -103,7 +103,7 @@ func main() {
 	})
 
 	// OnFrame: accumulate elapsed time and show it (demonstrates the frame hook).
-	clock := ui.NewLabel("elapsed: 0.0s", ui.LabelColor(pal.TextMuted))
+	clock := ui.NewLabel("elapsed: 0.0s", ui.LabelColour(pal.TextMuted))
 	var elapsed float64
 	app.OnFrame(func(dt float64) {
 		elapsed += dt

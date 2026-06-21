@@ -18,7 +18,7 @@ type Config struct {
 	Title string
 	// Width and Height are the initial logical window size.
 	Width, Height int
-	// Background is the color the surface is cleared to each frame. If nil, the
+	// Background is the colour the surface is cleared to each frame. If nil, the
 	// surface is not cleared by the driver.
 	Background color.Color
 	// Resizable allows the user to resize the host window.

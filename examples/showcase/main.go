@@ -66,10 +66,10 @@ func main() {
 
 	right := ui.NewContainer()
 	right.SetLayout(ui.VBox(10))
-	right.Add(ui.NewLabel("Pick a color:"))
-	colors := []string{"Red", "Orange", "Yellow", "Green", "Blue", "Indigo", "Violet"}
-	dd := ui.NewDropdown(colors, ui.DropdownPlaceholder("choose a color"))
-	dd.OnSelect(func(i int) { say("Dropdown: " + colors[i]) })
+	right.Add(ui.NewLabel("Pick a colour:"))
+	colours := []string{"Red", "Orange", "Yellow", "Green", "Blue", "Indigo", "Violet"}
+	dd := ui.NewDropdown(colours, ui.DropdownPlaceholder("choose a colour"))
+	dd.OnSelect(func(i int) { say("Dropdown: " + colours[i]) })
 	right.Add(dd, ui.Align(geom.AlignStart))
 	right.Add(ui.NewLabel("(right-click the list · try Ctrl/Cmd+N, +S, +Shift+S)"), ui.Weight(1))
 	content.Add(right, ui.Weight(1))

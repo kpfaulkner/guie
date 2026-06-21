@@ -37,27 +37,27 @@ func TestSpinnerAnimatesWhileSpinning(t *testing.T) {
 		t.Fatal("spinner should draw dots")
 	}
 
-	// While spinning, the head dot's color (alpha) advances frame to frame.
-	a := firstCircleColor(h.Step())
-	b := firstCircleColor(h.Step())
+	// While spinning, the head dot's colour (alpha) advances frame to frame.
+	a := firstCircleColour(h.Step())
+	b := firstCircleColour(h.Step())
 	if a == b {
 		t.Fatal("a spinning spinner should change between frames")
 	}
 
 	// Stopped, it freezes: consecutive frames are identical.
 	sp.Stop()
-	c := firstCircleColor(h.Step())
-	d := firstCircleColor(h.Step())
+	c := firstCircleColour(h.Step())
+	d := firstCircleColour(h.Step())
 	if c != d {
 		t.Fatal("a stopped spinner should not change between frames")
 	}
 }
 
-// firstCircleColor returns the RGBA of the first FillCircle op, or zeros.
-func firstCircleColor(rec *guitest.Recording) [4]uint32 {
+// firstCircleColour returns the RGBA of the first FillCircle op, or zeros.
+func firstCircleColour(rec *guitest.Recording) [4]uint32 {
 	for _, op := range rec.Ops {
-		if op.Kind == guitest.OpFillCircle && op.Color != nil {
-			r, g, b, a := op.Color.RGBA()
+		if op.Kind == guitest.OpFillCircle && op.Colour != nil {
+			r, g, b, a := op.Colour.RGBA()
 			return [4]uint32{r, g, b, a}
 		}
 	}

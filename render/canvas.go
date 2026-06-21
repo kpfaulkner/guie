@@ -47,7 +47,7 @@ type Canvas interface {
 	// StrokeCircle draws the outline of a circle with the given line width.
 	StrokeCircle(center geom.Point, radius float64, c color.Color, width float64)
 
-	// DrawText draws s with its top-left at pos using the given face and color.
+	// DrawText draws s with its top-left at pos using the given face and colour.
 	DrawText(s string, pos geom.Point, face FontFace, c color.Color)
 	// MeasureText returns the rendered size of s in the given face.
 	MeasureText(s string, face FontFace) geom.Size
@@ -106,7 +106,7 @@ type RenderTarget interface {
 	// starts with a full-surface clip stack; existing pixels are preserved
 	// (drawing is additive), so callers may accumulate content across frames.
 	Canvas() Canvas
-	// Clear fills the entire target with c. Use a fully transparent color to
+	// Clear fills the entire target with c. Use a fully transparent colour to
 	// erase to nothing.
 	Clear(c color.Color)
 	// Dispose releases the target's backing resources. The target must not be

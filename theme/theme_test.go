@@ -4,18 +4,18 @@ import "testing"
 
 func TestDefaultPaletteIsPopulated(t *testing.T) {
 	p := DefaultPalette()
-	colors := map[string]interface{ RGBA() (r, g, b, a uint32) }{
+	colours := map[string]interface{ RGBA() (r, g, b, a uint32) }{
 		"Background": p.Background, "Surface": p.Surface, "Primary": p.Primary,
 		"OnPrimary": p.OnPrimary, "Text": p.Text, "TextMuted": p.TextMuted,
 		"Border": p.Border, "Accent": p.Accent, "Disabled": p.Disabled,
 	}
-	for name, c := range colors {
+	for name, c := range colours {
 		if c == nil {
-			t.Errorf("palette color %s is nil", name)
+			t.Errorf("palette colour %s is nil", name)
 			continue
 		}
 		if _, _, _, a := c.RGBA(); a == 0 {
-			t.Errorf("palette color %s is fully transparent", name)
+			t.Errorf("palette colour %s is fully transparent", name)
 		}
 	}
 }

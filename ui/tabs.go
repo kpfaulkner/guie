@@ -175,23 +175,23 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	b := t.Bounds()
 	sh := t.stripHeight()
 
-	canvas.FillRect(geom.Rect{X: b.X, Y: b.Y, W: b.W, H: sh}, t.ColorOf(RoleSurface))
+	canvas.FillRect(geom.Rect{X: b.X, Y: b.Y, W: b.W, H: sh}, t.ColourOf(RoleSurface))
 	for i, tb := range t.tabs {
 		r := t.titleRect(i)
 		switch {
 		case i == t.selected:
-			canvas.FillRect(r, t.ColorOf(RolePrimary))
+			canvas.FillRect(r, t.ColourOf(RolePrimary))
 		case i == t.hover:
-			canvas.FillRect(r, lighten(t.ColorOf(RoleSurface), 1.25))
+			canvas.FillRect(r, lighten(t.ColourOf(RoleSurface), 1.25))
 		}
-		col := t.ColorOf(RoleText)
+		col := t.ColourOf(RoleText)
 		if i == t.selected {
-			col = t.ColorOf(RoleOnPrimary)
+			col = t.ColourOf(RoleOnPrimary)
 		}
 		canvas.DrawText(tb.title, geom.Point{X: r.X + tabHPad, Y: vCenterY(f, r.Y, r.H)}, f, col)
 	}
 	// Separator line under the strip.
-	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, t.ColorOf(RoleBorder), 1)
+	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, t.ColourOf(RoleBorder), 1)
 
 	if a := t.active(); a != nil && a.Visible() {
 		cr := t.contentRect()
@@ -201,7 +201,7 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	}
 
 	if t.focused {
-		canvas.StrokeRect(b, t.ColorOf(RoleAccent), 1)
+		canvas.StrokeRect(b, t.ColourOf(RoleAccent), 1)
 	}
 }
 

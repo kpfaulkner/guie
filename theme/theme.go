@@ -1,5 +1,5 @@
-// Package theme defines the color palette and font defaults used by widgets.
-// Widgets resolve colors through these palette roles and may override
+// Package theme defines the colour palette and font defaults used by widgets.
+// Widgets resolve colours through these palette roles and may override
 // individual values per widget.
 package theme
 
@@ -9,12 +9,12 @@ import (
 	"github.com/kpfaulkner/guie/render"
 )
 
-// Palette is the set of named colors a theme provides. Widgets fall back to
-// these when their own color fields are unset.
+// Palette is the set of named colours a theme provides. Widgets fall back to
+// these when their own colour fields are unset.
 type Palette struct {
 	Background color.Color // window/app backdrop
 	Surface    color.Color // panels, cards, containers
-	Primary    color.Color // primary action color (e.g. buttons)
+	Primary    color.Color // primary action colour (e.g. buttons)
 	OnPrimary  color.Color // text/icons drawn on Primary
 	Text       color.Color // default text
 	TextMuted  color.Color // secondary/disabled-ish text
@@ -23,7 +23,7 @@ type Palette struct {
 	Disabled   color.Color // disabled widget fill
 }
 
-// Theme bundles the color palette with the default font/size and the default
+// Theme bundles the colour palette with the default font/size and the default
 // corner radius used by controls.
 type Theme struct {
 	Palette      Palette

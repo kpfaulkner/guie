@@ -16,10 +16,10 @@ type BaseWidget struct {
 	visible     bool
 	enabled     bool
 	tooltip     string
-	contextMenu []MenuItem                // shown on right-click, empty for none
-	drag        *dragConfig               // drag-source / drop-target config, nil until opted in
-	colors      map[ColorRole]color.Color // per-widget color overrides
-	self        Widget                    // this widget's interface identity
+	contextMenu []MenuItem                 // shown on right-click, empty for none
+	drag        *dragConfig                // drag-source / drop-target config, nil until opted in
+	colours     map[ColourRole]color.Color // per-widget colour overrides
+	self        Widget                     // this widget's interface identity
 	parent      Widget
 	ctx         *treeContext
 }
@@ -112,7 +112,7 @@ func (b *BaseWidget) mount(self, parent Widget, ctx *treeContext) {
 }
 
 // appTheme returns the active theme, or a default if the widget is not yet
-// mounted. Widgets read it during Draw and MinSize to resolve fonts and colors.
+// mounted. Widgets read it during Draw and MinSize to resolve fonts and colours.
 func (b *BaseWidget) appTheme() theme.Theme {
 	if b.ctx != nil && b.ctx.theme != nil {
 		return *b.ctx.theme

@@ -168,16 +168,16 @@ func (d *DatePicker) Draw(canvas render.Canvas) {
 		return
 	}
 	b := d.Bounds()
-	canvas.FillRoundRect(b, d.cornerRadius(), d.ColorOf(RoleSurface))
-	border := d.ColorOf(RoleBorder)
+	canvas.FillRoundRect(b, d.cornerRadius(), d.ColourOf(RoleSurface))
+	border := d.ColourOf(RoleBorder)
 	if d.focused {
-		border = d.ColorOf(RoleAccent)
+		border = d.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRoundRect(b, d.cornerRadius(), border, 1)
 
 	origin, cellW, rowH := d.grid()
-	textCol := d.ColorOf(RoleText)
-	muted := d.ColorOf(RoleTextMuted)
+	textCol := d.ColourOf(RoleText)
+	muted := d.ColourOf(RoleTextMuted)
 
 	// Header: ‹ Month Year ›
 	d.drawCenteredText(canvas, "‹", origin.X, origin.Y, cellW, rowH, f, textCol)
@@ -204,18 +204,18 @@ func (d *DatePicker) Draw(canvas render.Canvas) {
 		inMonth := date.Month() == d.visible.Month()
 		switch {
 		case sameDay(date, d.selected):
-			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColorOf(RolePrimary))
+			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColourOf(RolePrimary))
 		case i == d.hover:
-			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, lighten(d.ColorOf(RoleSurface), 1.25))
+			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, lighten(d.ColourOf(RoleSurface), 1.25))
 		}
 		if sameDay(date, d.today) && !sameDay(date, d.selected) {
-			canvas.StrokeRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColorOf(RoleAccent), 1)
+			canvas.StrokeRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColourOf(RoleAccent), 1)
 		}
 
 		col2 := textCol
 		switch {
 		case sameDay(date, d.selected):
-			col2 = d.ColorOf(RoleOnPrimary)
+			col2 = d.ColourOf(RoleOnPrimary)
 		case !inMonth:
 			col2 = muted
 		}

@@ -100,18 +100,18 @@ func (r *RadioButton) Draw(canvas render.Canvas) {
 	center := geom.Point{X: b.X + radius, Y: b.Y + b.H/2}
 
 	if r.hover {
-		canvas.FillCircle(center, radius, r.ColorOf(RoleSurface))
+		canvas.FillCircle(center, radius, r.ColourOf(RoleSurface))
 	}
-	border := r.ColorOf(RoleBorder)
+	border := r.ColourOf(RoleBorder)
 	if r.focused {
-		border = r.ColorOf(RoleAccent)
+		border = r.ColourOf(RoleAccent)
 	}
 	canvas.StrokeCircle(center, radius, border, 1)
 	if r.selected {
-		canvas.FillCircle(center, radius*0.5, r.ColorOf(RoleAccent))
+		canvas.FillCircle(center, radius*0.5, r.ColourOf(RoleAccent))
 	}
 
-	canvas.DrawText(r.label, geom.Point{X: b.X + side + indicatorGap, Y: vCenterY(f, b.Y, b.H)}, f, r.ColorOf(RoleText))
+	canvas.DrawText(r.label, geom.Point{X: b.X + side + indicatorGap, Y: vCenterY(f, b.Y, b.H)}, f, r.ColourOf(RoleText))
 }
 
 // HandleEvent selects the button on click or Space/Enter and tracks hover/focus.

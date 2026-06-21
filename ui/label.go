@@ -7,7 +7,7 @@ import (
 	"github.com/kpfaulkner/guie/render"
 )
 
-// Label is a non-interactive widget that draws text. Color and font fall back
+// Label is a non-interactive widget that draws text. Colour and font fall back
 // to the theme when not overridden; the text is aligned horizontally per Align
 // and centered vertically within the widget's bounds. Embedded newlines render
 // as multiple stacked lines (use TextArea for editable multi-line text).
@@ -21,9 +21,9 @@ type Label struct {
 // LabelOption configures a Label during NewLabel.
 type LabelOption func(*Label)
 
-// LabelColor overrides the text color (RoleText).
-func LabelColor(c color.Color) LabelOption {
-	return func(l *Label) { l.SetColor(RoleText, c) }
+// LabelColour overrides the text colour (RoleText).
+func LabelColour(c color.Color) LabelOption {
+	return func(l *Label) { l.SetColour(RoleText, c) }
 }
 
 // LabelFont overrides the font face.
@@ -82,5 +82,5 @@ func (l *Label) Draw(c render.Canvas) {
 	if f == nil {
 		return
 	}
-	drawText(c, l.text, l.Bounds(), l.align, f, l.ColorOf(RoleText))
+	drawText(c, l.text, l.Bounds(), l.align, f, l.ColourOf(RoleText))
 }

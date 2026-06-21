@@ -1,11 +1,11 @@
-// Command colors demonstrates per-widget color control. Each widget resolves
-// its colors through theme "roles" (ui.RolePrimary, ui.RoleText, ...). Any role
-// can be overridden per widget with SetColor and read back (effective color)
-// with ColorOf. The swatch buttons recolor the sample button's RolePrimary at
+// Command colours demonstrates per-widget colour control. Each widget resolves
+// its colours through theme "roles" (ui.RolePrimary, ui.RoleText, ...). Any role
+// can be overridden per widget with SetColour and read back (effective colour)
+// with ColourOf. The swatch buttons recolour the sample button's RolePrimary at
 // runtime; "Reset" clears the override so it falls back to the theme. A second
 // sample button is left untouched to show overrides are per-widget.
 //
-// Run with: go run ./examples/colors
+// Run with: go run ./examples/colours
 package main
 
 import (
@@ -24,7 +24,7 @@ func hex(c color.Color) string {
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("guie — colors"),
+		ui.WithTitle("guie — colours"),
 		ui.WithSize(560, 360),
 	)
 
@@ -32,9 +32,9 @@ func main() {
 	root.SetLayout(ui.VBox(14))
 	root.SetPadding(geom.UniformInsets(20))
 
-	root.Add(ui.NewLabel("Per-widget color overrides (SetColor / ColorOf):"))
+	root.Add(ui.NewLabel("Per-widget colour overrides (SetColour / ColourOf):"))
 
-	// The sample whose fill (RolePrimary) we recolor, plus an untouched one.
+	// The sample whose fill (RolePrimary) we recolour, plus an untouched one.
 	sample := ui.NewButton("Sample")
 	other := ui.NewButton("Untouched")
 	samples := ui.NewContainer()
@@ -45,16 +45,16 @@ func main() {
 
 	status := ui.NewLabel("")
 	update := func() {
-		status.SetText("sample RolePrimary = " + hex(sample.ColorOf(ui.RolePrimary)))
+		status.SetText("sample RolePrimary = " + hex(sample.ColourOf(ui.RolePrimary)))
 	}
 	update()
 	root.Add(status)
 
-	// Swatches recolor the sample's RolePrimary; Reset clears the override.
+	// Swatches recolour the sample's RolePrimary; Reset clears the override.
 	swatch := func(label string, c color.Color) *ui.Button {
 		b := ui.NewButton(label)
 		b.OnClick(func() {
-			sample.SetColor(ui.RolePrimary, c) // nil clears the override
+			sample.SetColour(ui.RolePrimary, c) // nil clears the override
 			update()
 		})
 		return b
@@ -67,13 +67,13 @@ func main() {
 	swatches.Add(swatch("Reset", nil))
 	root.Add(swatches, ui.Align(geom.AlignStart))
 
-	// Per-widget text-color overrides (RoleText) on labels.
-	a := ui.NewLabel("Accent-colored text")
-	a.SetColor(ui.RoleText, color.RGBA{0x5D, 0x86, 0xC4, 0xff})
+	// Per-widget text-colour overrides (RoleText) on labels.
+	a := ui.NewLabel("Accent-coloured text")
+	a.SetColour(ui.RoleText, color.RGBA{0x5D, 0x86, 0xC4, 0xff})
 	root.Add(a)
 
 	b := ui.NewLabel("Muted text")
-	b.SetColor(ui.RoleText, color.RGBA{0x8A, 0x8A, 0x99, 0xff})
+	b.SetColour(ui.RoleText, color.RGBA{0x8A, 0x8A, 0x99, 0xff})
 	root.Add(b, ui.Weight(1))
 
 	app.SetContent(root)

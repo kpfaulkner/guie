@@ -153,35 +153,35 @@ func (s *Stepper) Draw(canvas render.Canvas) {
 	b := s.Bounds()
 	rad := s.cornerRadius()
 
-	canvas.FillRoundRect(b, rad, s.ColorOf(RoleSurface))
-	border := s.ColorOf(RoleBorder)
+	canvas.FillRoundRect(b, rad, s.ColourOf(RoleSurface))
+	border := s.ColourOf(RoleBorder)
 	if s.focused {
-		border = s.ColorOf(RoleAccent)
+		border = s.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRoundRect(b, rad, border, 1)
 
-	textColor := s.ColorOf(RoleText)
+	textColour := s.ColourOf(RoleText)
 	if !s.Enabled() {
-		textColor = s.ColorOf(RoleDisabled)
+		textColour = s.ColourOf(RoleDisabled)
 	}
 	inner := b.Inset(stepperPadding)
-	canvas.DrawText(s.text(), geom.Point{X: inner.X, Y: vCenterY(f, inner.Y, inner.H)}, f, textColor)
+	canvas.DrawText(s.text(), geom.Point{X: inner.X, Y: vCenterY(f, inner.Y, inner.H)}, f, textColour)
 
 	// Button column: up on the top half, down on the bottom half.
 	col := s.buttonColumn()
-	canvas.DrawLine(geom.Point{X: col.X, Y: b.Y + 2}, geom.Point{X: col.X, Y: b.Y + b.H - 2}, s.ColorOf(RoleBorder), 1)
+	canvas.DrawLine(geom.Point{X: col.X, Y: b.Y + 2}, geom.Point{X: col.X, Y: b.Y + b.H - 2}, s.ColourOf(RoleBorder), 1)
 	midY := col.Y + col.H/2
 	upRect := geom.Rect{X: col.X, Y: col.Y, W: col.W, H: col.H / 2}
 	downRect := geom.Rect{X: col.X, Y: midY, W: col.W, H: col.H / 2}
 	if s.hoverUp {
-		canvas.FillRect(upRect, lighten(s.ColorOf(RoleSurface), 1.25))
+		canvas.FillRect(upRect, lighten(s.ColourOf(RoleSurface), 1.25))
 	}
 	if s.hoverDown {
-		canvas.FillRect(downRect, lighten(s.ColorOf(RoleSurface), 1.25))
+		canvas.FillRect(downRect, lighten(s.ColourOf(RoleSurface), 1.25))
 	}
-	arrow := s.ColorOf(RoleText)
+	arrow := s.ColourOf(RoleText)
 	if !s.Enabled() {
-		arrow = s.ColorOf(RoleDisabled)
+		arrow = s.ColourOf(RoleDisabled)
 	}
 	s.drawArrow(canvas, upRect, true, arrow)
 	s.drawArrow(canvas, downRect, false, arrow)

@@ -117,7 +117,7 @@ that frame. Query it without a real surface:
 
 - `HasText(s)`, `TextContaining(substr)`, `Texts()`
 - `Count(kind)`, `OpsOfKind(kind)`
-- `FillsOfColor(c)` — rectangles filled with a color (e.g. a selection highlight)
+- `FillsOfColour(c)` — rectangles filled with a colour (e.g. a selection highlight)
 - `TextAt(x, y, tol)` — text drawn near a point
 
 The headless font (`guitest.NewFont`) has simple, **deterministic** metrics

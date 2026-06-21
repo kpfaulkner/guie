@@ -85,7 +85,7 @@ func NewApp(opts ...AppOption) *App {
 		o(a)
 	}
 
-	// Default the theme font and the clear color from the theme if unset.
+	// Default the theme font and the clear colour from the theme if unset.
 	if a.theme.Font == nil {
 		a.theme.Font = ebitenbackend.DefaultFont(a.theme.FontSize)
 	}

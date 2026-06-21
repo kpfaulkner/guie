@@ -19,7 +19,7 @@ const (
 	toastDefaultSecs = 3.0
 )
 
-// ToastKind selects a toast's accent color and conveys severity.
+// ToastKind selects a toast's accent colour and conveys severity.
 type ToastKind int
 
 const (
@@ -56,7 +56,7 @@ func ToastDuration(seconds float64) ToastOption {
 	}
 }
 
-// WithToastKind sets the toast's severity/color.
+// WithToastKind sets the toast's severity/colour.
 func WithToastKind(k ToastKind) ToastOption { return func(t *Toast) { t.kind = k } }
 
 // ShowToast displays a transient notification with the given message and returns
@@ -108,9 +108,9 @@ func (a *App) advanceToasts(dt float64) {
 	a.toasts = kept
 }
 
-// toastColors returns the background, border and text colors for a kind, using
+// toastColours returns the background, border and text colours for a kind, using
 // the theme where it makes sense so info toasts follow the palette.
-func (a *App) toastColors(k ToastKind) (bg, border, text color.Color) {
+func (a *App) toastColours(k ToastKind) (bg, border, text color.Color) {
 	pal := a.theme.Palette
 	switch k {
 	case ToastSuccess:
@@ -144,7 +144,7 @@ func (a *App) drawToasts(c render.Canvas) {
 		rect := geom.Rect{X: x, Y: top, W: w, H: h}
 
 		al := t.alpha()
-		bg, border, text := a.toastColors(t.kind)
+		bg, border, text := a.toastColours(t.kind)
 		if a.shadows && al > 0 {
 			drawShadow(c, rect, rad)
 		}

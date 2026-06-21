@@ -19,7 +19,7 @@ go run ./examples/table      # Table: header + weighted columns, selectable scro
 go run ./examples/fonts      # adjust font size at runtime (App.SetFont) + per-widget font
 go run ./examples/tooltips   # hover tooltips (SetTooltip) with a rest delay
 go run ./examples/splitter   # SplitPane: draggable dividers, nested splits
-go run ./examples/colors     # per-widget color overrides (SetColor / ColorOf, roles)
+go run ./examples/colours     # per-widget colour overrides (SetColour / ColourOf, roles)
 go run ./examples/images     # Image widget (scaled) + image buttons (ui.LoadImage)
 go run ./examples/editor     # text editor: menus, open/save, find/replace, modals
 go run ./examples/paint      # freehand drawing: mouse capture, multi-button, custom widget
@@ -29,7 +29,7 @@ go run ./examples/tree       # Tree (expand/collapse/keyboard) + Toast notificat
 go run ./examples/ime        # inline IME preedit rendering (simulated composition)
 go run ./examples/widgets2   # numeric Stepper + busy Spinner
 go run ./examples/datepicker # inline month calendar (DatePicker)
-go run ./examples/colorpicker # HSV color picker (swatch + H/S/V sliders)
+go run ./examples/colourpicker # HSV colour picker (swatch + H/S/V sliders)
 ```
 
 What each one exercises:
@@ -37,7 +37,7 @@ What each one exercises:
 | Example   | Covers                                                                       |
 |-----------|------------------------------------------------------------------------------|
 | `hello`   | `App`, options (`WithTitle`/`WithSize`), `Container`, `Stack`, `Label`, `Run` |
-| `layouts` | Nested containers, `VBox`/`HBox`/`Grid`, per-child `Weight`/`Align`, padding, themed colors |
+| `layouts` | Nested containers, `VBox`/`HBox`/`Grid`, per-child `Weight`/`Align`, padding, themed colours |
 | `widgets` | `Label.SetText`, `Button` + `OnClick`, `SetEnabled` toggling at runtime, pointer hover/press |
 | `events`  | Focus traversal, Space/Enter activation, `app.Events().Subscribe` global listener |
 | `canvas`  | Custom widget via `BaseWidget`, `Canvas` primitives (`FillRect`, `StrokeRect`, `DrawLine`, `DrawText`, `MeasureText`) |
@@ -51,17 +51,17 @@ What each one exercises:
 | `fonts`   | Runtime font sizing via `App.SetFont` + `ui.DefaultFont`, plus per-widget `SetFont` |
 | `tooltips`| Hover tooltips via `SetTooltip`, with a rest delay and on-screen clamping |
 | `splitter`| `SplitPane`/`HSplit`/`VSplit`: draggable dividers, ratio + min sizes, nested |
-| `colors`  | Per-widget color overrides via `SetColor`/`ColorOf` and `ColorRole`s |
+| `colours`  | Per-widget colour overrides via `SetColour`/`ColourOf` and `ColourRole`s |
 | `images`  | `Image` widget (fit modes) + image buttons via `ui.LoadImage`/`ButtonImage` |
 | `editor`  | A text editor: `MenuBar`, file open/save, find/replace, custom modal dialogs, `TextArea` selection API |
-| `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, color/brush controls |
+| `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, colour/brush controls |
 | `clipboard`| OS-backed clipboard via the opt-in `clipboard` package + `ui.WithClipboard`: copy/paste with other apps |
 | `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
 | `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
 | `ime`     | Inline IME preedit drawn underlined at the caret via `EventComposition`; uses a simulated composition since EBiten exposes no real IME |
 | `widgets2`| `Stepper` (min/max/step/decimals, buttons + arrows + wheel, `OnChange`) and the indeterminate busy `Spinner` (`Start`/`Stop`) |
 | `datepicker`| `DatePicker` inline calendar + `DateField` popup variant: month nav, click + keyboard day selection, `OnChange(time.Time)` |
-| `colorpicker`| `ColorPicker`: swatch + hue/saturation/value/alpha gradient sliders (transparency over a checkerboard), `OnChange(color.Color)` |
+| `colourpicker`| `ColourPicker`: swatch + hue/saturation/value/alpha gradient sliders (transparency over a checkerboard), `OnChange(color.Color)` |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

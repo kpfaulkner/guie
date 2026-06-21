@@ -141,7 +141,7 @@ func (l *List) Draw(canvas render.Canvas) {
 		return
 	}
 	b := l.Bounds()
-	canvas.FillRect(b, l.ColorOf(RoleSurface))
+	canvas.FillRect(b, l.ColourOf(RoleSurface))
 
 	rh := l.RowHeight()
 	overflow := l.ContentHeight() > b.H
@@ -159,19 +159,19 @@ func (l *List) Draw(canvas render.Canvas) {
 		row := geom.Rect{X: b.X, Y: y, W: rowW, H: rh}
 		switch {
 		case i == l.selected:
-			canvas.FillRect(row, l.ColorOf(RolePrimary))
+			canvas.FillRect(row, l.ColourOf(RolePrimary))
 		case i == l.hoverRow:
-			canvas.FillRect(row, lighten(l.ColorOf(RoleSurface), 1.25))
+			canvas.FillRect(row, lighten(l.ColourOf(RoleSurface), 1.25))
 		}
-		textColor := l.ColorOf(RoleText)
+		textColour := l.ColourOf(RoleText)
 		if i == l.selected {
-			textColor = l.ColorOf(RoleOnPrimary)
+			textColour = l.ColourOf(RoleOnPrimary)
 		}
-		canvas.DrawText(it, geom.Point{X: b.X + listRowPad, Y: vCenterY(f, y, rh)}, f, textColor)
+		canvas.DrawText(it, geom.Point{X: b.X + listRowPad, Y: vCenterY(f, y, rh)}, f, textColour)
 	}
 	canvas.PopClip()
 
-	canvas.StrokeRect(b, l.ColorOf(RoleBorder), 1)
+	canvas.StrokeRect(b, l.ColourOf(RoleBorder), 1)
 
 	if overflow {
 		l.drawScrollbar(canvas, b)
@@ -186,8 +186,8 @@ func (l *List) drawScrollbar(canvas render.Canvas, b geom.Rect) {
 		t = (l.offset / m) * (b.H - thumbH)
 	}
 	gutter := geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y, W: scrollbarWidth, H: b.H}
-	canvas.FillRect(gutter, l.ColorOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + t, W: scrollbarWidth, H: thumbH}, l.ColorOf(RoleAccent))
+	canvas.FillRect(gutter, l.ColourOf(RoleBackground))
+	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + t, W: scrollbarWidth, H: thumbH}, l.ColourOf(RoleAccent))
 }
 
 // HandleEvent handles hover tracking, clicking, wheel scrolling and keyboard

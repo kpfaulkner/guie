@@ -99,25 +99,25 @@ func (d *DropdownCombo) Draw(canvas render.Canvas) {
 	}
 	b := d.Bounds()
 	rad := d.cornerRadius()
-	canvas.FillRoundRect(b, rad, d.ColorOf(RoleSurface))
-	border := d.ColorOf(RoleBorder)
+	canvas.FillRoundRect(b, rad, d.ColourOf(RoleSurface))
+	border := d.ColourOf(RoleBorder)
 	if d.focused || d.open {
-		border = d.ColorOf(RoleAccent)
+		border = d.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRoundRect(b, rad, border, 1)
 
-	textColor := d.ColorOf(RoleText)
+	textColour := d.ColourOf(RoleText)
 	if d.selected < 0 {
-		textColor = d.ColorOf(RoleTextMuted)
+		textColour = d.ColourOf(RoleTextMuted)
 	}
-	canvas.DrawText(d.label(), geom.Point{X: b.X + listRowPad, Y: vCenterY(f, b.Y, b.H)}, f, textColor)
+	canvas.DrawText(d.label(), geom.Point{X: b.X + listRowPad, Y: vCenterY(f, b.Y, b.H)}, f, textColour)
 
 	// Chevron in the arrow area on the right.
 	cx := b.X + b.W - dropdownArrowW/2 - listRowPad
 	cy := b.Y + b.H/2
 	const aw = 4
-	canvas.DrawLine(geom.Point{X: cx - aw, Y: cy - aw/2}, geom.Point{X: cx, Y: cy + aw/2}, d.ColorOf(RoleText), 2)
-	canvas.DrawLine(geom.Point{X: cx, Y: cy + aw/2}, geom.Point{X: cx + aw, Y: cy - aw/2}, d.ColorOf(RoleText), 2)
+	canvas.DrawLine(geom.Point{X: cx - aw, Y: cy - aw/2}, geom.Point{X: cx, Y: cy + aw/2}, d.ColourOf(RoleText), 2)
+	canvas.DrawLine(geom.Point{X: cx, Y: cy + aw/2}, geom.Point{X: cx + aw, Y: cy - aw/2}, d.ColourOf(RoleText), 2)
 }
 
 // HandleEvent toggles the popup on click/Enter/Space and tracks hover/focus.

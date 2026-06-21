@@ -20,7 +20,7 @@ func WithSize(width, height int) AppOption {
 	return func(a *App) { a.cfg.Width, a.cfg.Height = width, height }
 }
 
-// WithBackground sets the color the surface is cleared to each frame,
+// WithBackground sets the colour the surface is cleared to each frame,
 // overriding the theme background.
 func WithBackground(c color.Color) AppOption {
 	return func(a *App) { a.cfg.Background = c }

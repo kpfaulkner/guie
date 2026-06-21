@@ -602,10 +602,10 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 	}
 	b := t.Bounds()
 	rad := t.cornerRadius()
-	canvas.FillRoundRect(b, rad, t.ColorOf(RoleSurface))
-	border := t.ColorOf(RoleBorder)
+	canvas.FillRoundRect(b, rad, t.ColourOf(RoleSurface))
+	border := t.ColourOf(RoleBorder)
 	if t.focused {
-		border = t.ColorOf(RoleAccent)
+		border = t.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRoundRect(b, rad, border, 1)
 
@@ -614,7 +614,7 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 
 	if t.isEmpty() && !t.focused && t.placeholder != "" {
 		canvas.PushClip(inner)
-		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: inner.Y}, f, t.ColorOf(RoleTextMuted))
+		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: inner.Y}, f, t.ColourOf(RoleTextMuted))
 		canvas.PopClip()
 		return
 	}
@@ -626,9 +626,9 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 
 	rows := t.rows()
 	ci := t.caretVisualIndex(rows)
-	textColor := t.ColorOf(RoleText)
+	textColour := t.ColourOf(RoleText)
 	canvas.PushClip(inner)
-	t.drawSelectionRows(canvas, inner, lh, rows, t.ColorOf(RolePrimary))
+	t.drawSelectionRows(canvas, inner, lh, rows, t.ColourOf(RolePrimary))
 	for vi, r := range rows {
 		y := inner.Y + float64(vi)*lh - t.scrollY
 		if y+lh < inner.Y || y > inner.Y+inner.H {
@@ -645,12 +645,12 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 				rel = len(seg)
 			}
 			pre, post := string(seg[:rel]), string(seg[rel:])
-			canvas.DrawText(pre+t.preedit+post, geom.Point{X: inner.X, Y: y}, f, textColor)
+			canvas.DrawText(pre+t.preedit+post, geom.Point{X: inner.X, Y: y}, f, textColour)
 			ux0 := inner.X + f.Measure(pre).W
 			ux1 := inner.X + f.Measure(pre+t.preedit).W
-			canvas.DrawLine(geom.Point{X: ux0, Y: y + lh - 1}, geom.Point{X: ux1, Y: y + lh - 1}, textColor, 1)
+			canvas.DrawLine(geom.Point{X: ux0, Y: y + lh - 1}, geom.Point{X: ux1, Y: y + lh - 1}, textColour, 1)
 		} else {
-			canvas.DrawText(string(seg), geom.Point{X: inner.X, Y: y}, f, textColor)
+			canvas.DrawText(string(seg), geom.Point{X: inner.X, Y: y}, f, textColour)
 		}
 	}
 	if t.focused {
@@ -660,7 +660,7 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: caretY + 1},
 			geom.Point{X: caretX, Y: caretY + lh - 1},
-			textColor, 1,
+			textColour, 1,
 		)
 	}
 	canvas.PopClip()
@@ -761,8 +761,8 @@ func (t *TextArea) drawScrollbar(canvas render.Canvas, b geom.Rect, viewH float6
 		off = (t.scrollY / m) * (b.H - thumbH)
 	}
 	x := b.X + b.W - scrollbarWidth
-	canvas.FillRect(geom.Rect{X: x, Y: b.Y, W: scrollbarWidth, H: b.H}, t.ColorOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: x, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColorOf(RoleAccent))
+	canvas.FillRect(geom.Rect{X: x, Y: b.Y, W: scrollbarWidth, H: b.H}, t.ColourOf(RoleBackground))
+	canvas.FillRect(geom.Rect{X: x, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColourOf(RoleAccent))
 }
 
 // HandleEvent edits the text, manages the selection and scrolls in response to

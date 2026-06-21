@@ -74,16 +74,16 @@ func (s *Slider) Draw(canvas render.Canvas) {
 	x0, x1, y := s.track()
 	hx := x0 + (x1-x0)*s.value
 
-	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: x1, Y: y}, s.ColorOf(RoleBorder), 3)
-	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: hx, Y: y}, s.ColorOf(RolePrimary), 3)
+	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: x1, Y: y}, s.ColourOf(RoleBorder), 3)
+	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: hx, Y: y}, s.ColourOf(RolePrimary), 3)
 
-	handle := s.ColorOf(RolePrimary)
+	handle := s.ColourOf(RolePrimary)
 	if s.hover || s.dragging {
-		handle = s.ColorOf(RoleAccent)
+		handle = s.ColourOf(RoleAccent)
 	}
 	canvas.FillCircle(geom.Point{X: hx, Y: y}, sliderHandle, handle)
 	if s.focused {
-		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColorOf(RoleAccent), 1)
+		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColourOf(RoleAccent), 1)
 	}
 }
 

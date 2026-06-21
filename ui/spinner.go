@@ -86,7 +86,7 @@ func (s *Spinner) Draw(canvas render.Canvas) {
 	cx, cy := b.X+b.W/2, b.Y+b.H/2
 	dotR := d / 12
 	ringR := d/2 - dotR - 1
-	col := s.ColorOf(RolePrimary)
+	col := s.ColourOf(RolePrimary)
 
 	head := s.phase * spinnerDots // which dot is currently brightest
 	for i := 0; i < spinnerDots; i++ {

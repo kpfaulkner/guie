@@ -74,7 +74,7 @@ pixels in surface space. Methods:
   current region. Backends must honour the active clip for every draw call.
 - Shapes: `Fill`, `FillRect`, `StrokeRect`, `DrawLine`, `FillCircle`,
   `StrokeCircle`.
-- Text: `DrawText(s, pos, face, color)` (pos = top-left), `MeasureText`.
+- Text: `DrawText(s, pos, face, colour)` (pos = top-left), `MeasureText`.
 - Images: `DrawImage(img, dst)` (scaled to `dst`).
 - `SubCanvas(r)` — a clipped sub-surface (used for compositing; rarely needed).
 
@@ -174,7 +174,7 @@ Package name `ebitenbackend`. The only place that touches EBiten.
   `FillCircle`, `StrokeCircle`) — note `vector.FillRect` (not the deprecated
   `DrawFilledRect`).
 - Text uses `ebiten/v2/text/v2`; `DrawText` translates to `pos×scale` and
-  color-scales, **rasterizing glyphs at physical size** (a shallow copy of the
+  colour-scales, **rasterizing glyphs at physical size** (a shallow copy of the
   face at `Size×scale`) so text stays sharp; `MeasureText` delegates to the
   face's `Measure`, which stays at logical size so layout is unaffected.
 - `toImageRect` rounds a float `Rect` outward to integer pixel bounds;
@@ -239,7 +239,7 @@ don't both claim a boundary pixel — matters for hit-testing).
 
 ---
 
-## 6. `theme` & the color model
+## 6. `theme` & the colour model
 
 `theme.Theme` = `Palette` + `Font` + `FontSize` (nothing else — the earlier
 `Spacing`/`Padding`/`CornerRadius` fields were removed because no widget read
@@ -248,7 +248,7 @@ them). `Palette` is nine named `color.Color` roles: `Background`, `Surface`,
 `Default()` returns the dark palette at size 14 with a nil `Font` (the App fills
 in the bundled font, keeping `theme` backend-independent).
 
-See §12 for how widgets resolve colors through these roles with per-widget
+See §12 for how widgets resolve colours through these roles with per-widget
 overrides.
 
 ---
@@ -268,12 +268,12 @@ reason all widgets live in one package. Custom widgets embed `ui.BaseWidget`
 
 ### 7.2 `BaseWidget` (`ui/base.go`)
 
-Stores bounds, visible/enabled flags, tooltip text, per-widget color overrides,
+Stores bounds, visible/enabled flags, tooltip text, per-widget colour overrides,
 the widget's own `self Widget` identity, its `parent`, and the shared
 `*treeContext`. Provides default implementations of every interface method
 (leaf defaults: no children, zero `MinSize`, no-op `Layout`/`Draw`,
 non-consuming `HandleEvent`, not focusable) plus `Invalidate`, `SetVisible`,
-`SetEnabled`, `SetTooltip`, `RequestFocus`, `SetColor`/`ColorOf`, and the
+`SetEnabled`, `SetTooltip`, `RequestFocus`, `SetColour`/`ColourOf`, and the
 internal `appTheme()`/`clipboard()` accessors.
 
 ### 7.3 The `mount` self-identity mechanism
@@ -313,7 +313,7 @@ happens every frame regardless (no dirty-region optimization yet).
 
 `NewApp(opts...)` builds defaults (ebiten driver via `ebitenbackend.New()`,
 default theme, 800×600 resizable), applies options, then: fills the theme font
-from the backend if unset, defaults the clear color to the palette background,
+from the backend if unset, defaults the clear colour to the palette background,
 defaults the clipboard to `memClipboard`, creates the `EventBus`, and wires the
 `treeContext` (closures over the App's dirty flag, focus, popups; pointers to
 its theme and clipboard).
@@ -396,8 +396,8 @@ Grid columns/rows).
 ### 9.4 `Container` (`ui/container.go`)
 
 Holds children + parallel `LayoutData`, an optional `Layout`, an optional
-background fill and border (explicit instance colors with `Background()`/
-`BorderColor()` getters), and padding. `MinSize` = layout's measure (or max
+background fill and border (explicit instance colours with `Background()`/
+`BorderColour()` getters), and padding. `MinSize` = layout's measure (or max
 child extents if no layout) + padding. `Layout` arranges via the layout over
 `ContentRect()` (bounds inset by padding), then recurses. `Draw` fills
 background, clips to the content rect, draws visible children, pops the clip,
@@ -501,7 +501,7 @@ Callbacks are **methods** named by event, uniform across widgets: `OnClick`,
 funcs) avoid the namespace collision that would otherwise force per-widget names
 and give one verb per event type. Construction *options* remain for
 non-callback config (`Placeholder`, `Checked`, `SliderValue`, `DropdownSelected`,
-`ListSelected`, color/font options, `TextAreaWrap`, ...).
+`ListSelected`, colour/font options, `TextAreaWrap`, ...).
 
 ---
 
@@ -610,25 +610,25 @@ effects. See `examples/dragdrop`.
 
 ---
 
-## 12. Color system (`ui/color.go`)
+## 12. Colour system (`ui/colour.go`)
 
-Every widget resolves the colors it draws through **roles**, not the palette
+Every widget resolves the colours it draws through **roles**, not the palette
 directly:
 
-- `ColorRole` enum mirrors the palette (`RoleBackground`…`RoleDisabled`).
-- `BaseWidget.SetColor(role, c)` stores a per-widget override (nil clears it).
-- `BaseWidget.ColorOf(role)` returns the **effective** color: the override if
-  set, else `paletteColor(theme.Palette, role)`.
+- `ColourRole` enum mirrors the palette (`RoleBackground`…`RoleDisabled`).
+- `BaseWidget.SetColour(role, c)` stores a per-widget override (nil clears it).
+- `BaseWidget.ColourOf(role)` returns the **effective** colour: the override if
+  set, else `paletteColour(theme.Palette, role)`.
 
-Because this lives on `BaseWidget`, *every* widget supports per-widget color
+Because this lives on `BaseWidget`, *every* widget supports per-widget colour
 overrides and read-back uniformly. Widget `Draw` methods call
-`w.ColorOf(RoleX)` instead of reading `theme.Palette.X`, so an override actually
-changes appearance. Derived state colors (button hover/pressed) are computed
-from the base role via `lighten`/`darken`, so overriding `RolePrimary` recolors
+`w.ColourOf(RoleX)` instead of reading `theme.Palette.X`, so an override actually
+changes appearance. Derived state colours (button hover/pressed) are computed
+from the base role via `lighten`/`darken`, so overriding `RolePrimary` recolours
 the hover/pressed states too. App-level chrome that isn't a widget (modal scrim,
 tooltip box) reads the theme palette directly.
 
-`Container` background/border are *explicit instance colors* (default
+`Container` background/border are *explicit instance colours* (default
 transparent / none), not roles — they have their own setters/getters.
 
 ---
@@ -687,9 +687,9 @@ in the same family as tooltips/popups.
   animations), so it is deterministic in tests.
 - **Rendering.** `drawToasts` (called in `App.draw` between `drawDrag` and
   `drawTooltip`) stacks them from the bottom-right upward, newest at the bottom,
-  each sized to its (possibly multi-line) text. Color comes from `ToastKind`
+  each sized to its (possibly multi-line) text. Colour comes from `ToastKind`
   (info → theme primary/on-primary; success/warning/error → fixed green/amber/red
-  with white text); every color is run through `withAlpha` for the fade. Toasts
+  with white text); every colour is run through `withAlpha` for the fade. Toasts
   are never hit-tested, so input passes through to the widgets beneath them.
 
 ## 13c. Stepper & Spinner
@@ -738,18 +738,18 @@ An inline month calendar over `time.Time`, self-drawn like `List`/`Tree`.
   dismiss via the overlay layer. `Value()` returns the date and whether one is
   set (it can start empty, showing the placeholder).
 
-## 13e. ColorPicker (`ui/color_picker.go`)
+## 13e. ColourPicker (`ui/colour_picker.go`)
 
-An HSV color picker, self-drawn. It avoids a 2D saturation/value area (which the
+An HSV colour picker, self-drawn. It avoids a 2D saturation/value area (which the
 `Canvas` can't gradient-fill cheaply, and which would force a per-frame strip
 grid or a GPU `RenderTarget`) in favour of a preview swatch over **four 1D
 gradient sliders** for hue, saturation, value and alpha.
 
-- **Model.** `h`, `s`, `v`, `a` in `[0,1]`; `Color()`/`SetColor` convert via
+- **Model.** `h`, `s`, `v`, `a` in `[0,1]`; `Colour()`/`SetColour` convert via
   `hsvToRGB`/`rgbToHSV` and carry alpha (`alphaOf`/`to8`).
 - **Tracks.** Each track is painted as ~`width/3` `FillRect` strips evaluated
-  through `gradientColor` (hue varies hue; sat/value reflect the current other
-  channels; the alpha track is the current color at varying opacity), so they
+  through `gradientColour` (hue varies hue; sat/value reflect the current other
+  channels; the alpha track is the current colour at varying opacity), so they
   update live and cost only a few dozen rects each — headless-safe, no offscreen
   surface. The alpha track and the preview swatch are drawn over a light/dark
   `drawCheckerboard` so transparency is visible.
@@ -757,7 +757,7 @@ gradient sliders** for hue, saturation, value and alpha.
   the active channel is held for the drag); while focused, Up/Down pick the
   active channel and Left/Right nudge it by `cpKeyStep`. `setChannel` clamps and
   fires `OnChange(color.Color)` only on a real change. The swatch shows the hex
-  value in a luminance-chosen black/white (`contrastColor`).
+  value in a luminance-chosen black/white (`contrastColour`).
 
 ---
 
@@ -826,7 +826,7 @@ no preedit or candidate-window API — see §16).
 | Widget | File | Notes |
 |---|---|---|
 | `Container` | container.go | grouping, layout host, bg/border/padding |
-| `Label` | label.go | single line text, `Align`, color/font overrides |
+| `Label` | label.go | single line text, `Align`, colour/font overrides |
 | `Button` | button.go | text and/or icon, hover/press/focus, keyboard activate |
 | `Checkbox` | checkbox.go | check glyph, `OnChange(bool)` |
 | `RadioButton`/`RadioGroup` | radio.go | circular indicators, group exclusivity |
@@ -844,7 +844,7 @@ no preedit or candidate-window API — see §16).
 | `Spinner` | spinner.go | indeterminate busy indicator (animated dot ring) |
 | `DatePicker` | date.go | inline month calendar over `time.Time`, month nav, click + keyboard |
 | `DateField` | date_field.go | collapsed date control; opens a `DatePicker` popup (like `DropdownCombo`) |
-| `ColorPicker` | color_picker.go | HSV+alpha picker: preview swatch + hue/sat/value/alpha gradient sliders |
+| `ColourPicker` | colour_picker.go | HSV+alpha picker: preview swatch + hue/sat/value/alpha gradient sliders |
 | `TabContainer` | tabs.go | tab strip; all panes mounted (keep state), only active shown |
 | `SplitPane` | splitter.go | draggable divider, ratio + min sizes, nests |
 | `Image` | image.go | displays `render.Image` with `FitContain/Stretch/None` |
@@ -895,7 +895,7 @@ per-row hover via the pointer-move-to-hovered dispatch (§10.3).
 ## 17. Testing approach
 
 - **White-box** tests (`package ui`) cover layout math, event dispatch, focus,
-  selection, wrap, color roles, tooltip timing, etc. Pure logic, no GPU.
+  selection, wrap, colour roles, tooltip timing, etc. Pure logic, no GPU.
 - **Black-box** tests (`package ui_test`) exercise the exported API as a
   consumer would, plus godoc `Example` functions that compile-check usage.
 - **Headless-safety**: tests avoid creating GPU resources. Text/layout use the
@@ -928,7 +928,7 @@ the design's testing TBD called for.
 - **Recording.** The headless `canvas` records each draw call as an `Op` rather
   than rasterizing (clipping is recorded but not enforced; coordinates are
   absolute). `Recording` exposes query helpers (`HasText`, `TextContaining`,
-  `Count`, `OpsOfKind`, `FillsOfColor`, `TextAt`) so a test asserts what was
+  `Count`, `OpsOfKind`, `FillsOfColour`, `TextAt`) so a test asserts what was
   painted without a surface.
 - **Deterministic font.** `guitest.NewFont(size)` has synthetic, stable metrics
   (advance `0.6·size`/rune, ascent/descent/line-height fixed fractions), so text

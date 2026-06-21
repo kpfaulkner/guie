@@ -177,9 +177,9 @@ func (s *SplitPane) Draw(canvas render.Canvas) {
 		canvas.PopClip()
 	}
 
-	col := s.ColorOf(RoleBorder)
+	col := s.ColourOf(RoleBorder)
 	if s.hover || s.dragging {
-		col = s.ColorOf(RoleAccent)
+		col = s.ColourOf(RoleAccent)
 	}
 	canvas.FillRect(divider, col)
 }

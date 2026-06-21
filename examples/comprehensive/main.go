@@ -14,7 +14,7 @@
 //   - Layout:    a Grid with a spanning cell and a ScrollView, in a vertical
 //     SplitPane; plus a Stack for centering
 //   - Media:     a generated image (FitContain) and the theme palette as swatches
-//   - cross-cutting: a custom theme, per-widget color overrides, tooltips, a
+//   - cross-cutting: a custom theme, per-widget colour overrides, tooltips, a
 //     status bar, and a global click counter wired through the event bus
 //
 // Run with: go run ./examples/comprehensive
@@ -36,7 +36,7 @@ import (
 
 func main() {
 	// A custom theme: start from the default dark palette and tweak the accent
-	// colors and corner rounding. Widgets pick these up automatically.
+	// colours and corner rounding. Widgets pick these up automatically.
 	th := theme.Default()
 	th.Palette.Primary = color.RGBA{R: 0x3b, G: 0x82, B: 0xf6, A: 0xff}
 	th.Palette.Accent = color.RGBA{R: 0x60, G: 0xa5, B: 0xfa, A: 0xff}
@@ -59,7 +59,7 @@ func main() {
 	// Click in the whole UI is published, so this updates without wiring each
 	// widget. Bus handlers run on the UI goroutine, so touching a widget is safe.
 	clicks := 0
-	clickLabel := ui.NewLabel("clicks: 0", ui.LabelColor(pal.TextMuted))
+	clickLabel := ui.NewLabel("clicks: 0", ui.LabelColour(pal.TextMuted))
 	app.Events().Subscribe(ui.EventClick, func(ev ui.Event) {
 		clicks++
 		clickLabel.SetText(fmt.Sprintf("clicks: %d", clicks))
@@ -127,7 +127,7 @@ func main() {
 }
 
 // controlsTab demonstrates buttons, checkboxes, radios, a slider→progress link,
-// a dropdown, tooltips, color overrides, and both dialog styles.
+// a dropdown, tooltips, colour overrides, and both dialog styles.
 func controlsTab(app *ui.App, say func(string), pal theme.Palette, swatch render.Image) ui.Widget {
 	// Buttons: primary, flat, disabled, and an image button.
 	primary := ui.NewButton("Primary")
@@ -140,9 +140,9 @@ func controlsTab(app *ui.App, say func(string), pal theme.Palette, swatch render
 	disabled := ui.NewButton("Disabled")
 	disabled.SetEnabled(false)
 
-	custom := ui.NewButton("Custom color")
-	custom.SetColor(ui.RolePrimary, color.RGBA{R: 0x16, G: 0xa3, B: 0x4a, A: 0xff})
-	custom.OnClick(func() { say("Custom recolored button") })
+	custom := ui.NewButton("Custom colour")
+	custom.SetColour(ui.RolePrimary, color.RGBA{R: 0x16, G: 0xa3, B: 0x4a, A: 0xff})
+	custom.OnClick(func() { say("Custom recoloured button") })
 
 	imgBtn := ui.NewButton("Image", ui.ButtonImage(swatch))
 	imgBtn.OnClick(func() { say("Image button clicked") })
@@ -167,13 +167,13 @@ func controlsTab(app *ui.App, say func(string), pal theme.Palette, swatch render
 
 	dd := ui.NewDropdown(
 		[]string{"Red", "Orange", "Yellow", "Green", "Blue", "Violet"},
-		ui.DropdownPlaceholder("choose a color"),
+		ui.DropdownPlaceholder("choose a colour"),
 	)
 	dd.OnSelect(func(i int) { say(fmt.Sprintf("Dropdown index %d", i)) })
 
 	selection := card("Selection", pal,
 		cb1, cb2,
-		ui.NewLabel("Size:", ui.LabelColor(pal.TextMuted)),
+		ui.NewLabel("Size:", ui.LabelColour(pal.TextMuted)),
 		r1, r2, r3,
 		dd,
 	)
@@ -258,7 +258,7 @@ func showPrompt(app *ui.App, say func(string), pal theme.Palette) {
 
 // textTab shows a TextField with live echo + submit and a wrapping TextArea.
 func textTab(say func(string), pal theme.Palette) ui.Widget {
-	echo := ui.NewLabel("(type above)", ui.LabelColor(pal.TextMuted))
+	echo := ui.NewLabel("(type above)", ui.LabelColour(pal.TextMuted))
 	field := ui.NewTextField(ui.Placeholder("Type something and press Enter"))
 	field.OnChange(func(s string) { echo.SetText("echo: " + s) })
 	field.OnSubmit(func(s string) { say("Submitted: " + s) })
@@ -406,7 +406,7 @@ func card(title string, pal theme.Palette, body ...ui.Widget) *ui.Container {
 	c.SetCornerRadius(6)
 	c.SetPadding(geom.UniformInsets(12))
 	c.SetLayout(ui.VBox(8))
-	c.Add(ui.NewLabel(title, ui.LabelColor(pal.TextMuted)))
+	c.Add(ui.NewLabel(title, ui.LabelColour(pal.TextMuted)))
 	for _, w := range body {
 		c.Add(w)
 	}
@@ -423,7 +423,7 @@ func row(spacing float64, ws ...ui.Widget) *ui.Container {
 	return c
 }
 
-// tile is a colored cell with a centered label, used for grid demos.
+// tile is a coloured cell with a centered label, used for grid demos.
 func tile(text string, bg color.Color) *ui.Container {
 	c := ui.NewContainer()
 	c.SetBackground(bg)

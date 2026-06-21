@@ -11,15 +11,15 @@ import (
 type OpKind int
 
 const (
-	OpFill            OpKind = iota // Fill(color) over the current clip
-	OpFillRect                      // FillRect(rect, color)
-	OpStrokeRect                    // StrokeRect(rect, color, width)
-	OpFillRoundRect                 // FillRoundRect(rect, radius, color)
-	OpStrokeRoundRect               // StrokeRoundRect(rect, radius, color, width)
-	OpDrawLine                      // DrawLine(a, b, color, width)
-	OpFillCircle                    // FillCircle(center=A, radius, color)
-	OpStrokeCircle                  // StrokeCircle(center=A, radius, color, width)
-	OpDrawText                      // DrawText(text, pos=A, color)
+	OpFill            OpKind = iota // Fill(colour) over the current clip
+	OpFillRect                      // FillRect(rect, colour)
+	OpStrokeRect                    // StrokeRect(rect, colour, width)
+	OpFillRoundRect                 // FillRoundRect(rect, radius, colour)
+	OpStrokeRoundRect               // StrokeRoundRect(rect, radius, colour, width)
+	OpDrawLine                      // DrawLine(a, b, colour, width)
+	OpFillCircle                    // FillCircle(center=A, radius, colour)
+	OpStrokeCircle                  // StrokeCircle(center=A, radius, colour, width)
+	OpDrawText                      // DrawText(text, pos=A, colour)
 	OpDrawImage                     // DrawImage(image into rect)
 	OpPushClip                      // PushClip(rect)
 	OpPopClip                       // PopClip()
@@ -31,7 +31,7 @@ type Op struct {
 	Kind   OpKind
 	Rect   geom.Rect
 	A, B   geom.Point
-	Color  color.Color
+	Colour color.Color
 	Text   string
 	Width  float64
 	Radius float64
@@ -98,17 +98,17 @@ func (r *Recording) OpsOfKind(kind OpKind) []Op {
 	return out
 }
 
-// FillsOfColor returns the rectangles of every FillRect / FillRoundRect op whose
-// color matches c (compared by RGBA). Useful for asserting selection/hover
+// FillsOfColour returns the rectangles of every FillRect / FillRoundRect op whose
+// colour matches c (compared by RGBA). Useful for asserting selection/hover
 // highlights or themed backgrounds were painted.
-func (r *Recording) FillsOfColor(c color.Color) []geom.Rect {
+func (r *Recording) FillsOfColour(c color.Color) []geom.Rect {
 	var out []geom.Rect
 	want := rgba(c)
 	for _, op := range r.Ops {
 		if op.Kind != OpFillRect && op.Kind != OpFillRoundRect {
 			continue
 		}
-		if op.Color != nil && rgba(op.Color) == want {
+		if op.Colour != nil && rgba(op.Colour) == want {
 			out = append(out, op.Rect)
 		}
 	}

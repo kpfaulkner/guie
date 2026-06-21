@@ -16,14 +16,14 @@ import (
 // by attaching a layout manager.
 type Container struct {
 	BaseWidget
-	children    []Widget
-	data        []LayoutData // per-child layout params, parallel to children
-	layout      Layout       // optional; nil means children keep their bounds
-	background  color.Color  // optional fill; nil means transparent
-	padding     geom.Insets
-	borderColor color.Color // optional outline; nil means none
-	borderWidth float64
-	radius      float64 // corner radius for background/border; 0 = sharp
+	children     []Widget
+	data         []LayoutData // per-child layout params, parallel to children
+	layout       Layout       // optional; nil means children keep their bounds
+	background   color.Color  // optional fill; nil means transparent
+	padding      geom.Insets
+	borderColour color.Color // optional outline; nil means none
+	borderWidth  float64
+	radius       float64 // corner radius for background/border; 0 = sharp
 }
 
 // NewContainer returns an empty, visible Container.
@@ -37,7 +37,7 @@ func (c *Container) SetLayout(l Layout) {
 	c.Invalidate()
 }
 
-// SetBackground sets the fill color drawn behind the children. Nil is transparent.
+// SetBackground sets the fill colour drawn behind the children. Nil is transparent.
 func (c *Container) SetBackground(col color.Color) {
 	c.background = col
 	c.Invalidate()
@@ -49,10 +49,10 @@ func (c *Container) SetPadding(in geom.Insets) {
 	c.Invalidate()
 }
 
-// SetBorder draws an outline of the given color and width around the container.
-// A nil color removes the border.
+// SetBorder draws an outline of the given colour and width around the container.
+// A nil colour removes the border.
 func (c *Container) SetBorder(col color.Color, width float64) {
-	c.borderColor = col
+	c.borderColour = col
 	c.borderWidth = width
 }
 
@@ -62,12 +62,12 @@ func (c *Container) SetCornerRadius(r float64) {
 	c.Invalidate()
 }
 
-// Background returns the container's fill color (nil means transparent).
+// Background returns the container's fill colour (nil means transparent).
 func (c *Container) Background() color.Color { return c.background }
 
-// BorderColor returns the container's border color (nil means no border), and
+// BorderColour returns the container's border colour (nil means no border), and
 // its width.
-func (c *Container) BorderColor() (color.Color, float64) { return c.borderColor, c.borderWidth }
+func (c *Container) BorderColour() (color.Color, float64) { return c.borderColour, c.borderWidth }
 
 // Add appends a child widget with optional per-child layout parameters,
 // mounting it immediately if the container is already part of a mounted tree.
@@ -162,8 +162,8 @@ func (c *Container) Draw(canvas render.Canvas) {
 	}
 	canvas.PopClip()
 
-	if c.borderColor != nil && c.borderWidth > 0 {
-		canvas.StrokeRoundRect(c.Bounds(), c.radius, c.borderColor, c.borderWidth)
+	if c.borderColour != nil && c.borderWidth > 0 {
+		canvas.StrokeRoundRect(c.Bounds(), c.radius, c.borderColour, c.borderWidth)
 	}
 }
 

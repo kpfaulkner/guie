@@ -9,7 +9,7 @@ import (
 	"github.com/kpfaulkner/guie/ui"
 )
 
-func sameColor(a, b color.Color) bool {
+func sameColour(a, b color.Color) bool {
 	r1, g1, b1, a1 := a.RGBA()
 	r2, g2, b2, a2 := b.RGBA()
 	return r1 == r2 && g1 == g2 && b1 == b2 && a1 == a2
@@ -41,20 +41,20 @@ func TestCheckboxOnChange(t *testing.T) {
 	}
 }
 
-func TestColorOverrideAndFallback(t *testing.T) {
+func TestColourOverrideAndFallback(t *testing.T) {
 	app := ui.NewApp()
 	lbl := ui.NewLabel("x")
 	app.SetContent(lbl)
 
 	// Unset role falls back to the theme.
-	if !sameColor(lbl.ColorOf(ui.RoleSurface), app.Theme().Palette.Surface) {
-		t.Fatal("unset role should return the theme color")
+	if !sameColour(lbl.ColourOf(ui.RoleSurface), app.Theme().Palette.Surface) {
+		t.Fatal("unset role should return the theme colour")
 	}
-	// Override is returned as the effective color.
+	// Override is returned as the effective colour.
 	red := color.RGBA{R: 0xff, A: 0xff}
-	lbl.SetColor(ui.RoleText, red)
-	if !sameColor(lbl.ColorOf(ui.RoleText), red) {
-		t.Fatal("ColorOf should return the override")
+	lbl.SetColour(ui.RoleText, red)
+	if !sameColour(lbl.ColourOf(ui.RoleText), red) {
+		t.Fatal("ColourOf should return the override")
 	}
 }
 
@@ -98,8 +98,8 @@ func ExampleApp() {
 	// app.Run() // starts the main loop; omitted so the example stays headless.
 }
 
-// ExampleLabel_SetColor shows overriding a widget's color by role.
-func ExampleLabel_SetColor() {
+// ExampleLabel_SetColour shows overriding a widget's colour by role.
+func ExampleLabel_SetColour() {
 	label := ui.NewLabel("warning")
-	label.SetColor(ui.RoleText, color.RGBA{R: 0xff, G: 0x55, B: 0x55, A: 0xff})
+	label.SetColour(ui.RoleText, color.RGBA{R: 0xff, G: 0x55, B: 0x55, A: 0xff})
 }

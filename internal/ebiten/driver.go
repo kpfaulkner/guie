@@ -83,7 +83,7 @@ func (g *game) Update() error {
 	return nil
 }
 
-// Draw clears the surface to the background color and runs the Draw hook. The
+// Draw clears the surface to the background colour and runs the Draw hook. The
 // canvas is bound with the current device scale so logical draw coordinates map
 // to the physical-resolution surface.
 func (g *game) Draw(screen *ebiten.Image) {

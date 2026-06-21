@@ -130,16 +130,16 @@ func (m *MenuBar) Draw(canvas render.Canvas) {
 	if f == nil {
 		return
 	}
-	canvas.FillRect(m.Bounds(), m.ColorOf(RoleSurface))
+	canvas.FillRect(m.Bounds(), m.ColourOf(RoleSurface))
 	for i, t := range m.titles {
 		r := m.titleRect(i)
 		switch {
 		case i == m.openIdx:
-			canvas.FillRect(r, m.ColorOf(RolePrimary))
+			canvas.FillRect(r, m.ColourOf(RolePrimary))
 		case i == m.hover:
-			canvas.FillRect(r, lighten(m.ColorOf(RoleSurface), 1.25))
+			canvas.FillRect(r, lighten(m.ColourOf(RoleSurface), 1.25))
 		}
-		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: vCenterY(f, r.Y, r.H)}, f, m.ColorOf(RoleText))
+		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: vCenterY(f, r.Y, r.H)}, f, m.ColourOf(RoleText))
 	}
 }
 
@@ -228,9 +228,9 @@ func (r *menuRow) Draw(canvas render.Canvas) {
 	}
 	b := r.Bounds()
 	if r.hover {
-		canvas.FillRect(b, r.ColorOf(RoleAccent))
+		canvas.FillRect(b, r.ColourOf(RoleAccent))
 	}
-	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: vCenterY(f, b.Y, b.H)}, f, r.ColorOf(RoleText))
+	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: vCenterY(f, b.Y, b.H)}, f, r.ColourOf(RoleText))
 }
 
 func (r *menuRow) HandleEvent(ev *Event) bool {

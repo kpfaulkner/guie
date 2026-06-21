@@ -1,9 +1,9 @@
-// Command colorpicker demonstrates the ColorPicker: a preview swatch (showing
+// Command colourpicker demonstrates the ColourPicker: a preview swatch (showing
 // the hex value) over hue/saturation/value/alpha gradient sliders. Drag or click
-// a track to change a channel; the chosen color (including its transparency) is
+// a track to change a channel; the chosen colour (including its transparency) is
 // applied to a panel on the right so you can see it in context.
 //
-// Run with: go run ./examples/colorpicker
+// Run with: go run ./examples/colourpicker
 package main
 
 import (
@@ -16,7 +16,7 @@ import (
 
 func main() {
 	app := ui.NewApp(
-		ui.WithTitle("guie — color picker"),
+		ui.WithTitle("guie — colour picker"),
 		ui.WithSize(440, 280),
 	)
 
@@ -27,7 +27,7 @@ func main() {
 	preview.SetLayout(ui.NewStack())
 	preview.Add(ui.NewLabel("Preview"), ui.Align(geom.AlignCenter))
 
-	picker := ui.NewColorPicker(ui.ColorPickerValue(color.NRGBA{R: 0x4F, G: 0x8A, B: 0xE0, A: 0xff}))
+	picker := ui.NewColourPicker(ui.ColourPickerValue(color.NRGBA{R: 0x4F, G: 0x8A, B: 0xE0, A: 0xff}))
 	picker.OnChange(func(c color.Color) {
 		preview.SetBackground(c)
 	})

@@ -1,8 +1,8 @@
 // Command paint is a tiny freehand drawing program built with guie. It
 // shows how to read mouse position from pointer events: a custom widget records
 // the cursor on pointer-down/move/up (pointer capture delivers the whole drag),
-// and renders strokes via the Canvas. Left-drag draws with the selected color;
-// right-drag erases (paints with the canvas color). Pick colors from the
+// and renders strokes via the Canvas. Left-drag draws with the selected colour;
+// right-drag erases (paints with the canvas colour). Pick colours from the
 // swatches, set the brush size with the slider, and Clear to reset.
 //
 // Run with: go run ./examples/paint
@@ -20,13 +20,13 @@ import (
 	"github.com/kpfaulkner/guie/ui"
 )
 
-var canvasColor = color.RGBA{R: 0xf6, G: 0xf6, B: 0xf2, A: 0xff}
+var canvasColour = color.RGBA{R: 0xf6, G: 0xf6, B: 0xf2, A: 0xff}
 
-// stroke is one freehand line: a list of points with a color and width.
+// stroke is one freehand line: a list of points with a colour and width.
 type stroke struct {
-	pts   []geom.Point
-	color color.Color
-	width float64
+	pts    []geom.Point
+	colour color.Color
+	width  float64
 }
 
 // sketchpad is a custom widget: it captures the pointer on press and records the
@@ -39,7 +39,7 @@ type sketchpad struct {
 	ui.BaseWidget
 	strokes []*stroke
 	cur     *stroke
-	color   color.Color
+	colour  color.Color
 	width   float64
 
 	layer   render.RenderTarget // baked, completed strokes (nil until first Draw)
@@ -47,14 +47,14 @@ type sketchpad struct {
 }
 
 func newSketchpad() *sketchpad {
-	return &sketchpad{BaseWidget: ui.NewBase(), color: color.RGBA{A: 0xff}, width: 3}
+	return &sketchpad{BaseWidget: ui.NewBase(), colour: color.RGBA{A: 0xff}, width: 3}
 }
 
 func (s *sketchpad) Clear() {
 	s.strokes = nil
 	s.cur = nil
 	if s.layer != nil {
-		s.layer.Clear(canvasColor)
+		s.layer.Clear(canvasColour)
 	}
 }
 
@@ -78,7 +78,7 @@ func (s *sketchpad) ensureLayer() {
 	if s.layer == nil {
 		return
 	}
-	s.layer.Clear(canvasColor)
+	s.layer.Clear(canvasColour)
 	lc := s.layer.Canvas()
 	for _, st := range s.strokes {
 		drawStroke(lc, st, b.Min())
@@ -88,11 +88,11 @@ func (s *sketchpad) ensureLayer() {
 func (s *sketchpad) HandleEvent(ev *ui.Event) bool {
 	switch ev.Type {
 	case ui.EventPointerDown:
-		col, w := s.color, s.width
+		col, w := s.colour, s.width
 		if ev.Button == render.MouseRight { // right-drag erases
-			col, w = canvasColor, s.width*3
+			col, w = canvasColour, s.width*3
 		}
-		s.cur = &stroke{pts: []geom.Point{ev.Pos}, color: col, width: w}
+		s.cur = &stroke{pts: []geom.Point{ev.Pos}, colour: col, width: w}
 		s.strokes = append(s.strokes, s.cur)
 		// Bake the starting dot straight into the layer.
 		s.paint(func(c render.Canvas, off geom.Point) {
@@ -111,8 +111,8 @@ func (s *sketchpad) HandleEvent(ev *ui.Event) bool {
 				// cost (and allocation) stays flat no matter how long the stroke.
 				cur := s.cur
 				s.paint(func(c render.Canvas, off geom.Point) {
-					c.DrawLine(sub(last, off), sub(ev.Pos, off), cur.color, cur.width)
-					c.FillCircle(sub(ev.Pos, off), cur.width/2, cur.color)
+					c.DrawLine(sub(last, off), sub(ev.Pos, off), cur.colour, cur.width)
+					c.FillCircle(sub(ev.Pos, off), cur.width/2, cur.colour)
 				})
 			}
 		}
@@ -131,10 +131,10 @@ func (s *sketchpad) Draw(c render.Canvas) {
 	if s.layer != nil {
 		c.DrawImage(s.layer, b) // the whole drawing, in one blit
 	} else {
-		c.FillRect(b, canvasColor)
+		c.FillRect(b, canvasColour)
 	}
 	c.PopClip()
-	c.StrokeRect(b, s.ColorOf(ui.RoleBorder), 1)
+	c.StrokeRect(b, s.ColourOf(ui.RoleBorder), 1)
 }
 
 // paint runs draw against the layer's canvas in widget-local coordinates (off is
@@ -153,17 +153,17 @@ func sub(p, off geom.Point) geom.Point { return geom.Point{X: p.X - off.X, Y: p.
 // points translated by -off.
 func drawStroke(c render.Canvas, st *stroke, off geom.Point) {
 	if len(st.pts) == 1 {
-		c.FillCircle(sub(st.pts[0], off), st.width/2, st.color)
+		c.FillCircle(sub(st.pts[0], off), st.width/2, st.colour)
 		return
 	}
 	for i := 1; i < len(st.pts); i++ {
-		c.DrawLine(sub(st.pts[i-1], off), sub(st.pts[i], off), st.color, st.width)
+		c.DrawLine(sub(st.pts[i-1], off), sub(st.pts[i], off), st.colour, st.width)
 		// round the joins so the stroke looks smooth
-		c.FillCircle(sub(st.pts[i], off), st.width/2, st.color)
+		c.FillCircle(sub(st.pts[i], off), st.width/2, st.colour)
 	}
 }
 
-// solidImage builds an 18x18 swatch of a solid color.
+// solidImage builds an 18x18 swatch of a solid colour.
 func solidImage(c color.RGBA) render.Image {
 	const sz = 18
 	img := image.NewRGBA(image.Rect(0, 0, sz, sz))
@@ -191,7 +191,7 @@ func main() {
 
 	pad := newSketchpad()
 
-	// Toolbar: color swatches, a brush-size slider, and Clear.
+	// Toolbar: colour swatches, a brush-size slider, and Clear.
 	toolbar := ui.NewContainer()
 	toolbar.SetLayout(ui.HBox(8))
 	toolbar.SetPadding(geom.UniformInsets(8))
@@ -207,7 +207,7 @@ func main() {
 	for _, col := range palette {
 		c := col
 		sw := ui.NewButton("", ui.ButtonImage(solidImage(c)), ui.ButtonFlat())
-		sw.OnClick(func() { pad.color = c })
+		sw.OnClick(func() { pad.colour = c })
 		toolbar.Add(sw)
 	}
 

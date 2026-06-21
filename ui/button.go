@@ -34,14 +34,14 @@ type Button struct {
 // ButtonOption configures a Button during NewButton.
 type ButtonOption func(*Button)
 
-// ButtonColor overrides the button's base fill color (RolePrimary).
-func ButtonColor(c color.Color) ButtonOption {
-	return func(b *Button) { b.SetColor(RolePrimary, c) }
+// ButtonColour overrides the button's base fill colour (RolePrimary).
+func ButtonColour(c color.Color) ButtonOption {
+	return func(b *Button) { b.SetColour(RolePrimary, c) }
 }
 
-// ButtonTextColor overrides the label color (RoleOnPrimary).
-func ButtonTextColor(c color.Color) ButtonOption {
-	return func(b *Button) { b.SetColor(RoleOnPrimary, c) }
+// ButtonTextColour overrides the label colour (RoleOnPrimary).
+func ButtonTextColour(c color.Color) ButtonOption {
+	return func(b *Button) { b.SetColour(RoleOnPrimary, c) }
 }
 
 // ButtonFont overrides the label font.
@@ -129,12 +129,12 @@ func (b *Button) MinSize() geom.Size {
 	}
 }
 
-// fillColor resolves the background color for the button's current state.
-func (b *Button) fillColor() color.Color {
+// fillColour resolves the background colour for the button's current state.
+func (b *Button) fillColour() color.Color {
 	if !b.Enabled() {
-		return b.ColorOf(RoleDisabled)
+		return b.ColourOf(RoleDisabled)
 	}
-	base := b.ColorOf(RolePrimary)
+	base := b.ColourOf(RolePrimary)
 	switch {
 	case b.pressed && b.hover:
 		return darken(base, 0.8)
@@ -145,20 +145,20 @@ func (b *Button) fillColor() color.Color {
 	}
 }
 
-func (b *Button) labelColor() color.Color {
+func (b *Button) labelColour() color.Color {
 	switch {
 	case !b.Enabled():
-		return b.ColorOf(RoleTextMuted)
+		return b.ColourOf(RoleTextMuted)
 	case b.flat:
-		return b.ColorOf(RoleText)
+		return b.ColourOf(RoleText)
 	default:
-		return b.ColorOf(RoleOnPrimary)
+		return b.ColourOf(RoleOnPrimary)
 	}
 }
 
 // flatHighlight is the subtle background a flat button shows on hover/press.
 func (b *Button) flatHighlight() color.Color {
-	base := b.ColorOf(RoleSurface)
+	base := b.ColourOf(RoleSurface)
 	if b.pressed && b.hover {
 		return lighten(base, 1.8)
 	}
@@ -179,12 +179,12 @@ func (b *Button) Draw(c render.Canvas) {
 			c.FillRoundRect(rect, rad, b.flatHighlight())
 		}
 	} else {
-		c.FillRoundRect(rect, rad, b.fillColor())
-		c.StrokeRoundRect(rect, rad, b.ColorOf(RoleBorder), 1)
+		c.FillRoundRect(rect, rad, b.fillColour())
+		c.StrokeRoundRect(rect, rad, b.ColourOf(RoleBorder), 1)
 	}
 	if b.focused {
 		ring := rect.Inset(geom.UniformInsets(2))
-		c.StrokeRoundRect(ring, maxF(0, rad-1), b.ColorOf(RoleAccent), 1)
+		c.StrokeRoundRect(ring, maxF(0, rad-1), b.ColourOf(RoleAccent), 1)
 	}
 
 	content := b.contentSize()
@@ -202,7 +202,7 @@ func (b *Button) Draw(c render.Canvas) {
 
 	if b.text != "" {
 		if f := b.face(); f != nil {
-			c.DrawText(b.text, geom.Point{X: x, Y: vCenterY(f, rect.Y, rect.H)}, f, b.labelColor())
+			c.DrawText(b.text, geom.Point{X: x, Y: vCenterY(f, rect.Y, rect.H)}, f, b.labelColour())
 		}
 	}
 }
@@ -264,7 +264,7 @@ func darken(c color.Color, factor float64) color.Color { return scaleRGB(c, fact
 func lighten(c color.Color, factor float64) color.Color { return scaleRGB(c, factor) }
 
 func scaleRGB(c color.Color, factor float64) color.Color {
-	r, g, bl, a := c.RGBA() // 16-bit premultiplied; here colors are opaque
+	r, g, bl, a := c.RGBA() // 16-bit premultiplied; here colours are opaque
 	scale := func(v uint32) uint8 {
 		f := float64(v>>8) * factor
 		if f > 255 {

@@ -9,7 +9,7 @@ import (
 	"github.com/kpfaulkner/guie/render"
 )
 
-// color picker layout constants.
+// colour picker layout constants.
 const (
 	cpPad      = 6
 	cpSwatchH  = 36
@@ -21,15 +21,15 @@ const (
 // cpKeyStep is the keyboard adjustment per Left/Right press.
 const cpKeyStep = 0.02
 
-// ColorPicker is an HSV color picker: a preview swatch (with the hex value) above
+// ColourPicker is an HSV colour picker: a preview swatch (with the hex value) above
 // four gradient sliders for hue, saturation, value and alpha. Drag or click a
 // track to set that channel; while focused, Up/Down choose the active channel and
-// Left/Right adjust it. OnChange fires with the new color whenever it changes.
+// Left/Right adjust it. OnChange fires with the new colour whenever it changes.
 //
 // It is built from 1D gradient tracks (not a 2D area) so it needs no gradient
 // primitive or offscreen surface, and works headlessly. A fourth track edits
 // alpha (opacity), drawn over a checkerboard so transparency is visible.
-type ColorPicker struct {
+type ColourPicker struct {
 	BaseWidget
 	h, s, v, a float64
 	dragging   bool
@@ -39,40 +39,40 @@ type ColorPicker struct {
 	onChange   func(color.Color)
 }
 
-// ColorPickerOption configures a ColorPicker.
-type ColorPickerOption func(*ColorPicker)
+// ColourPickerOption configures a ColourPicker.
+type ColourPickerOption func(*ColourPicker)
 
-// ColorPickerValue sets the initial color (including its alpha).
-func ColorPickerValue(c color.Color) ColorPickerOption {
-	return func(p *ColorPicker) {
+// ColourPickerValue sets the initial colour (including its alpha).
+func ColourPickerValue(c color.Color) ColourPickerOption {
+	return func(p *ColourPicker) {
 		p.h, p.s, p.v = rgbToHSV(c)
 		p.a = alphaOf(c)
 	}
 }
 
-// NewColorPicker returns a ColorPicker (defaulting to opaque red) configured by
+// NewColourPicker returns a ColourPicker (defaulting to opaque red) configured by
 // opts.
-func NewColorPicker(opts ...ColorPickerOption) *ColorPicker {
-	p := &ColorPicker{BaseWidget: NewBase(), h: 0, s: 1, v: 1, a: 1}
+func NewColourPicker(opts ...ColourPickerOption) *ColourPicker {
+	p := &ColourPicker{BaseWidget: NewBase(), h: 0, s: 1, v: 1, a: 1}
 	for _, o := range opts {
 		o(p)
 	}
 	return p
 }
 
-// OnChange registers the handler invoked with the new color when it changes.
-func (p *ColorPicker) OnChange(fn func(color.Color)) { p.onChange = fn }
+// OnChange registers the handler invoked with the new colour when it changes.
+func (p *ColourPicker) OnChange(fn func(color.Color)) { p.onChange = fn }
 
-// Color returns the currently selected color, including its alpha.
-func (p *ColorPicker) Color() color.Color {
+// Colour returns the currently selected colour, including its alpha.
+func (p *ColourPicker) Colour() color.Color {
 	c := hsvToRGB(p.h, p.s, p.v)
 	c.A = to8(p.a)
 	return c
 }
 
-// SetColor sets the color (converted to HSV plus alpha) and fires OnChange if it
+// SetColour sets the colour (converted to HSV plus alpha) and fires OnChange if it
 // changed.
-func (p *ColorPicker) SetColor(c color.Color) {
+func (p *ColourPicker) SetColour(c color.Color) {
 	h, s, v := rgbToHSV(c)
 	a := alphaOf(c)
 	if h == p.h && s == p.s && v == p.v && a == p.a {
@@ -83,13 +83,13 @@ func (p *ColorPicker) SetColor(c color.Color) {
 	p.Invalidate()
 }
 
-func (p *ColorPicker) fireChange() {
+func (p *ColourPicker) fireChange() {
 	if p.onChange != nil {
-		p.onChange(p.Color())
+		p.onChange(p.Colour())
 	}
 }
 
-func (p *ColorPicker) face() render.FontFace {
+func (p *ColourPicker) face() render.FontFace {
 	if p.font != nil {
 		return p.font
 	}
@@ -97,37 +97,37 @@ func (p *ColorPicker) face() render.FontFace {
 }
 
 // SetFont overrides the picker's font face (nil falls back to the theme font).
-func (p *ColorPicker) SetFont(f render.FontFace) {
+func (p *ColourPicker) SetFont(f render.FontFace) {
 	p.font = f
 	p.Invalidate()
 }
 
 // Focusable reports whether the picker can take focus (only when enabled).
-func (p *ColorPicker) Focusable() bool { return p.Enabled() }
+func (p *ColourPicker) Focusable() bool { return p.Enabled() }
 
 // MinSize returns the picker's footprint: swatch over four tracks.
-func (p *ColorPicker) MinSize() geom.Size {
+func (p *ColourPicker) MinSize() geom.Size {
 	return geom.Size{
 		W: 220,
 		H: cpSwatchH + cpGap + cpChannels*cpTrackH + (cpChannels-1)*cpGap + 2*cpPad,
 	}
 }
 
-func (p *ColorPicker) inner() geom.Rect { return p.Bounds().Inset(geom.UniformInsets(cpPad)) }
+func (p *ColourPicker) inner() geom.Rect { return p.Bounds().Inset(geom.UniformInsets(cpPad)) }
 
-func (p *ColorPicker) swatchRect() geom.Rect {
+func (p *ColourPicker) swatchRect() geom.Rect {
 	in := p.inner()
 	return geom.Rect{X: in.X, Y: in.Y, W: in.W, H: cpSwatchH}
 }
 
 // trackRect returns the rectangle of channel i's slider track.
-func (p *ColorPicker) trackRect(i int) geom.Rect {
+func (p *ColourPicker) trackRect(i int) geom.Rect {
 	in := p.inner()
 	y := in.Y + cpSwatchH + cpGap + float64(i)*(cpTrackH+cpGap)
 	return geom.Rect{X: in.X, Y: y, W: in.W, H: cpTrackH}
 }
 
-func (p *ColorPicker) channel(i int) float64 {
+func (p *ColourPicker) channel(i int) float64 {
 	switch i {
 	case 0:
 		return p.h
@@ -140,8 +140,8 @@ func (p *ColorPicker) channel(i int) float64 {
 	}
 }
 
-// gradientColor returns the color shown at position t in channel i's track.
-func (p *ColorPicker) gradientColor(i int, t float64) color.Color {
+// gradientColour returns the colour shown at position t in channel i's track.
+func (p *ColourPicker) gradientColour(i int, t float64) color.Color {
 	switch i {
 	case 0:
 		return hsvToRGB(t, 1, 1)
@@ -149,7 +149,7 @@ func (p *ColorPicker) gradientColor(i int, t float64) color.Color {
 		return hsvToRGB(p.h, t, p.v)
 	case 2:
 		return hsvToRGB(p.h, p.s, t)
-	default: // alpha: current color at opacity t (drawn over a checkerboard)
+	default: // alpha: current colour at opacity t (drawn over a checkerboard)
 		c := hsvToRGB(p.h, p.s, p.v)
 		c.A = to8(t)
 		return c
@@ -157,23 +157,23 @@ func (p *ColorPicker) gradientColor(i int, t float64) color.Color {
 }
 
 // Draw paints the preview swatch (with hex) and the gradient tracks.
-func (p *ColorPicker) Draw(canvas render.Canvas) {
+func (p *ColourPicker) Draw(canvas render.Canvas) {
 	b := p.Bounds()
 	rad := p.cornerRadius()
-	canvas.FillRoundRect(b, rad, p.ColorOf(RoleSurface))
-	canvas.StrokeRoundRect(b, rad, p.ColorOf(RoleBorder), 1)
+	canvas.FillRoundRect(b, rad, p.ColourOf(RoleSurface))
+	canvas.StrokeRoundRect(b, rad, p.ColourOf(RoleBorder), 1)
 
-	// Preview swatch with the hex value in a contrasting color. A checkerboard
+	// Preview swatch with the hex value in a contrasting colour. A checkerboard
 	// behind it makes any transparency visible.
 	sw := p.swatchRect()
-	cur := p.Color()
+	cur := p.Colour()
 	p.drawCheckerboard(canvas, sw, 8)
 	canvas.FillRoundRect(sw, 4, cur)
-	canvas.StrokeRoundRect(sw, 4, p.ColorOf(RoleBorder), 1)
+	canvas.StrokeRoundRect(sw, 4, p.ColourOf(RoleBorder), 1)
 	if f := p.face(); f != nil {
 		hex := hexOf(cur)
 		tw := f.Measure(hex).W
-		canvas.DrawText(hex, geom.Point{X: sw.X + (sw.W-tw)/2, Y: vCenterY(f, sw.Y, sw.H)}, f, contrastColor(cur))
+		canvas.DrawText(hex, geom.Point{X: sw.X + (sw.W-tw)/2, Y: vCenterY(f, sw.Y, sw.H)}, f, contrastColour(cur))
 	}
 
 	for i := 0; i < cpChannels; i++ {
@@ -181,7 +181,7 @@ func (p *ColorPicker) Draw(canvas render.Canvas) {
 	}
 }
 
-func (p *ColorPicker) drawTrack(canvas render.Canvas, i int) {
+func (p *ColourPicker) drawTrack(canvas render.Canvas, i int) {
 	tr := p.trackRect(i)
 	if tr.W <= 0 {
 		return
@@ -198,11 +198,11 @@ func (p *ColorPicker) drawTrack(canvas render.Canvas, i int) {
 		t := (float64(k) + 0.5) / float64(strips)
 		sx := tr.X + float64(k)/float64(strips)*tr.W
 		sw := tr.W/float64(strips) + 1
-		canvas.FillRect(geom.Rect{X: sx, Y: tr.Y, W: sw, H: tr.H}, p.gradientColor(i, t))
+		canvas.FillRect(geom.Rect{X: sx, Y: tr.Y, W: sw, H: tr.H}, p.gradientColour(i, t))
 	}
-	border := p.ColorOf(RoleBorder)
+	border := p.ColourOf(RoleBorder)
 	if p.active == i && (p.dragging || p.focused()) {
-		border = p.ColorOf(RoleAccent)
+		border = p.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRect(tr, border, 1)
 
@@ -215,7 +215,7 @@ func (p *ColorPicker) drawTrack(canvas render.Canvas, i int) {
 
 // drawCheckerboard fills r with a light/dark checker pattern, clipped to r, used
 // behind translucent fills so transparency is visible.
-func (p *ColorPicker) drawCheckerboard(canvas render.Canvas, r geom.Rect, cell float64) {
+func (p *ColourPicker) drawCheckerboard(canvas render.Canvas, r geom.Rect, cell float64) {
 	light := color.NRGBA{R: 0xCC, G: 0xCC, B: 0xCC, A: 0xFF}
 	dark := color.NRGBA{R: 0x99, G: 0x99, B: 0x99, A: 0xFF}
 	canvas.PushClip(r)
@@ -235,10 +235,10 @@ func (p *ColorPicker) drawCheckerboard(canvas render.Canvas, r geom.Rect, cell f
 
 // focused reports keyboard focus (BaseWidget has no focus flag, so the picker
 // tracks it itself via events).
-func (p *ColorPicker) focused() bool { return p.hasFocus }
+func (p *ColourPicker) focused() bool { return p.hasFocus }
 
 // HandleEvent drives dragging, hover and keyboard channel selection/adjustment.
-func (p *ColorPicker) HandleEvent(ev *Event) bool {
+func (p *ColourPicker) HandleEvent(ev *Event) bool {
 	if !p.Enabled() {
 		return false
 	}
@@ -271,7 +271,7 @@ func (p *ColorPicker) HandleEvent(ev *Event) bool {
 	return false
 }
 
-func (p *ColorPicker) handleKey(k render.Key) bool {
+func (p *ColourPicker) handleKey(k render.Key) bool {
 	switch k {
 	case render.KeyUp:
 		p.active = (p.active + cpChannels - 1) % cpChannels
@@ -288,7 +288,7 @@ func (p *ColorPicker) handleKey(k render.Key) bool {
 }
 
 // trackAt returns the channel index whose track contains pos, or -1.
-func (p *ColorPicker) trackAt(pos geom.Point) int {
+func (p *ColourPicker) trackAt(pos geom.Point) int {
 	for i := 0; i < cpChannels; i++ {
 		if p.trackRect(i).Contains(pos) {
 			return i
@@ -297,7 +297,7 @@ func (p *ColorPicker) trackAt(pos geom.Point) int {
 	return -1
 }
 
-func (p *ColorPicker) setChannelFromX(i int, x float64) {
+func (p *ColourPicker) setChannelFromX(i int, x float64) {
 	tr := p.trackRect(i)
 	if tr.W <= 0 {
 		return
@@ -306,7 +306,7 @@ func (p *ColorPicker) setChannelFromX(i int, x float64) {
 }
 
 // setChannel sets channel i to t (clamped) and fires OnChange if it changed.
-func (p *ColorPicker) setChannel(i int, t float64) {
+func (p *ColourPicker) setChannel(i int, t float64) {
 	t = clamp01(t)
 	if t == p.channel(i) {
 		return
@@ -327,7 +327,7 @@ func (p *ColorPicker) setChannel(i int, t float64) {
 
 // --- HSV <-> RGB helpers ---
 
-// hsvToRGB converts hue/sat/value in [0,1] to an opaque color.
+// hsvToRGB converts hue/sat/value in [0,1] to an opaque colour.
 func hsvToRGB(h, s, v float64) color.NRGBA {
 	h = math.Mod(h, 1)
 	if h < 0 {
@@ -356,7 +356,7 @@ func hsvToRGB(h, s, v float64) color.NRGBA {
 	return color.NRGBA{R: to8(r), G: to8(g), B: to8(b), A: 255}
 }
 
-// rgbToHSV converts a color to hue/sat/value in [0,1].
+// rgbToHSV converts a colour to hue/sat/value in [0,1].
 func rgbToHSV(c color.Color) (h, s, v float64) {
 	nc := color.NRGBAModel.Convert(c).(color.NRGBA)
 	r, g, b := float64(nc.R)/255, float64(nc.G)/255, float64(nc.B)/255
@@ -406,8 +406,8 @@ func hexOf(c color.Color) string {
 	return fmt.Sprintf("#%02X%02X%02X", nc.R, nc.G, nc.B)
 }
 
-// contrastColor returns black or white, whichever is more readable on c.
-func contrastColor(c color.Color) color.Color {
+// contrastColour returns black or white, whichever is more readable on c.
+func contrastColour(c color.Color) color.Color {
 	nc := color.NRGBAModel.Convert(c).(color.NRGBA)
 	lum := 0.299*float64(nc.R) + 0.587*float64(nc.G) + 0.114*float64(nc.B)
 	if lum > 140 {

@@ -314,10 +314,10 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	b := t.Bounds()
 	rad := t.cornerRadius()
 
-	canvas.FillRoundRect(b, rad, t.ColorOf(RoleSurface))
-	border := t.ColorOf(RoleBorder)
+	canvas.FillRoundRect(b, rad, t.ColourOf(RoleSurface))
+	border := t.ColourOf(RoleBorder)
 	if t.focused {
-		border = t.ColorOf(RoleAccent)
+		border = t.ColourOf(RoleAccent)
 	}
 	canvas.StrokeRoundRect(b, rad, border, 1)
 
@@ -328,7 +328,7 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	y := vCenterY(f, inner.Y, inner.H)
 
 	if len(t.runes) == 0 && !t.composing() && !t.focused && t.placeholder != "" {
-		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: y}, f, t.ColorOf(RoleTextMuted))
+		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: y}, f, t.ColourOf(RoleTextMuted))
 		return
 	}
 
@@ -340,22 +340,22 @@ func (t *TextField) Draw(canvas render.Canvas) {
 		lo, hi := t.selRange()
 		x0 := inner.X - t.scrollX + f.Measure(string(t.runes[:lo])).W
 		x1 := inner.X - t.scrollX + f.Measure(string(t.runes[:hi])).W
-		canvas.FillRect(geom.Rect{X: x0, Y: inner.Y, W: x1 - x0, H: inner.H}, t.ColorOf(RolePrimary))
+		canvas.FillRect(geom.Rect{X: x0, Y: inner.Y, W: x1 - x0, H: inner.H}, t.ColourOf(RolePrimary))
 	}
 
-	textColor := t.ColorOf(RoleText)
+	textColour := t.ColourOf(RoleText)
 	originX := inner.X - t.scrollX
 	if t.composing() {
 		// Insert the preedit into the displayed text at the caret and underline it.
 		pre := string(t.runes[:t.caret])
 		post := string(t.runes[t.caret:])
-		canvas.DrawText(pre+t.preedit+post, geom.Point{X: originX, Y: y}, f, textColor)
+		canvas.DrawText(pre+t.preedit+post, geom.Point{X: originX, Y: y}, f, textColour)
 		ux0 := originX + f.Measure(pre).W
 		ux1 := originX + f.Measure(pre+t.preedit).W
 		uy := inner.Y + inner.H - 2
-		canvas.DrawLine(geom.Point{X: ux0, Y: uy}, geom.Point{X: ux1, Y: uy}, textColor, 1)
+		canvas.DrawLine(geom.Point{X: ux0, Y: uy}, geom.Point{X: ux1, Y: uy}, textColour, 1)
 	} else {
-		canvas.DrawText(string(t.runes), geom.Point{X: originX, Y: y}, f, textColor)
+		canvas.DrawText(string(t.runes), geom.Point{X: originX, Y: y}, f, textColour)
 	}
 
 	if t.focused {
@@ -363,7 +363,7 @@ func (t *TextField) Draw(canvas render.Canvas) {
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: inner.Y + 2},
 			geom.Point{X: caretX, Y: inner.Y + inner.H - 2},
-			textColor, 1,
+			textColour, 1,
 		)
 	}
 }

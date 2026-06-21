@@ -1,6 +1,6 @@
 // Command layouts demonstrates the layout engine: nested containers using
 // VBox / HBox / Grid / Stack, per-child weights and alignment, padding and
-// themed panel colors. Resize the window and everything reflows.
+// themed panel colours. Resize the window and everything reflows.
 //
 // Run with: go run ./examples/layouts
 package main
@@ -14,12 +14,12 @@ import (
 	"github.com/kpfaulkner/guie/ui"
 )
 
-// panel is a colored box with a single centered label, built from a Stack.
+// panel is a coloured box with a single centered label, built from a Stack.
 func panel(bg color.Color, label string, txt color.Color) *ui.Container {
 	c := ui.NewContainer()
 	c.SetBackground(bg)
 	c.SetLayout(ui.NewStack())
-	c.Add(ui.NewLabel(label, ui.LabelColor(txt)), ui.Align(geom.AlignCenter))
+	c.Add(ui.NewLabel(label, ui.LabelColour(txt)), ui.Align(geom.AlignCenter))
 	return c
 }
 
@@ -49,11 +49,11 @@ func main() {
 	grid := ui.NewContainer()
 	grid.SetLayout(ui.NewGrid(3, 8))
 	grid.Add(panel(pal.Primary, "header (spans 3 columns)", pal.OnPrimary), ui.Span(3, 1))
-	colors := []color.Color{
+	colours := []color.Color{
 		color.RGBA{0x8a, 0x4a, 0x4a, 0xff}, color.RGBA{0x4a, 0x8a, 0x5a, 0xff}, color.RGBA{0x4a, 0x5a, 0x8a, 0xff},
 		color.RGBA{0x8a, 0x7a, 0x4a, 0xff},
 	}
-	for i, cc := range colors {
+	for i, cc := range colours {
 		grid.Add(panel(cc, fmt.Sprintf("cell %d", i+1), pal.Text))
 	}
 	grid.Add(panel(color.RGBA{0x4a, 0x8a, 0x8a, 0xff}, "wide (spans 2)", pal.Text), ui.Span(2, 1))

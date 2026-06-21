@@ -95,31 +95,31 @@ func (c *canvas) add(op Op)            { c.rec.Ops = append(c.rec.Ops, op) }
 func (c *canvas) Size() geom.Size      { return c.size }
 func (c *canvas) PushClip(r geom.Rect) { c.add(Op{Kind: OpPushClip, Rect: r}) }
 func (c *canvas) PopClip()             { c.add(Op{Kind: OpPopClip}) }
-func (c *canvas) Fill(col color.Color) { c.add(Op{Kind: OpFill, Color: col}) }
+func (c *canvas) Fill(col color.Color) { c.add(Op{Kind: OpFill, Colour: col}) }
 
 func (c *canvas) FillRect(r geom.Rect, col color.Color) {
-	c.add(Op{Kind: OpFillRect, Rect: r, Color: col})
+	c.add(Op{Kind: OpFillRect, Rect: r, Colour: col})
 }
 func (c *canvas) StrokeRect(r geom.Rect, col color.Color, width float64) {
-	c.add(Op{Kind: OpStrokeRect, Rect: r, Color: col, Width: width})
+	c.add(Op{Kind: OpStrokeRect, Rect: r, Colour: col, Width: width})
 }
 func (c *canvas) FillRoundRect(r geom.Rect, radius float64, col color.Color) {
-	c.add(Op{Kind: OpFillRoundRect, Rect: r, Radius: radius, Color: col})
+	c.add(Op{Kind: OpFillRoundRect, Rect: r, Radius: radius, Colour: col})
 }
 func (c *canvas) StrokeRoundRect(r geom.Rect, radius float64, col color.Color, width float64) {
-	c.add(Op{Kind: OpStrokeRoundRect, Rect: r, Radius: radius, Color: col, Width: width})
+	c.add(Op{Kind: OpStrokeRoundRect, Rect: r, Radius: radius, Colour: col, Width: width})
 }
 func (c *canvas) DrawLine(a, b geom.Point, col color.Color, width float64) {
-	c.add(Op{Kind: OpDrawLine, A: a, B: b, Color: col, Width: width})
+	c.add(Op{Kind: OpDrawLine, A: a, B: b, Colour: col, Width: width})
 }
 func (c *canvas) FillCircle(center geom.Point, radius float64, col color.Color) {
-	c.add(Op{Kind: OpFillCircle, A: center, Radius: radius, Color: col})
+	c.add(Op{Kind: OpFillCircle, A: center, Radius: radius, Colour: col})
 }
 func (c *canvas) StrokeCircle(center geom.Point, radius float64, col color.Color, width float64) {
-	c.add(Op{Kind: OpStrokeCircle, A: center, Radius: radius, Color: col, Width: width})
+	c.add(Op{Kind: OpStrokeCircle, A: center, Radius: radius, Colour: col, Width: width})
 }
 func (c *canvas) DrawText(s string, pos geom.Point, face render.FontFace, col color.Color) {
-	c.add(Op{Kind: OpDrawText, Text: s, A: pos, Color: col})
+	c.add(Op{Kind: OpDrawText, Text: s, A: pos, Colour: col})
 }
 func (c *canvas) MeasureText(s string, face render.FontFace) geom.Size {
 	if face == nil {

@@ -191,18 +191,18 @@ func (t *Table) Draw(canvas render.Canvas) {
 	widths := t.colWidths()
 	xs := t.colX(widths)
 
-	canvas.FillRect(b, t.ColorOf(RoleSurface))
+	canvas.FillRect(b, t.ColourOf(RoleSurface))
 
 	// Header row.
 	header := geom.Rect{X: b.X, Y: b.Y, W: b.W, H: rh}
-	canvas.FillRect(header, lighten(t.ColorOf(RoleSurface), 1.2))
+	canvas.FillRect(header, lighten(t.ColourOf(RoleSurface), 1.2))
 	for c, col := range t.columns {
 		cell := geom.Rect{X: xs[c], Y: b.Y, W: widths[c], H: rh}
 		canvas.PushClip(cell)
-		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, b.Y, rh)}, f, t.ColorOf(RoleText))
+		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, b.Y, rh)}, f, t.ColourOf(RoleText))
 		canvas.PopClip()
 	}
-	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + rh}, geom.Point{X: b.X + b.W, Y: b.Y + rh}, t.ColorOf(RoleBorder), 1)
+	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + rh}, geom.Point{X: b.X + b.W, Y: b.Y + rh}, t.ColourOf(RoleBorder), 1)
 
 	// Body rows.
 	bodyTop := b.Y + rh
@@ -214,13 +214,13 @@ func (t *Table) Draw(canvas render.Canvas) {
 			continue
 		}
 		rowRect := geom.Rect{X: b.X, Y: y, W: b.W, H: rh}
-		textColor := t.ColorOf(RoleText)
+		textColour := t.ColourOf(RoleText)
 		switch {
 		case i == t.selected:
-			canvas.FillRect(rowRect, t.ColorOf(RolePrimary))
-			textColor = t.ColorOf(RoleOnPrimary)
+			canvas.FillRect(rowRect, t.ColourOf(RolePrimary))
+			textColour = t.ColourOf(RoleOnPrimary)
 		case i == t.hoverRow:
-			canvas.FillRect(rowRect, lighten(t.ColorOf(RoleSurface), 1.25))
+			canvas.FillRect(rowRect, lighten(t.ColourOf(RoleSurface), 1.25))
 		}
 		for c := range t.columns {
 			if c >= len(row) {
@@ -228,7 +228,7 @@ func (t *Table) Draw(canvas render.Canvas) {
 			}
 			cell := geom.Rect{X: xs[c], Y: y, W: widths[c], H: rh}
 			canvas.PushClip(cell)
-			canvas.DrawText(row[c], geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, y, rh)}, f, textColor)
+			canvas.DrawText(row[c], geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, y, rh)}, f, textColour)
 			canvas.PopClip()
 		}
 	}
@@ -236,10 +236,10 @@ func (t *Table) Draw(canvas render.Canvas) {
 
 	// Column separators (skip the left edge).
 	for c := 1; c < len(xs); c++ {
-		canvas.DrawLine(geom.Point{X: xs[c], Y: b.Y}, geom.Point{X: xs[c], Y: b.Y + b.H}, t.ColorOf(RoleBorder), 1)
+		canvas.DrawLine(geom.Point{X: xs[c], Y: b.Y}, geom.Point{X: xs[c], Y: b.Y + b.H}, t.ColourOf(RoleBorder), 1)
 	}
 
-	canvas.StrokeRect(b, t.ColorOf(RoleBorder), 1)
+	canvas.StrokeRect(b, t.ColourOf(RoleBorder), 1)
 
 	if t.overflow() {
 		t.drawScrollbar(canvas, b, bodyTop)
@@ -255,8 +255,8 @@ func (t *Table) drawScrollbar(canvas render.Canvas, b geom.Rect, bodyTop float64
 		off = (t.offset / m) * (bh - thumbH)
 	}
 	x := b.X + b.W - scrollbarWidth
-	canvas.FillRect(geom.Rect{X: x, Y: bodyTop, W: scrollbarWidth, H: bh}, t.ColorOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: x, Y: bodyTop + off, W: scrollbarWidth, H: thumbH}, t.ColorOf(RoleAccent))
+	canvas.FillRect(geom.Rect{X: x, Y: bodyTop, W: scrollbarWidth, H: bh}, t.ColourOf(RoleBackground))
+	canvas.FillRect(geom.Rect{X: x, Y: bodyTop + off, W: scrollbarWidth, H: thumbH}, t.ColourOf(RoleAccent))
 }
 
 // HandleEvent handles hover, row selection, wheel scrolling and keyboard

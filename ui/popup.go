@@ -7,8 +7,8 @@ import (
 	"github.com/kpfaulkner/guie/render"
 )
 
-// scrimColor dims the background behind a modal popup.
-var scrimColor = color.RGBA{R: 0, G: 0, B: 0, A: 0xA0}
+// scrimColour dims the background behind a modal popup.
+var scrimColour = color.RGBA{R: 0, G: 0, B: 0, A: 0xA0}
 
 // Popup is a transient overlay (dropdown list, menu, dialog) drawn above the
 // main widget tree. Its content is positioned at Bounds in surface coordinates.
@@ -102,7 +102,7 @@ func (a *App) layoutOverlays() {
 func (a *App) drawOverlays(c render.Canvas) {
 	for _, ov := range a.overlays {
 		if ov.modal {
-			c.FillRect(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H}, scrimColor)
+			c.FillRect(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H}, scrimColour)
 		}
 		if a.shadows {
 			drawShadow(c, ov.bounds, a.theme.CornerRadius)
@@ -183,7 +183,7 @@ func (a *App) ShowMessage(title, message string, buttons ...DialogButton) *Popup
 	panel.Add(NewLabel(title))
 	// Label renders embedded newlines as stacked lines, so a multi-line message
 	// works as a single Label.
-	panel.Add(NewLabel(message, LabelColor(pal.TextMuted)))
+	panel.Add(NewLabel(message, LabelColour(pal.TextMuted)))
 
 	var popup *Popup
 	row := NewContainer()

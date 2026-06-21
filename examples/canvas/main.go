@@ -17,7 +17,7 @@ import (
 	"github.com/kpfaulkner/guie/ui"
 )
 
-// sketch is a custom leaf widget. It receives its font and colors at
+// sketch is a custom leaf widget. It receives its font and colours at
 // construction (the theme is read from the App), then paints itself each frame
 // through the Canvas.
 type sketch struct {
