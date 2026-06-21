@@ -24,6 +24,7 @@ go run ./examples/images     # Image widget (scaled) + image buttons (ui.LoadIma
 go run ./examples/editor     # text editor: menus, open/save, find/replace, modals
 go run ./examples/paint      # freehand drawing: mouse capture, multi-button, custom widget
 go run ./examples/clipboard  # OS clipboard: system-wide copy/paste via ui.WithClipboard
+go run ./examples/dragdrop   # drag-and-drop: move items between panels, ghost + highlight
 ```
 
 What each one exercises:
@@ -50,6 +51,7 @@ What each one exercises:
 | `editor`  | A text editor: `MenuBar`, file open/save, find/replace, custom modal dialogs, `TextArea` selection API |
 | `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, color/brush controls |
 | `clipboard`| OS-backed clipboard via the opt-in `clipboard` package + `ui.WithClipboard`: copy/paste with other apps |
+| `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

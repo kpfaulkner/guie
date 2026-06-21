@@ -401,7 +401,9 @@ background fill and border (explicit instance colors with `Background()`/
 child extents if no layout) + padding. `Layout` arranges via the layout over
 `ContentRect()` (bounds inset by padding), then recurses. `Draw` fills
 background, clips to the content rect, draws visible children, pops the clip,
-then strokes the border.
+then strokes the border. `Add` mounts the child; `Remove` detaches it (leaving
+the widget intact so it can be re-`Add`ed elsewhere — used to move an item
+between panels on a drag-and-drop drop, §11b).
 
 ### 9.5 The viewport rule
 
@@ -555,6 +557,56 @@ affecting property still calls `Invalidate` through its setter and re-lays-out
 the same frame. Widgets can already be animated via their public setters from
 app code; exposing the animator to widgets internally (through `treeContext`) is
 a straightforward future extension. See `examples/animation`.
+
+---
+
+## 11b. Drag-and-drop (`ui/dragdrop.go`)
+
+In-process DnD layered on the existing pointer capture (§10.3), not a new input
+path. The pieces:
+
+- **Payload.** `DragData{Type string; Value any}` — `Type` is a free-form tag
+  drop targets match on; `Value` is the in-process payload.
+- **Configuration on `BaseWidget`** (read by the dispatcher via accessors, the
+  same pattern as `ContextMenu()`/tooltip — not routed through `HandleEvent`):
+  `SetDragSource(func() *DragData)`, `SetDragGhost(DragGhost)`,
+  `SetDropTarget(func(DragData) bool)`, and the `OnDragEnd`/`OnDragEnter`/
+  `OnDragLeave`/`OnDragOver`/`OnDrop` callbacks. Accessors (`dragSourceFn()`,
+  `dropAcceptFn()`, …) default to nil on `BaseWidget`, so any widget opts in by
+  calling a setter.
+- **Session** (`*dragSession` on the `App`, one at a time, stored beside
+  `pressTarget`): `{data, source, over, ghost, origin, started}`. `origin` is the
+  press point; `started` flips once movement passes `dragThreshold` (4px).
+
+**Dispatcher hooks (`dispatchPointer`).** All inside the existing capture block:
+
+1. *Press* — when `pressTarget` is set, if the hit chain has a drag source, a
+   *pending* session is recorded (`started=false`). Normal `PointerDown` still
+   fires, so the widget stays clickable.
+2. *Move* — if pending and not yet `started` and `|pos-origin| > dragThreshold`,
+   call the source provider; a nil return aborts, otherwise `started=true` and the
+   ghost is built. While `started`, the App **intercepts** moves: it resolves the
+   nearest accepting drop target under the cursor (`dropTarget`, walks `Parent()`
+   like `contextTarget`), fires `OnDragLeave`/`OnDragEnter` on change and
+   `OnDragOver` each move, and **suppresses the normal `PointerMove` to the
+   source** (so a dragged slider doesn't also slide).
+3. *Release* — if `started`: `over != nil && over.OnDrop(data,pos)` → success →
+   `source.OnDragEnd(true)`, else `OnDragEnd(false)`; the derived `Click`
+   (§10.3) is **suppressed** for that release. If never `started`, behaves exactly
+   as before (normal click).
+
+**Cancel.** `Escape` in `dispatchKeyboard` cancels an active drag
+(`OnDragEnd(false)`) and takes precedence over closing popups while a drag runs.
+
+**Ghost rendering.** `App.draw` calls `drawDrag(c)` between `drawOverlays` and
+`drawTooltip`, so the ghost sits above the root and overlays but below tooltips.
+Default ghost is a translucent snapshot of the source captured into a
+`render.RenderTarget` (§3.3) and blitted at the cursor offset by `pos-origin`;
+overridable via `SetDragGhost`, or nil so targets indicate the drop via
+`OnDragOver`.
+
+Only the left button initiates a drag. Deferred: edge auto-scroll, copy/move drop
+effects. See `examples/dragdrop`.
 
 ---
 

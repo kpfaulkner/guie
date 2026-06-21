@@ -56,6 +56,8 @@ type App struct {
 	prevPointer geom.Point // cursor pos at the previous frame
 	havePrev    bool       // whether prevPointer has been set
 
+	drag *dragSession // in-flight drag-and-drop, nil when none
+
 	// tooltip state (hover-delay timed in Update ticks)
 	lastPointer  geom.Point
 	tooltipTicks int
@@ -317,12 +319,20 @@ func (a *App) dispatchPointer(in render.InputState) {
 	// with a redundant move event every frame (which, e.g., would make a drawing
 	// widget append duplicate points 60×/sec while stationary).
 	moved := !a.havePrev || pos != a.prevPointer
-	moveTarget := a.pressTarget
-	if moveTarget == nil {
-		moveTarget = a.hovered
+	// Advance any drag first; once it has actually started, it intercepts
+	// movement so the normal PointerMove is not also delivered to the source
+	// (e.g. a dragged slider must not also slide).
+	if a.drag != nil && moved {
+		a.advanceDrag(pos, hit)
 	}
-	if moved && moveTarget != nil {
-		a.dispatch(moveTarget, Event{Type: EventPointerMove, Pos: pos, Modifiers: in.Modifiers})
+	if a.drag == nil || !a.drag.started {
+		moveTarget := a.pressTarget
+		if moveTarget == nil {
+			moveTarget = a.hovered
+		}
+		if moved && moveTarget != nil {
+			a.dispatch(moveTarget, Event{Type: EventPointerMove, Pos: pos, Modifiers: in.Modifiers})
+		}
 	}
 	a.prevPointer = pos
 	a.havePrev = true
@@ -351,6 +361,14 @@ func (a *App) dispatchPointer(in render.InputState) {
 			a.hideTooltip()
 			a.focusFromPointer(hit)
 			a.pressTarget = hit
+			// A left press on a drag source arms a pending drag; it only
+			// becomes a real drag once movement crosses the threshold, so the
+			// widget stays clickable.
+			if btn == render.MouseLeft {
+				if src := dragSourceOf(hit); src != nil {
+					a.drag = &dragSession{source: src, origin: pos, last: pos}
+				}
+			}
 		}
 		if a.pressTarget != nil {
 			a.dispatch(a.pressTarget, Event{Type: EventPointerDown, Pos: pos, Button: btn, Modifiers: in.Modifiers})
@@ -360,17 +378,22 @@ func (a *App) dispatchPointer(in render.InputState) {
 	// Releases: deliver to the captured widget, deriving a click when the release
 	// lands within its bounds. Capture is held until all buttons are up.
 	if a.pressTarget != nil {
+		dragEnding := a.drag != nil && a.drag.started
 		for _, btn := range mouseButtons {
 			if !in.MouseReleased.Has(btn) {
 				continue
 			}
 			a.dispatch(a.pressTarget, Event{Type: EventPointerUp, Pos: pos, Button: btn, Modifiers: in.Modifiers})
-			if a.pressTarget.Bounds().Contains(pos) {
+			// A release that ends a drag does not also derive a click.
+			if !dragEnding && a.pressTarget.Bounds().Contains(pos) {
 				a.dispatch(a.pressTarget, Event{Type: EventClick, Pos: pos, Button: btn, Modifiers: in.Modifiers})
 			}
 		}
 		if in.MouseDown == 0 {
 			a.pressTarget = nil
+			if a.drag != nil {
+				a.finishDrag(pos)
+			}
 		}
 	}
 }
@@ -394,6 +417,10 @@ func (a *App) focusFromPointer(hit Widget) {
 // Shift-Tab move focus instead of being delivered.
 func (a *App) dispatchKeyboard(in render.InputState) {
 	for _, k := range in.KeysPressed {
+		if k == render.KeyEscape && a.drag != nil {
+			a.cancelDrag()
+			continue
+		}
 		if k == render.KeyEscape && len(a.overlays) > 0 {
 			a.closeTop()
 			continue
@@ -431,6 +458,7 @@ func (a *App) draw(c render.Canvas) {
 		a.root.Draw(c)
 	}
 	a.drawOverlays(c)
+	a.drawDrag(c)
 	a.drawTooltip(c)
 }
 

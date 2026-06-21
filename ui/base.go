@@ -17,6 +17,7 @@ type BaseWidget struct {
 	enabled     bool
 	tooltip     string
 	contextMenu []MenuItem                // shown on right-click, empty for none
+	drag        *dragConfig               // drag-source / drop-target config, nil until opted in
 	colors      map[ColorRole]color.Color // per-widget color overrides
 	self        Widget                    // this widget's interface identity
 	parent      Widget

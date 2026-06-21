@@ -84,6 +84,21 @@ func (c *Container) Add(w Widget, opts ...ItemOption) {
 	c.Invalidate()
 }
 
+// Remove detaches w from the container (along with its layout data) and requests
+// a re-layout. It is a no-op if w is not a child. The widget itself is left
+// intact, so it can be Added to another container (e.g. to move an item between
+// panels during drag-and-drop).
+func (c *Container) Remove(w Widget) {
+	for i, ch := range c.children {
+		if ch == w {
+			c.children = append(c.children[:i], c.children[i+1:]...)
+			c.data = append(c.data[:i], c.data[i+1:]...)
+			c.Invalidate()
+			return
+		}
+	}
+}
+
 // Children returns the container's child widgets.
 func (c *Container) Children() []Widget { return c.children }
 

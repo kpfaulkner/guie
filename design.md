@@ -457,6 +457,92 @@ attempts from a Windows dev box):
 
 ---
 
+## DRAG-AND-DROP
+
+In-process drag-and-drop: pick up data/a widget from a **drag source**, drag it
+over the tree, and release it on a **drop target** that accepts it. Covers
+list/table row reordering, dragging items between panels, dragging tabs and
+palette→canvas drops. Cross-application / OS file drops are **out of scope** for
+now — like the OS clipboard, that is a backend-seam concern (EBiten would have to
+surface native drop events) for a later opt-in package; this is the in-surface
+engine such a bridge would feed.
+
+### Mechanism — layered on pointer capture
+
+The dispatcher already captures `pressTarget` on press and routes every later
+`PointerMove`/`PointerUp` to it until release. DnD is a **state machine on top of
+that capture**: a captured press that moves past a small threshold *becomes* a
+drag. No new capture path, no change to hit-testing.
+
+```
+press on source ──move>threshold──▶ DRAGGING ──release over accepting target──▶ DROP
+     │                                  │                                          │
+   (also fires PointerDown,          (App intercepts moves: enter/over/leave   source.OnDragEnd(accepted)
+    widget can stay clickable)        to targets, draws ghost; suppresses      target.OnDrop(data,pos)
+                                      normal move to source)                   click on source suppressed
+                                          └────release off target / Esc────▶ CANCEL → source.OnDragEnd(false)
+```
+
+### API — mirrors SetContextMenu / the OnX convention
+
+Configuration is stored on `BaseWidget` and read by the dispatcher via
+accessors, exactly like `SetContextMenu`/`ContextMenu()`. Behaviour uses `OnX`
+callbacks.
+
+```go
+// DragData is the in-process payload. Type is a free-form tag drop targets
+// match on ("row", "file", "tab"); Value is the payload.
+type DragData struct { Type string; Value any }
+
+// Source — any widget becomes draggable:
+func (b *BaseWidget) SetDragSource(provide func() *DragData) // nil return → no drag
+func (b *BaseWidget) SetDragGhost(g DragGhost)               // optional custom ghost
+func (b *BaseWidget) OnDragEnd(func(accepted bool))
+
+// Target — any widget can accept drops:
+func (b *BaseWidget) SetDropTarget(accept func(DragData) bool)
+func (b *BaseWidget) OnDragEnter(func(d DragData))
+func (b *BaseWidget) OnDragLeave(func())
+func (b *BaseWidget) OnDragOver(func(d DragData, pos geom.Point))
+func (b *BaseWidget) OnDrop(func(d DragData, pos geom.Point) bool) // true = accepted
+```
+
+`provide` runs once when the threshold is crossed (so the source snapshots its
+current state); returning `nil` vetoes the drag. `OnDrop`/`OnDragOver` carry
+`pos` so self-drawing multi-row widgets (`List`, `Table`) can map the cursor to a
+row, just as they already do for clicks. Drop-target resolution walks the hit
+chain for the nearest widget whose `accept(data)` is true — the same shape as
+`contextTarget`.
+
+### Ghost rendering
+
+The dragged "ghost" is painted above the root and overlays, below the tooltip
+(one line in `App.draw`). Default ghost is a translucent snapshot of the source
+drawn at the cursor via the existing `render.RenderTarget` (`ui.NewRenderTarget`,
+§3.3) — no new rendering capability needed. Overridable with a custom ghost
+widget, or disabled so targets show their own insert indicator via `OnDragOver`.
+
+### Design decisions (locked)
+
+| Area | Decision |
+|---|---|
+| Transport | Reuse `pressTarget` pointer capture; drag is a state machine on top. |
+| Config API | `SetDragSource`/`SetDropTarget` stored on `BaseWidget`, read by dispatcher (mirrors `SetContextMenu`). |
+| Behaviour API | `OnDrop`/`OnDragEnter/Leave/Over`/`OnDragEnd` (the `OnX` convention). |
+| Payload | `DragData{Type string, Value any}`, in-process; targets match on `Type`. |
+| Threshold | 4 logical px before a press becomes a drag, so clicks still work. |
+| Click suppression | A release that ends a drag does not derive a `Click`. |
+| Buttons | Left button only initiates a drag. |
+| Ghost | Default = translucent `RenderTarget` snapshot of source; overridable/none. |
+| Cancel | Escape, or release off any accepting target. |
+| Bus | Drag lifecycle is observable; per-widget callbacks remain primary. |
+| Scope | In-process only; OS/file drops deferred to a future backend bridge. |
+
+Deferred for v1: edge auto-scroll over a `ScrollView`, copy-vs-move drop effects,
+multi-button drags.
+
+---
+
 ## IMPLEMENTATION PLAN
 
 1. **Skeleton & backend seam** — `geom` types, `render.Canvas`/`Input`
@@ -476,6 +562,8 @@ attempts from a Windows dev box):
 11. **Splitters** — draggable dividers that resize adjacent panes (H/V split panes).
 12. **Tables** — a grid of rows/columns with headers and selectable rows.
 13. **Drag-and-drop** — pick up, drag and drop widgets/data between targets.
+    *(Designed — see DRAG-AND-DROP below; in-process engine layered on pointer
+    capture.)*
 14. **Multi-window** — more than one top-level OS window, each with its own tree.
 15. **Dirty-region redraw** — only repaint changed regions instead of every frame.
 16. **Accessibility hooks** — expose roles/labels/state for assistive technology.
