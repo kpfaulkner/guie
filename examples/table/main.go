@@ -1,6 +1,7 @@
 // Command table demonstrates the Table widget: a header row over scrollable,
 // selectable body rows with weighted columns. Click a row or use Up/Down while
-// focused; scroll with the wheel when the rows overflow.
+// focused; scroll with the wheel when the rows overflow. Click a column header
+// to sort by it (click again to reverse) — the "Years" column sorts numerically.
 //
 // Run with: go run ./examples/table
 package main
@@ -8,6 +9,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/ui"
@@ -40,12 +42,21 @@ func main() {
 		{"Jack Black", "Engineer", "8"},
 	}
 
-	// "Name" is twice as wide as the other two columns.
-	table := ui.NewTable(
-		[]ui.Column{{Title: "Name", Weight: 2}, {Title: "Role", Weight: 1}, {Title: "Years", Weight: 1}},
-	)
+	// "Name" is twice as wide as the other two columns. "Years" sorts numerically.
+	table := ui.NewTable([]ui.Column{
+		{Title: "Name", Weight: 2},
+		{Title: "Role", Weight: 1},
+		{Title: "Years", Weight: 1, Less: func(a, b string) bool {
+			ai, _ := strconv.Atoi(a)
+			bi, _ := strconv.Atoi(b)
+			return ai < bi
+		}},
+	})
+	// Read the selected row from the table (its order changes when sorted), not
+	// from the original slice.
 	table.OnSelect(func(i int) {
-		status.SetText(fmt.Sprintf("Selected: %s (%s)", people[i][0], people[i][1]))
+		r := table.Row(i)
+		status.SetText(fmt.Sprintf("Selected: %s (%s)", r[0], r[1]))
 	})
 	table.SetRows(people)
 

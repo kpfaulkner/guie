@@ -1,17 +1,28 @@
 package ui
 
 import (
+	"sort"
+
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
 )
 
 const tableCellPad = 6
 
-// Column describes a table column: a header title and a width weight (its share
-// of the available width; 0 is treated as 1, giving equal columns by default).
+// Column describes a table column.
 type Column struct {
-	Title  string
+	// Title is the header text.
+	Title string
+	// Weight is the column's share of the available width (0 is treated as 1,
+	// giving equal columns by default).
 	Weight int
+	// Less compares two cell values from this column for sorting (true if a sorts
+	// before b). If nil, cells are compared as strings. Set it for numeric or
+	// date columns, e.g. by parsing before comparing.
+	Less func(a, b string) bool
+	// NoSort disables click-to-sort for this column (its header still reports
+	// OnHeaderClick).
+	NoSort bool
 }
 
 // Table is a grid of string cells with a fixed header row and a scrollable,
@@ -24,15 +35,141 @@ type Table struct {
 	rows     [][]string
 	selected int // -1 = none
 	hoverRow int // -1 = none
+	hoverCol int // header column under the cursor, -1 = none
 	offset   float64
 	focused  bool
-	onSelect func(int)
-	font     render.FontFace
+
+	sortable bool // whether header clicks sort (default true)
+	sortCol  int  // column currently sorted by, -1 = none
+	sortAsc  bool // sort direction
+
+	onSelect      func(int)
+	onHeaderClick func(int)
+	font          render.FontFace
 }
 
-// NewTable returns a Table with the given columns.
+// NewTable returns a Table with the given columns. Click-to-sort is enabled by
+// default (see SetSortable).
 func NewTable(columns []Column) *Table {
-	return &Table{BaseWidget: NewBase(), columns: columns, selected: -1, hoverRow: -1}
+	return &Table{
+		BaseWidget: NewBase(),
+		columns:    columns,
+		selected:   -1,
+		hoverRow:   -1,
+		hoverCol:   -1,
+		sortable:   true,
+		sortCol:    -1,
+	}
+}
+
+// OnHeaderClick registers a handler invoked with the column index when a header
+// cell is clicked (fired whether or not the click also triggers a sort).
+func (t *Table) OnHeaderClick(fn func(col int)) { t.onHeaderClick = fn }
+
+// SetSortable enables or disables built-in click-to-sort. Disable it to handle
+// header clicks entirely via OnHeaderClick.
+func (t *Table) SetSortable(v bool) { t.sortable = v }
+
+// SortColumn returns the column the table is sorted by (-1 if unsorted) and the
+// direction (true = ascending).
+func (t *Table) SortColumn() (col int, ascending bool) { return t.sortCol, t.sortAsc }
+
+// SortBy sorts the rows by column col in the given direction and shows the
+// indicator. It is a no-op for an out-of-range column.
+func (t *Table) SortBy(col int, ascending bool) {
+	if col < 0 || col >= len(t.columns) {
+		return
+	}
+	t.sortCol, t.sortAsc = col, ascending
+	t.applySort()
+}
+
+// headerColAt returns the header column index containing pos, or -1 if pos is
+// not in the header row.
+func (t *Table) headerColAt(pos geom.Point) int {
+	b := t.Bounds()
+	if pos.Y < b.Y || pos.Y >= b.Y+t.rowHeight() {
+		return -1
+	}
+	widths := t.colWidths()
+	xs := t.colX(widths)
+	for c := range xs {
+		if pos.X >= xs[c] && pos.X < xs[c]+widths[c] {
+			return c
+		}
+	}
+	return -1
+}
+
+// toggleSort sorts by column c, flipping direction if it is already the sort
+// column (otherwise sorts ascending).
+func (t *Table) toggleSort(c int) {
+	if c == t.sortCol {
+		t.sortAsc = !t.sortAsc
+	} else {
+		t.sortCol, t.sortAsc = c, true
+	}
+	t.applySort()
+}
+
+// applySort stably sorts the rows by the active column (using the column's Less,
+// or a string compare), preserving the selected row, and requests a redraw.
+func (t *Table) applySort() {
+	if t.sortCol < 0 || t.sortCol >= len(t.columns) {
+		return
+	}
+	sel := t.selectedRow()
+	c := t.sortCol
+	less := t.columns[c].Less
+	sort.SliceStable(t.rows, func(i, j int) bool {
+		a, b := cellOf(t.rows[i], c), cellOf(t.rows[j], c)
+		if !t.sortAsc {
+			a, b = b, a // reverse the comparison for descending order
+		}
+		if less != nil {
+			return less(a, b)
+		}
+		return a < b
+	})
+	t.restoreSelection(sel)
+	t.clamp()
+	t.Invalidate()
+}
+
+// cellOf returns row's cell c, or "" if the row is short.
+func cellOf(row []string, c int) string {
+	if c < len(row) {
+		return row[c]
+	}
+	return ""
+}
+
+// selectedRow returns the currently selected row, or nil.
+func (t *Table) selectedRow() []string {
+	if t.selected >= 0 && t.selected < len(t.rows) {
+		return t.rows[t.selected]
+	}
+	return nil
+}
+
+// restoreSelection relocates sel by row identity after a reorder, updating the
+// selection index, or clears it if sel is gone.
+func (t *Table) restoreSelection(sel []string) {
+	if sel == nil {
+		return
+	}
+	for i, row := range t.rows {
+		if sameRow(row, sel) {
+			t.selected = i
+			return
+		}
+	}
+	t.selected = -1
+}
+
+// sameRow reports whether a and b are the same underlying slice.
+func sameRow(a, b []string) bool {
+	return len(a) > 0 && len(b) > 0 && &a[0] == &b[0]
 }
 
 // OnSelect registers the handler invoked with the newly selected row index.
@@ -54,6 +191,20 @@ func (t *Table) AddRow(cells ...string) {
 
 // Selected returns the selected row index, or -1.
 func (t *Table) Selected() int { return t.selected }
+
+// RowCount returns the number of rows.
+func (t *Table) RowCount() int { return len(t.rows) }
+
+// Row returns the cells of row i in the table's current (possibly sorted) order,
+// or nil if i is out of range. Use it instead of indexing your own data, since
+// sorting reorders the table's rows independently. The returned slice is the
+// table's own; do not mutate it.
+func (t *Table) Row(i int) []string {
+	if i < 0 || i >= len(t.rows) {
+		return nil
+	}
+	return t.rows[i]
+}
 
 // SetSelected sets the selection and fires OnRowSelect if it changed.
 func (t *Table) SetSelected(i int) {
@@ -198,8 +349,14 @@ func (t *Table) Draw(canvas render.Canvas) {
 	canvas.FillRect(header, lighten(t.ColourOf(RoleSurface), 1.2))
 	for c, col := range t.columns {
 		cell := geom.Rect{X: xs[c], Y: b.Y, W: widths[c], H: rh}
+		if c == t.hoverCol {
+			canvas.FillRect(cell, lighten(t.ColourOf(RoleSurface), 1.3))
+		}
 		canvas.PushClip(cell)
 		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, b.Y, rh)}, f, t.ColourOf(RoleText))
+		if c == t.sortCol {
+			t.drawSortIndicator(canvas, cell, t.sortAsc)
+		}
 		canvas.PopClip()
 	}
 	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + rh}, geom.Point{X: b.X + b.W, Y: b.Y + rh}, t.ColourOf(RoleBorder), 1)
@@ -246,6 +403,22 @@ func (t *Table) Draw(canvas render.Canvas) {
 	}
 }
 
+// drawSortIndicator draws a small up (ascending) or down (descending) chevron at
+// the right edge of a header cell.
+func (t *Table) drawSortIndicator(canvas render.Canvas, cell geom.Rect, asc bool) {
+	cx := cell.X + cell.W - tableCellPad - 4
+	cy := cell.Y + cell.H/2
+	const s = 3.0
+	col := t.ColourOf(RoleAccent)
+	if asc {
+		canvas.DrawLine(geom.Point{X: cx - s, Y: cy + s/2}, geom.Point{X: cx, Y: cy - s/2}, col, 1.5)
+		canvas.DrawLine(geom.Point{X: cx + s, Y: cy + s/2}, geom.Point{X: cx, Y: cy - s/2}, col, 1.5)
+	} else {
+		canvas.DrawLine(geom.Point{X: cx - s, Y: cy - s/2}, geom.Point{X: cx, Y: cy + s/2}, col, 1.5)
+		canvas.DrawLine(geom.Point{X: cx + s, Y: cy - s/2}, geom.Point{X: cx, Y: cy + s/2}, col, 1.5)
+	}
+}
+
 func (t *Table) drawScrollbar(canvas render.Canvas, b geom.Rect, bodyTop float64) {
 	bh := t.bodyHeight()
 	ch := t.contentHeight()
@@ -268,11 +441,22 @@ func (t *Table) HandleEvent(ev *Event) bool {
 	switch ev.Type {
 	case EventPointerMove:
 		t.hoverRow = t.rowAt(ev.Pos.Y)
+		t.hoverCol = t.headerColAt(ev.Pos)
 		return true
 	case EventPointerLeave:
 		t.hoverRow = -1
+		t.hoverCol = -1
 		return true
 	case EventClick:
+		if c := t.headerColAt(ev.Pos); c >= 0 {
+			if t.onHeaderClick != nil {
+				t.onHeaderClick(c)
+			}
+			if t.sortable && !t.columns[c].NoSort {
+				t.toggleSort(c)
+			}
+			return true
+		}
 		if i := t.rowAt(ev.Pos.Y); i >= 0 {
 			t.SetSelected(i)
 		}

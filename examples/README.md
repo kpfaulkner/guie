@@ -47,7 +47,7 @@ What each one exercises:
 | `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal |
 | `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap, selection, cut/copy/paste, scrolling |
 | `tabs`    | `TabContainer`: tab strip, click/Left-Right to switch, panes keep their state |
-| `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows |
+| `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows, click-header sort (numeric "Years" column) |
 | `fonts`   | Runtime font sizing via `App.SetFont` + `ui.DefaultFont`, plus per-widget `SetFont` |
 | `tooltips`| Hover tooltips via `SetTooltip`, with a rest delay and on-screen clamping |
 | `splitter`| `SplitPane`/`HSplit`/`VSplit`: draggable dividers, ratio + min sizes, nested |

@@ -835,7 +835,7 @@ no preedit or candidate-window API — see §16).
 | `ScrollView` | scrollview.go | viewport + wheel + draggable thumb |
 | `List` | list.go | selectable rows, wheel, keyboard, per-row hover |
 | `Tree` | tree.go | hierarchical `TreeNode`s, expand/collapse chevrons, keyboard nav, scroll |
-| `Table` | table.go | header + weighted columns, selectable scrollable body |
+| `Table` | table.go | header + weighted columns, selectable scrollable body, click-header sort |
 | `DropdownCombo` | dropdown.go | opens a popup `List` |
 | `MenuBar`/`Menu`/`MenuItem` | menu.go | popup menus, hover-switch between titles |
 | `Slider` | slider.go | drag + arrow keys, `[0,1]` |
@@ -854,6 +854,15 @@ Self-drawing multi-row widgets (`List`, `Tree`, `Table`, `MenuBar`,
 real child widgets (or none) from `Children()`, so hit-testing returns the
 widget itself for the self-drawn regions and it handles those clicks. They get
 per-row hover via the pointer-move-to-hovered dispatch (§10.3).
+
+**Table sorting.** A click resolved to the header band (`headerColAt`) fires
+`OnHeaderClick(col)` and, unless disabled (`SetSortable(false)` or the column's
+`NoSort`), sorts the rows by that column — toggling ascending/descending on
+repeat clicks (`toggleSort`/`applySort`, a stable sort using the column's `Less`
+or a string compare). The active column draws a ▲/▼ indicator; the selected row
+is relocated by slice identity so the selection follows the data across a sort.
+Because sorting reorders the table's own rows, read cells via `Table.Row(i)`
+rather than indexing your source slice.
 
 ---
 

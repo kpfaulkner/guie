@@ -1,11 +1,130 @@
 package ui
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
 )
+
+// sortApp builds a table with deliberately unsorted rows; the Age column sorts
+// numerically.
+func sortApp() (*App, *Table) {
+	app := NewApp()
+	tbl := NewTable([]Column{
+		{Title: "Name"},
+		{Title: "Age", Less: func(a, b string) bool { return atoiSafe(a) < atoiSafe(b) }},
+	})
+	tbl.SetRows([][]string{
+		{"Cy", "30"},
+		{"Ada", "9"},
+		{"Bob", "21"},
+	})
+	app.SetContent(tbl)
+	tbl.SetBounds(geom.Rect{X: 0, Y: 0, W: 200, H: tbl.rowHeight() * 5})
+	return app, tbl
+}
+
+func atoiSafe(s string) int { n, _ := strconv.Atoi(s); return n }
+
+// clickHeader clicks the header cell of column c (200px wide table, equal cols).
+func clickHeader(tbl *Table, c int) {
+	rh := tbl.rowHeight()
+	x := float64(c)*100 + 50 // center of a 100px-wide column
+	tbl.HandleEvent(&Event{Type: EventClick, Pos: geom.Point{X: x, Y: tbl.Bounds().Y + rh/2}})
+}
+
+func col0(tbl *Table) []string {
+	out := make([]string, len(tbl.rows))
+	for i, r := range tbl.rows {
+		out[i] = r[0]
+	}
+	return out
+}
+
+func eqStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestTableHeaderClickSortsAndToggles(t *testing.T) {
+	_, tbl := sortApp()
+
+	clickHeader(tbl, 0) // sort by Name ascending
+	if c, asc := tbl.SortColumn(); c != 0 || !asc {
+		t.Fatalf("first click should sort col 0 ascending, got (%d,%v)", c, asc)
+	}
+	if got := col0(tbl); !eqStrings(got, []string{"Ada", "Bob", "Cy"}) {
+		t.Fatalf("ascending name order wrong: %v", got)
+	}
+
+	clickHeader(tbl, 0) // toggle to descending
+	if _, asc := tbl.SortColumn(); asc {
+		t.Fatal("second click should flip to descending")
+	}
+	if got := col0(tbl); !eqStrings(got, []string{"Cy", "Bob", "Ada"}) {
+		t.Fatalf("descending name order wrong: %v", got)
+	}
+}
+
+func TestTableNumericColumnSort(t *testing.T) {
+	_, tbl := sortApp()
+	clickHeader(tbl, 1) // Age, numeric Less
+	if got := col0(tbl); !eqStrings(got, []string{"Ada", "Bob", "Cy"}) {
+		t.Fatalf("numeric age sort should order 9,21,30 (Ada,Bob,Cy), got %v", got)
+	}
+}
+
+func TestTableSortPreservesSelection(t *testing.T) {
+	_, tbl := sortApp()
+	// Select "Bob" (row index 2 in the unsorted data).
+	tbl.SetSelected(2)
+	if tbl.rows[tbl.Selected()][0] != "Bob" {
+		t.Fatalf("setup: expected Bob selected, got %q", tbl.rows[tbl.Selected()][0])
+	}
+	clickHeader(tbl, 0) // sort by name → Ada, Bob, Cy
+	if tbl.Selected() < 0 || tbl.rows[tbl.Selected()][0] != "Bob" {
+		t.Fatalf("selection should follow the row across a sort, got index %d", tbl.Selected())
+	}
+}
+
+func TestTableNoSortColumn(t *testing.T) {
+	app := NewApp()
+	clicks := 0
+	tbl := NewTable([]Column{{Title: "Name"}, {Title: "Actions", NoSort: true}})
+	tbl.OnHeaderClick(func(int) { clicks++ })
+	tbl.SetRows([][]string{{"Cy", "x"}, {"Ada", "x"}})
+	app.SetContent(tbl)
+	tbl.SetBounds(geom.Rect{X: 0, Y: 0, W: 200, H: tbl.rowHeight() * 4})
+
+	before := col0(tbl)
+	clickHeader(tbl, 1) // NoSort column
+	if c, _ := tbl.SortColumn(); c != -1 {
+		t.Fatalf("clicking a NoSort header should not sort, got col %d", c)
+	}
+	if !eqStrings(col0(tbl), before) {
+		t.Fatal("NoSort header click must not reorder rows")
+	}
+	if clicks != 1 {
+		t.Fatalf("OnHeaderClick should still fire for a NoSort column, got %d", clicks)
+	}
+}
+
+func TestTableSortByProgrammatic(t *testing.T) {
+	_, tbl := sortApp()
+	tbl.SortBy(0, false) // name descending
+	if got := col0(tbl); !eqStrings(got, []string{"Cy", "Bob", "Ada"}) {
+		t.Fatalf("SortBy desc wrong: %v", got)
+	}
+}
 
 func tableApp() (*App, *Table) {
 	app := NewApp()
