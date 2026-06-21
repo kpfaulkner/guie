@@ -692,6 +692,44 @@ in the same family as tooltips/popups.
   with white text); every color is run through `withAlpha` for the fade. Toasts
   are never hit-tested, so input passes through to the widgets beneath them.
 
+## 13c. Stepper & Spinner
+
+- **`Stepper` (`ui/stepper.go`)** is a self-drawn numeric input — no free-form
+  text entry, so values stay valid by construction. State is `value`, `min`,
+  `max`, `step`, `decimals`; `SetValue` clamps via `clampF` and fires `OnChange`
+  only on a real change. It draws the formatted value (`strconv.FormatFloat`)
+  plus an up/down button column on the right; `HandleEvent` steps on a click in
+  the column's top/bottom half, on Up/Down keys (Home/End jump to min/max), and
+  on the wheel, tracking per-half hover. Focusable like the other inputs.
+- **`Spinner` (`ui/spinner.go`)** is an indeterminate busy indicator: a ring of
+  `spinnerDots` dots with a bright rotating head and fading tail. It **advances
+  in `Draw`** (by `speed·nominalFrameDelta` per frame) rather than via a timer —
+  the framework redraws every frame, so this stays smooth and is deterministic
+  under the `guitest` step model. `Start`/`Stop` toggle the animation (a stopped
+  spinner freezes; hide it with `SetVisible(false)`). Dots are drawn with
+  `FillCircle` and `withAlpha` for the fade, in `RolePrimary`.
+
+## 13d. DatePicker (`ui/date.go`)
+
+An inline month calendar over `time.Time`, self-drawn like `List`/`Tree`.
+
+- **Model.** `selected`, `visible` (first of the displayed month) and `today` are
+  all date-only (`dayOf` truncates to midnight in the value's location). Options
+  set the value, the today marker (handy for deterministic tests) and the
+  `firstWeekday` (Sunday default). `SetValue` clamps the view to the new month
+  and fires `OnChange` only on a real day change; `ShowMonth`/`stepMonth` move the
+  view without touching the selection.
+- **Grid.** A fixed 8×7 layout (header, weekday labels, 6 week rows) sized to the
+  content rect (`grid()` returns origin + cell size), so it scales with the
+  widget. `offset()` is the count of leading cells before day 1;
+  `dateForCell`/`cellForDate` convert between grid index and date via
+  `AddDate`, so prev/next-month days fall out naturally (drawn dimmed, still
+  selectable).
+- **Input.** Click selects a day (or the corner header cells step the month);
+  the wheel steps months; Left/Right move ±1 day, Up/Down ±1 week, PageUp/
+  PageDown ±1 month (all via `SetValue`, so the view follows the selection).
+  Selected day filled `RolePrimary`; today outlined `RoleAccent`; hover lightened.
+
 ---
 
 ## 14. Text editing internals
@@ -772,7 +810,10 @@ no preedit or candidate-window API — see §16).
 | `DropdownCombo` | dropdown.go | opens a popup `List` |
 | `MenuBar`/`Menu`/`MenuItem` | menu.go | popup menus, hover-switch between titles |
 | `Slider` | slider.go | drag + arrow keys, `[0,1]` |
+| `Stepper` | stepper.go | numeric value, up/down buttons + arrows + wheel, min/max/step |
 | `ProgressBar` | progressbar.go | non-interactive fill |
+| `Spinner` | spinner.go | indeterminate busy indicator (animated dot ring) |
+| `DatePicker` | date.go | inline month calendar over `time.Time`, month nav, click + keyboard |
 | `TabContainer` | tabs.go | tab strip; all panes mounted (keep state), only active shown |
 | `SplitPane` | splitter.go | draggable divider, ratio + min sizes, nests |
 | `Image` | image.go | displays `render.Image` with `FitContain/Stretch/None` |

@@ -353,6 +353,12 @@ Grouped by build priority.
 - **DropdownCombo** — collapsed selector that opens a popup list (uses Overlay).
 - **Menu / MenuBar** — popup menus, items, separators, submenus.
 - **Slider**, **ProgressBar** — convenience widgets.
+- **Stepper** — numeric input with up/down buttons, arrow keys and wheel
+  (min/max/step/decimals). *(Done — `internals.md` §13c, `examples/widgets2`.)*
+- **Spinner** — indeterminate busy/activity indicator. *(Done — `internals.md`
+  §13c, `examples/widgets2`.)*
+- **DatePicker** — inline month calendar over `time.Time`. *(Done —
+  `internals.md` §13d, `examples/datepicker`.)*
 - **Toast** — transient, auto-dismissing notifications raised via
   `App.ShowToast` (info/success/warning/error). *(Done — see `internals.md`
   §13b and `examples/tree`.)*

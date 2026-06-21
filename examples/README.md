@@ -27,6 +27,8 @@ go run ./examples/clipboard  # OS clipboard: system-wide copy/paste via ui.WithC
 go run ./examples/dragdrop   # drag-and-drop: move items between panels, ghost + highlight
 go run ./examples/tree       # Tree (expand/collapse/keyboard) + Toast notifications
 go run ./examples/ime        # inline IME preedit rendering (simulated composition)
+go run ./examples/widgets2   # numeric Stepper + busy Spinner
+go run ./examples/datepicker # inline month calendar (DatePicker)
 ```
 
 What each one exercises:
@@ -56,6 +58,8 @@ What each one exercises:
 | `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
 | `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
 | `ime`     | Inline IME preedit drawn underlined at the caret via `EventComposition`; uses a simulated composition since EBiten exposes no real IME |
+| `widgets2`| `Stepper` (min/max/step/decimals, buttons + arrows + wheel, `OnChange`) and the indeterminate busy `Spinner` (`Start`/`Stop`) |
+| `datepicker`| `DatePicker` inline calendar: month nav (arrows/wheel), click + keyboard day selection, `OnChange(time.Time)` |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.
