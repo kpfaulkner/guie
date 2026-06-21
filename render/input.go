@@ -110,6 +110,19 @@ const (
 	Key9
 )
 
+// Composition is the in-progress IME preedit (uncommitted) text for a frame. It
+// is a level, not an edge: a backend that supports IME reports the current
+// preedit every frame while the user is composing, and the zero value (empty
+// Text) means "not composing". Caret is the caret position within Text in runes;
+// SelLo..SelHi is the active/converted clause within Text (SelLo==SelHi: none).
+// Committed text is delivered separately via InputState.Runes.
+type Composition struct {
+	Text  string
+	Caret int
+	SelLo int
+	SelHi int
+}
+
 // InputState is the backend-neutral snapshot of input for a single frame. The
 // "Pressed"/"Released" fields report edges (transitions during this frame),
 // while the "Down"/"KeysDown" fields report the level (held state).
@@ -131,8 +144,13 @@ type InputState struct {
 	KeysPressed []Key
 	// KeysReleased is the set of keys that went up this frame.
 	KeysReleased []Key
-	// Runes is the text input produced this frame, in order.
+	// Runes is the committed text input produced this frame, in order. This
+	// includes the final output of an IME after composition is accepted.
 	Runes []rune
 	// Modifiers is the set of modifiers active this frame.
 	Modifiers ModifierSet
+
+	// Composition is the IME preedit being composed this frame, or the zero
+	// value when not composing. Only backends that support IME populate it.
+	Composition Composition
 }

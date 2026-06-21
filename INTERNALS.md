@@ -719,6 +719,39 @@ position, click-to-caret, vertical scrolling, and Up/Down navigation all operate
 on visual rows; Up/Down preserves the caret's x. Selection highlighting is
 computed per visual row.
 
+### 14.3 IME / preedit
+
+Input method editors have three concerns; the framework machinery for all three
+is wired, but only committed text is deliverable on EBiten v2.9.9 (which exposes
+no preedit or candidate-window API — see §16).
+
+- **Seam.** `render.Composition{Text, Caret, SelLo, SelHi}` is a per-frame field
+  on `InputState` (zero = not composing); it is a **level**, not an edge —
+  supporting backends report the current preedit every frame while composing.
+  `render.IMEController{SetIMEEnabled, SetIMERect}` is an optional capability the
+  framework type-asserts on the `Driver`.
+- **Dispatch (`dispatchKeyboard`).** Before the key/rune loops, if the frame has
+  a composition (or one was active last frame) an `EventComposition` carrying
+  `Event.Comp` is sent to the focused widget, and `App.composing` is updated.
+  **While composing, KeyDown/KeyUp are not forwarded** to the focused widget (the
+  IME owns those keys); committed runes still flow as `EventText`. A commit frame
+  carries `Comp.Text==""` (clears the preedit) followed by the committed `Runes`.
+- **App wiring.** `App.ime` caches the driver if it implements `IMEController`.
+  `setFocus` calls `SetIMEEnabled(true/false)` as an editable widget gains/loses
+  focus; `update` reports the focused widget's `imeCaretRect()` via `SetIMERect`
+  each frame. Editable widgets are detected by the unexported `imeEditable`
+  interface (`imeCaretRect() (geom.Rect, bool)`), implemented by `TextField`/
+  `TextArea`.
+- **Widgets.** Both hold `preedit`/`preeditCaret`. `setPreedit` replaces the
+  selection on composition start (once), then stores the preedit; focus-loss
+  clears it. `Draw` inserts the preedit inline at the caret (in `TextField`, into
+  the displayed string; in `TextArea`, into the caret's visual row), underlines
+  it, and places the caret within the preedit. The preedit is never written into
+  the committed `runes`/`lines`; the commit arrives separately as `EventText`.
+- **Testing.** Because composition is just `InputState` fields, the `guitest`
+  harness drives the whole lifecycle headlessly via `Compose`/`CommitText`/
+  `CancelComposition`, independent of EBiten's limitations.
+
 ---
 
 ## 15. Widget catalogue (quick reference)
@@ -773,7 +806,13 @@ per-row hover via the pointer-move-to-hovered dispatch (§10.3).
 - **No accessibility** bridge (EBiten surfaces have no OS a11y tree to feed).
 - **Clipboard** default is in-process; OS integration is opt-in via
   `WithClipboard` using the `clipboard` package (§3.6).
-- **IME / complex text input** is not handled (relies on `AppendInputChars`).
+- **IME / complex text input**: the framework seam (`render.Composition`,
+  `render.IMEController`, `EventComposition`) and inline preedit rendering in the
+  text widgets are implemented and tested via `guitest` (§14.3). But **EBiten
+  v2.9.9 exposes no preedit or candidate-window API**, so on the EBiten backend
+  only *committed* IME text flows (via `AppendInputChars`); preedit is never fed
+  and `SetIMERect` is a no-op. The wiring activates without API churn once a
+  backend supplies composition.
 - **Coordinates are absolute**; a widget that overflows its parent's bounds
   won't be found by `hitTest` through the parent (the parent's bounds gate the
   recursion).

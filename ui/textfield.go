@@ -45,6 +45,9 @@ type TextField struct {
 	dragging bool
 	scrollX  float64
 
+	preedit      string // IME composition (uncommitted) shown inline at the caret
+	preeditCaret int    // caret position within preedit, in runes
+
 	placeholder string
 	onChange    func(string)
 	onSubmit    func(string)
@@ -255,6 +258,52 @@ func (t *TextField) caretIndexAt(absX float64) int {
 	return caretIndexForX(t.runes, absX-inner.X+t.scrollX, t.face())
 }
 
+// --- IME preedit ---
+
+// composing reports whether an IME composition is active.
+func (t *TextField) composing() bool { return t.preedit != "" }
+
+// setPreedit stores the IME preedit. Starting a composition (first non-empty
+// preedit) replaces any selection, so the eventual commit lands at the caret.
+func (t *TextField) setPreedit(text string, caret int) {
+	if text != "" && t.preedit == "" && t.hasSelection() {
+		t.deleteSelection()
+	}
+	t.preedit = text
+	n := len([]rune(text))
+	if caret < 0 {
+		caret = 0
+	}
+	if caret > n {
+		caret = n
+	}
+	t.preeditCaret = caret
+	t.Invalidate()
+}
+
+// caretVisualWidth returns the caret's x offset from the text origin, including
+// the preedit prefix while composing.
+func (t *TextField) caretVisualWidth(f render.FontFace) float64 {
+	w := f.Measure(string(t.runes[:t.caret])).W
+	if t.composing() {
+		pr := []rune(t.preedit)
+		w += f.Measure(string(pr[:t.preeditCaret])).W
+	}
+	return w
+}
+
+// imeCaretRect reports the caret rectangle in absolute coordinates for IME
+// candidate-window placement.
+func (t *TextField) imeCaretRect() (geom.Rect, bool) {
+	f := t.face()
+	if !t.focused || f == nil {
+		return geom.Rect{}, false
+	}
+	inner := t.Bounds().Inset(textFieldPadding)
+	x := inner.X - t.scrollX + t.caretVisualWidth(f)
+	return geom.Rect{X: x, Y: inner.Y, W: 1, H: inner.H}, true
+}
+
 // Draw renders the box, the selection highlight, the text (or placeholder) and
 // the caret when focused.
 func (t *TextField) Draw(canvas render.Canvas) {
@@ -278,35 +327,51 @@ func (t *TextField) Draw(canvas render.Canvas) {
 
 	y := vCenterY(f, inner.Y, inner.H)
 
-	if len(t.runes) == 0 && !t.focused && t.placeholder != "" {
+	if len(t.runes) == 0 && !t.composing() && !t.focused && t.placeholder != "" {
 		canvas.DrawText(t.placeholder, geom.Point{X: inner.X, Y: y}, f, t.ColorOf(RoleTextMuted))
 		return
 	}
 
 	t.updateScroll(f, inner.W)
 
-	if t.hasSelection() {
+	// While composing, the selection has already been removed (setPreedit), so
+	// only draw the highlight when not composing.
+	if t.hasSelection() && !t.composing() {
 		lo, hi := t.selRange()
 		x0 := inner.X - t.scrollX + f.Measure(string(t.runes[:lo])).W
 		x1 := inner.X - t.scrollX + f.Measure(string(t.runes[:hi])).W
 		canvas.FillRect(geom.Rect{X: x0, Y: inner.Y, W: x1 - x0, H: inner.H}, t.ColorOf(RolePrimary))
 	}
 
-	canvas.DrawText(string(t.runes), geom.Point{X: inner.X - t.scrollX, Y: y}, f, t.ColorOf(RoleText))
+	textColor := t.ColorOf(RoleText)
+	originX := inner.X - t.scrollX
+	if t.composing() {
+		// Insert the preedit into the displayed text at the caret and underline it.
+		pre := string(t.runes[:t.caret])
+		post := string(t.runes[t.caret:])
+		canvas.DrawText(pre+t.preedit+post, geom.Point{X: originX, Y: y}, f, textColor)
+		ux0 := originX + f.Measure(pre).W
+		ux1 := originX + f.Measure(pre+t.preedit).W
+		uy := inner.Y + inner.H - 2
+		canvas.DrawLine(geom.Point{X: ux0, Y: uy}, geom.Point{X: ux1, Y: uy}, textColor, 1)
+	} else {
+		canvas.DrawText(string(t.runes), geom.Point{X: originX, Y: y}, f, textColor)
+	}
 
 	if t.focused {
-		caretX := inner.X - t.scrollX + f.Measure(string(t.runes[:t.caret])).W
+		caretX := originX + t.caretVisualWidth(f)
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: inner.Y + 2},
 			geom.Point{X: caretX, Y: inner.Y + inner.H - 2},
-			t.ColorOf(RoleText), 1,
+			textColor, 1,
 		)
 	}
 }
 
-// updateScroll adjusts scrollX so the caret stays within the visible width.
+// updateScroll adjusts scrollX so the caret (including any preedit) stays within
+// the visible width.
 func (t *TextField) updateScroll(f render.FontFace, width float64) {
-	caretW := f.Measure(string(t.runes[:t.caret])).W
+	caretW := t.caretVisualWidth(f)
 	if caretW-t.scrollX > width {
 		t.scrollX = caretW - width
 	}
@@ -350,6 +415,11 @@ func (t *TextField) HandleEvent(ev *Event) bool {
 	case EventFocusLost:
 		t.focused = false
 		t.dragging = false
+		t.preedit = ""
+		t.preeditCaret = 0
+		return true
+	case EventComposition:
+		t.setPreedit(ev.Comp.Text, ev.Comp.Caret)
 		return true
 	case EventText:
 		if ev.Rune >= 0x20 && ev.Rune != 0x7f {

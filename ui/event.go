@@ -35,6 +35,11 @@ const (
 	EventFocusGained
 	// EventFocusLost is sent to a widget when it loses focus.
 	EventFocusLost
+	// EventComposition is sent to the focused widget when the IME preedit
+	// (uncommitted composition) changes. The preedit is carried in Event.Comp; an
+	// empty Comp.Text ends/clears the composition. Committed text still arrives
+	// separately via EventText.
+	EventComposition
 )
 
 // Event describes a single input event. Which fields are meaningful depends on
@@ -48,6 +53,7 @@ type Event struct {
 	Key       render.Key // key for EventKeyDown/EventKeyUp
 	Rune      rune       // typed rune for EventText
 	Modifiers render.ModifierSet
+	Comp      render.Composition // IME preedit for EventComposition
 }
 
 // hitTest returns the top-most visible widget whose bounds contain pos, going

@@ -5,6 +5,7 @@ import (
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
 )
 
@@ -14,6 +15,14 @@ type Driver struct{}
 
 // New returns an EBiten-backed render.Driver.
 func New() render.Driver { return &Driver{} }
+
+// SetIMEEnabled and SetIMERect satisfy render.IMEController. EBiten (v2.9.9)
+// exposes no API to toggle the IME or position the candidate window, and does
+// not surface preedit text, so these are no-ops today: only committed IME text
+// flows (via AppendInputChars in pollInput). The methods exist so the framework
+// can light up IME support once a backend provides it, without API churn above.
+func (d *Driver) SetIMEEnabled(on bool)  {}
+func (d *Driver) SetIMERect(r geom.Rect) {}
 
 // Run configures the host window and runs the EBiten game loop, invoking the
 // framework's hooks each frame. It blocks until the window closes or a hook

@@ -370,8 +370,9 @@ Grouped by build priority.
   scale factor wired through the loop + canvas; see MACOS/CROSS-PLATFORM POLISH.)*
 - Clipboard and IME support for text fields. *(Done for clipboard — an
   OS-backed clipboard ships in the opt-in `clipboard` package, injected via
-  `ui.WithClipboard`; see `examples/clipboard`. IME still TBD — see
-  MACOS/CROSS-PLATFORM POLISH.)*
+  `ui.WithClipboard`; see `examples/clipboard`. IME: the framework-side seam,
+  events, preedit rendering and tests are built — see IME below; the EBiten last
+  mile is blocked upstream.)*
 - Animation/transition primitives (timeline vs per-frame). *(Done — per-frame
   hook `App.OnFrame` plus `App.Animate`/`App.Tween` with easings; see
   `internals.md` §11a and `examples/animation`.)*
@@ -549,6 +550,66 @@ widget, or disabled so targets show their own insert indicator via `OnDragOver`.
 
 Deferred for v1: edge auto-scroll over a `ScrollView`, copy-vs-move drop effects,
 multi-button drags.
+
+---
+
+## IME (INPUT METHOD EDITORS)
+
+IME has three separable concerns; the framework-side machinery for all three is
+built, but only the first is deliverable on the current backend:
+
+1. **Committed text** — the IME's final output (e.g. 日本語). *Already works:* the
+   OS commits runes, EBiten surfaces them via `AppendInputChars`, the backend
+   puts them in `InputState.Runes`, and the text widgets insert them on
+   `EventText`.
+2. **Preedit / composition** — the uncommitted string shown inline (underlined)
+   while composing. The seam, event and widget rendering exist; **EBiten v2.9.9
+   exposes no preedit API**, so no composition is fed on that backend today.
+3. **Candidate-window placement** — telling the OS where the caret is. The seam
+   exists (`SetIMERect`); **EBiten exposes no positioning API**, so it is a no-op
+   there today.
+
+### Seam (`render`)
+
+```go
+// Per-frame preedit; zero value (empty Text) = not composing. Backends that
+// support IME fill it; others leave it zero and only committed Runes flow.
+type Composition struct { Text string; Caret int; SelLo, SelHi int }
+
+type InputState struct { /* …; */ Composition Composition }
+
+// Optional capability a Driver may implement; the framework type-asserts for it.
+type IMEController interface {
+    SetIMEEnabled(on bool)   // toggled on focus/blur of an editable widget
+    SetIMERect(r geom.Rect)  // caret rect (abs logical px) for the candidate window
+}
+```
+
+### Events & widgets
+
+- New `EventComposition` (carries `Event.Comp`) is delivered to the focused
+  widget like `EventText`; committed text stays on `EventText` (independent
+  channel). An empty `Comp.Text` ends/clears the preedit.
+- `TextField`/`TextArea` hold `preedit`/`preeditCaret`, drawn **inline at the
+  caret, underlined**, never mixed into the committed runes; starting a
+  composition replaces any selection. They expose `imeCaretRect()`; the App
+  reports it via `SetIMERect` each frame while focused and toggles
+  `SetIMEEnabled` on focus change.
+- **Key gating:** while a composition is active the App does not forward
+  KeyDown/KeyUp to the focused widget (the IME owns those keys). Committed text
+  still arrives as `EventText`.
+
+### Degradation & testing
+
+- No `IMEController`/`Composition` from the backend → committed-text-only
+  (today's behavior), no crashes. When EBiten gains preedit (or another backend
+  is used) it simply starts populating `Composition`/honoring `SetIMERect`; the
+  already-wired widgets light up with **no API churn above the backend**.
+- The `guitest` headless backend can simulate composition fully (`Compose`,
+  `CommitText`, `CancelComposition`), so the entire preedit→commit lifecycle is
+  deterministically tested even though EBiten can't drive it through a window.
+
+See `internals.md` §14.3.
 
 ---
 

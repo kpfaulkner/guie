@@ -29,6 +29,11 @@ type Harness struct {
 	down  render.ButtonSet
 	mods  render.ModifierSet
 
+	// composition is the current IME preedit. Unlike the edge fields below it
+	// persists across frames (it is a level), so the preedit stays visible until
+	// changed, committed or cancelled.
+	composition render.Composition
+
 	// edges accumulated for the next Step, cleared after it
 	pressed      render.ButtonSet
 	released     render.ButtonSet
@@ -78,6 +83,7 @@ func (h *Harness) Step() *Recording {
 		KeysReleased:  h.keysReleased,
 		Runes:         h.runes,
 		Modifiers:     h.mods,
+		Composition:   h.composition,
 	}
 	rec, err := h.driver.step(in)
 	if err != nil {
@@ -93,6 +99,14 @@ func (h *Harness) Step() *Recording {
 
 // Frame returns the most recently drawn Recording (nil before the first Step).
 func (h *Harness) Frame() *Recording { return h.last }
+
+// IMEEnabled reports whether the app last asked the backend to enable IME (true
+// while an editable widget holds focus).
+func (h *Harness) IMEEnabled() bool { return h.driver.imeEnabled }
+
+// IMERect returns the caret rectangle the app last reported for IME
+// candidate-window placement.
+func (h *Harness) IMERect() geom.Rect { return h.driver.imeRect }
 
 // Err returns the first error returned by the framework's Update hook, if any.
 func (h *Harness) Err() error { return h.err }
@@ -195,6 +209,31 @@ func (h *Harness) Drag(fromX, fromY, toX, toY float64) *Recording {
 func (h *Harness) TypeKey(k render.Key) *Recording {
 	h.PressKey(k).Step()
 	return h.ReleaseKey(k).Step()
+}
+
+// --- IME (input method editor) ---
+
+// Compose sets the IME preedit (uncommitted composition) text with the caret at
+// the given rune position and steps a frame. The preedit persists across frames
+// until changed by another Compose, ended by CommitText, or CancelComposition.
+// This simulates an IME-capable backend regardless of the real one's support.
+func (h *Harness) Compose(text string, caret int) *Recording {
+	h.composition = render.Composition{Text: text, Caret: caret}
+	return h.Step()
+}
+
+// CommitText ends the active composition and delivers s as committed text in the
+// same frame (the order a real IME produces on accept), then steps.
+func (h *Harness) CommitText(s string) *Recording {
+	h.composition = render.Composition{}
+	h.runes = append(h.runes, []rune(s)...)
+	return h.Step()
+}
+
+// CancelComposition ends the active composition without committing any text.
+func (h *Harness) CancelComposition() *Recording {
+	h.composition = render.Composition{}
+	return h.Step()
 }
 
 func appendUnique(ks []render.Key, k render.Key) []render.Key {

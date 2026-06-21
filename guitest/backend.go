@@ -145,9 +145,19 @@ type driver struct {
 	hooks  render.Hooks
 	width  int
 	height int
+
+	// IME state recorded via render.IMEController, for test assertions.
+	imeEnabled bool
+	imeRect    geom.Rect
 }
 
 func newDriver() *driver { return &driver{} }
+
+// SetIMEEnabled and SetIMERect satisfy render.IMEController so the harness
+// exercises the App's IME wiring (focus enables IME; the caret rect is reported
+// each frame). The values are recorded for assertions.
+func (d *driver) SetIMEEnabled(on bool)  { d.imeEnabled = on }
+func (d *driver) SetIMERect(r geom.Rect) { d.imeRect = r }
 
 func (d *driver) Run(cfg render.Config, hooks render.Hooks) error {
 	d.hooks = hooks

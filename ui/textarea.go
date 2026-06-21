@@ -37,6 +37,9 @@ type TextArea struct {
 	dragging  bool
 	scrollY   float64
 
+	preedit      string // IME composition (uncommitted) shown inline at the caret
+	preeditCaret int    // caret position within preedit, in runes
+
 	wrap      bool
 	wrapWidth float64 // content width used for the last wrap pass
 
@@ -539,6 +542,57 @@ func (t *TextArea) caretAt(p geom.Point) (int, int) {
 	return r.lr, col
 }
 
+// --- IME preedit ---
+
+// composing reports whether an IME composition is active.
+func (t *TextArea) composing() bool { return t.preedit != "" }
+
+// setPreedit stores the IME preedit. Starting a composition replaces any
+// selection, so the eventual commit lands at the caret.
+func (t *TextArea) setPreedit(text string, caret int) {
+	if text != "" && t.preedit == "" && t.hasSelection() {
+		t.deleteSelection()
+	}
+	t.preedit = text
+	n := len([]rune(text))
+	if caret < 0 {
+		caret = 0
+	}
+	if caret > n {
+		caret = n
+	}
+	t.preeditCaret = caret
+	t.Invalidate()
+}
+
+// caretXWithPreedit returns the caret's x offset within visual row r, including
+// the preedit prefix when composing on the caret's row.
+func (t *TextArea) caretXWithPreedit(f render.FontFace, r visRow) float64 {
+	x := f.Measure(string(t.lines[r.lr][r.start:t.caretCol])).W
+	if t.composing() {
+		pr := []rune(t.preedit)
+		x += f.Measure(string(pr[:t.preeditCaret])).W
+	}
+	return x
+}
+
+// imeCaretRect reports the caret rectangle in absolute coordinates for IME
+// candidate-window placement.
+func (t *TextArea) imeCaretRect() (geom.Rect, bool) {
+	f := t.face()
+	if !t.focused || f == nil {
+		return geom.Rect{}, false
+	}
+	inner := t.Bounds().Inset(textAreaPadding)
+	lh := t.lineHeight()
+	rows := t.rows()
+	ci := t.caretVisualIndex(rows)
+	r := rows[ci]
+	x := inner.X + t.caretXWithPreedit(f, r)
+	y := inner.Y + float64(ci)*lh - t.scrollY
+	return geom.Rect{X: x, Y: y, W: 1, H: lh}, true
+}
+
 // Draw renders the box, the selection, the visible lines (or placeholder), the
 // caret, and a scrollbar thumb when the content overflows.
 func (t *TextArea) Draw(canvas render.Canvas) {
@@ -571,6 +625,8 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 	t.scrollCaretIntoView(inner.H)
 
 	rows := t.rows()
+	ci := t.caretVisualIndex(rows)
+	textColor := t.ColorOf(RoleText)
 	canvas.PushClip(inner)
 	t.drawSelectionRows(canvas, inner, lh, rows, t.ColorOf(RolePrimary))
 	for vi, r := range rows {
@@ -578,17 +634,33 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 		if y+lh < inner.Y || y > inner.Y+inner.H {
 			continue
 		}
-		canvas.DrawText(string(t.lines[r.lr][r.start:r.end]), geom.Point{X: inner.X, Y: y}, f, t.ColorOf(RoleText))
+		seg := t.lines[r.lr][r.start:r.end]
+		if t.composing() && vi == ci {
+			// Insert the preedit at the caret within this row and underline it.
+			rel := t.caretCol - r.start
+			if rel < 0 {
+				rel = 0
+			}
+			if rel > len(seg) {
+				rel = len(seg)
+			}
+			pre, post := string(seg[:rel]), string(seg[rel:])
+			canvas.DrawText(pre+t.preedit+post, geom.Point{X: inner.X, Y: y}, f, textColor)
+			ux0 := inner.X + f.Measure(pre).W
+			ux1 := inner.X + f.Measure(pre+t.preedit).W
+			canvas.DrawLine(geom.Point{X: ux0, Y: y + lh - 1}, geom.Point{X: ux1, Y: y + lh - 1}, textColor, 1)
+		} else {
+			canvas.DrawText(string(seg), geom.Point{X: inner.X, Y: y}, f, textColor)
+		}
 	}
 	if t.focused {
-		ci := t.caretVisualIndex(rows)
 		r := rows[ci]
-		caretX := inner.X + f.Measure(string(t.lines[r.lr][r.start:t.caretCol])).W
+		caretX := inner.X + t.caretXWithPreedit(f, r)
 		caretY := inner.Y + float64(ci)*lh - t.scrollY
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: caretY + 1},
 			geom.Point{X: caretX, Y: caretY + lh - 1},
-			t.ColorOf(RoleText), 1,
+			textColor, 1,
 		)
 	}
 	canvas.PopClip()
@@ -727,6 +799,11 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 	case EventFocusLost:
 		t.focused = false
 		t.dragging = false
+		t.preedit = ""
+		t.preeditCaret = 0
+		return true
+	case EventComposition:
+		t.setPreedit(ev.Comp.Text, ev.Comp.Caret)
 		return true
 	case EventWheel:
 		t.scrollY -= ev.Wheel.Y * wheelStep

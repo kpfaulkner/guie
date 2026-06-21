@@ -3,6 +3,8 @@ package render
 import (
 	"errors"
 	"image/color"
+
+	"github.com/kpfaulkner/guie/geom"
 )
 
 // ErrTerminated may be returned from Hooks.Update to request a clean shutdown of
@@ -45,4 +47,18 @@ type Driver interface {
 	// each frame. It blocks until the window is closed or a hook returns an
 	// error.
 	Run(cfg Config, hooks Hooks) error
+}
+
+// IMEController is an optional capability a Driver may implement to support
+// input method editors. The framework type-asserts a Driver for it; when absent,
+// IME degrades to committed-text-only (no inline preedit, no candidate-window
+// positioning). A Driver that implements it should also report the preedit each
+// frame via InputState.Composition.
+type IMEController interface {
+	// SetIMEEnabled turns IME on or off, called as an editable widget gains or
+	// loses focus.
+	SetIMEEnabled(on bool)
+	// SetIMERect reports the focused widget's caret rectangle in absolute logical
+	// pixels, so the OS can place the candidate window beside it.
+	SetIMERect(r geom.Rect)
 }

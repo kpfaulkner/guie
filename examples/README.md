@@ -26,6 +26,7 @@ go run ./examples/paint      # freehand drawing: mouse capture, multi-button, cu
 go run ./examples/clipboard  # OS clipboard: system-wide copy/paste via ui.WithClipboard
 go run ./examples/dragdrop   # drag-and-drop: move items between panels, ghost + highlight
 go run ./examples/tree       # Tree (expand/collapse/keyboard) + Toast notifications
+go run ./examples/ime        # inline IME preedit rendering (simulated composition)
 ```
 
 What each one exercises:
@@ -54,6 +55,7 @@ What each one exercises:
 | `clipboard`| OS-backed clipboard via the opt-in `clipboard` package + `ui.WithClipboard`: copy/paste with other apps |
 | `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
 | `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
+| `ime`     | Inline IME preedit drawn underlined at the caret via `EventComposition`; uses a simulated composition since EBiten exposes no real IME |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

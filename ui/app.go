@@ -26,6 +26,7 @@ import (
 // from a background goroutine.
 type App struct {
 	driver    render.Driver
+	ime       render.IMEController // non-nil if the driver supports IME
 	cfg       render.Config
 	theme     theme.Theme
 	clipboard render.Clipboard
@@ -57,7 +58,8 @@ type App struct {
 	prevPointer geom.Point // cursor pos at the previous frame
 	havePrev    bool       // whether prevPointer has been set
 
-	drag *dragSession // in-flight drag-and-drop, nil when none
+	drag      *dragSession // in-flight drag-and-drop, nil when none
+	composing bool         // an IME composition (preedit) is active
 
 	// tooltip state (hover-delay timed in Update ticks)
 	lastPointer  geom.Point
@@ -92,6 +94,10 @@ func NewApp(opts ...AppOption) *App {
 	}
 	if a.clipboard == nil {
 		a.clipboard = &memClipboard{}
+	}
+	// Detect optional IME support on the (possibly custom) driver.
+	if c, ok := a.driver.(render.IMEController); ok {
+		a.ime = c
 	}
 
 	a.bus = newEventBus()
@@ -193,6 +199,7 @@ func (a *App) update(in render.InputState) error {
 	a.layoutIfNeeded()
 	a.dispatchPointer(in)
 	a.dispatchKeyboard(in)
+	a.reportIMERect()
 	return nil
 }
 
@@ -232,6 +239,12 @@ func (a *App) setFocus(w Widget) {
 	a.focused = w
 	if w != nil {
 		a.sendTo(w, Event{Type: EventFocusGained})
+	}
+	// Toggle IME for editable widgets so the OS shows its input UI only when a
+	// text widget holds focus.
+	if a.ime != nil {
+		_, editable := w.(imeEditable)
+		a.ime.SetIMEEnabled(editable)
 	}
 }
 
@@ -418,7 +431,20 @@ func (a *App) focusFromPointer(hit Widget) {
 // dispatchKeyboard routes key and text input to the focused widget. Tab and
 // Shift-Tab move focus instead of being delivered.
 func (a *App) dispatchKeyboard(in render.InputState) {
+	// IME preedit first: deliver composition changes to the focused widget. While
+	// a composition is active the IME owns the keyboard, so editing keys are not
+	// forwarded; committed text still arrives below as EventText.
+	if in.Composition.Text != "" || a.composing {
+		if a.focused != nil {
+			a.dispatch(a.focused, Event{Type: EventComposition, Comp: in.Composition, Modifiers: in.Modifiers})
+		}
+		a.composing = in.Composition.Text != ""
+	}
+
 	for _, k := range in.KeysPressed {
+		if a.composing {
+			break // IME consumes keys while composing
+		}
 		if k == render.KeyEscape && a.drag != nil {
 			a.cancelDrag()
 			continue
@@ -444,6 +470,9 @@ func (a *App) dispatchKeyboard(in render.InputState) {
 		}
 	}
 	for _, k := range in.KeysReleased {
+		if a.composing {
+			break
+		}
 		if a.focused != nil {
 			a.dispatch(a.focused, Event{Type: EventKeyUp, Key: k, Modifiers: in.Modifiers})
 		}
@@ -451,6 +480,26 @@ func (a *App) dispatchKeyboard(in render.InputState) {
 	for _, r := range in.Runes {
 		if a.focused != nil {
 			a.dispatch(a.focused, Event{Type: EventText, Rune: r, Modifiers: in.Modifiers})
+		}
+	}
+}
+
+// imeEditable is implemented by widgets that accept IME input. The App uses it to
+// enable IME on focus and to report the caret rectangle for candidate-window
+// placement.
+type imeEditable interface {
+	imeCaretRect() (geom.Rect, bool)
+}
+
+// reportIMERect tells the backend where the focused editable widget's caret is,
+// so the OS can position the IME candidate window. No-op without IME support.
+func (a *App) reportIMERect() {
+	if a.ime == nil || a.focused == nil {
+		return
+	}
+	if t, ok := a.focused.(imeEditable); ok {
+		if r, ok := t.imeCaretRect(); ok {
+			a.ime.SetIMERect(r)
 		}
 	}
 }
