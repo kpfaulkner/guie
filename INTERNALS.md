@@ -796,6 +796,38 @@ per-row hover via the pointer-move-to-hovered dispatch (§10.3).
   `Update` calls rather than wall-clock.
 - The `geom`, `render`, and `theme` packages have their own focused tests.
 
+### 17.1 Headless harness (`guitest`)
+
+The `guitest` package is a public, GPU-free implementation of the render seam
+plus a `Harness` that drives an `App` frame by frame, so **app authors** (not
+just the framework) can integration-test their UIs. It is the headless backend
+the design's testing TBD called for.
+
+- **Injection.** `ui.WithDriver(render.Driver)` lets an alternate backend be
+  supplied at `NewApp`. `guitest.New(w, h, opts…)` wires a headless `driver`
+  plus a deterministic `font` (via `ui.WithFont`), builds the `App`, and calls
+  `App.Run` — which the headless driver makes **non-blocking**: it captures the
+  `render.Hooks`, fires the initial `Resize`, and returns. The harness then
+  invokes those hooks on demand.
+- **Stepping.** `Harness.Step()` builds an `InputState` from accumulated input,
+  runs the framework's `Update` then `Draw` onto a fresh `Recording`, clears the
+  per-frame edges (held buttons/keys persist), and returns the recording. Input
+  helpers are low-level (`MoveMouse`/`PressMouse`/`PressKey`/`TypeText`/…) and
+  high-level gestures that self-step (`Click`, `RightClick`, `Drag`, `TypeKey`).
+- **Recording.** The headless `canvas` records each draw call as an `Op` rather
+  than rasterizing (clipping is recorded but not enforced; coordinates are
+  absolute). `Recording` exposes query helpers (`HasText`, `TextContaining`,
+  `Count`, `OpsOfKind`, `FillsOfColor`, `TextAt`) so a test asserts what was
+  painted without a surface.
+- **Deterministic font.** `guitest.NewFont(size)` has synthetic, stable metrics
+  (advance `0.6·size`/rune, ascent/descent/line-height fixed fractions), so text
+  measurement and layout are predictable in assertions and independent of the
+  bundled TTF.
+- **Caveat.** `ui.NewRenderTarget` still routes to the real backend (it is not
+  part of the `Driver` seam), so headless tests must avoid it — e.g. a drag must
+  set a custom `DragGhost` rather than rely on the default snapshot ghost. See
+  `guitest/harness_test.go` for worked examples.
+
 GUI examples can't run in CI (no display) but all compile; they're the manual
 "does it actually render" check, run locally with `go run ./examples/<name>`.
 ```

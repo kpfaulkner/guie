@@ -377,7 +377,11 @@ Grouped by build priority.
   `internals.md` §11a and `examples/animation`.)*
 - Persistence of window size/position.
 - Testing approach (headless backend implementing `Canvas`/`Input` for unit
-  tests of layout and event dispatch without a real window).
+  tests of layout and event dispatch without a real window). *(Done — the
+  `guitest` package provides a GPU-free `render.Driver`/`Canvas`/`FontFace`
+  plus a `Harness` that steps an `App` frame by frame, synthesizes input and
+  records drawing ops for assertions. Injected via `ui.WithDriver`; see
+  `internals.md` §17.1.)*
 
 ---
 

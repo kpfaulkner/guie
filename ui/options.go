@@ -42,6 +42,17 @@ func WithClipboard(c render.Clipboard) AppOption {
 	return func(a *App) { a.clipboard = c }
 }
 
+// WithDriver replaces the graphics/loop backend. By default the app uses the
+// bundled EBiten driver; tests can inject a headless driver (see the guitest
+// package) to drive the app frame by frame without a window or GPU.
+func WithDriver(d render.Driver) AppOption {
+	return func(a *App) {
+		if d != nil {
+			a.driver = d
+		}
+	}
+}
+
 // WithFont sets the default text face used by widgets that don't override it.
 func WithFont(f render.FontFace) AppOption {
 	return func(a *App) { a.theme.Font = f }
