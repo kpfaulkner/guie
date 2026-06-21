@@ -348,9 +348,14 @@ Grouped by build priority.
 ### Third wave
 
 - **List** — virtualized vertical list of selectable rows.
+- **Tree** — hierarchical list of expand/collapse nodes (`TreeNode`), keyboard
+  navigable. *(Done — see `internals.md` §13a and `examples/tree`.)*
 - **DropdownCombo** — collapsed selector that opens a popup list (uses Overlay).
 - **Menu / MenuBar** — popup menus, items, separators, submenus.
 - **Slider**, **ProgressBar** — convenience widgets.
+- **Toast** — transient, auto-dismissing notifications raised via
+  `App.ShowToast` (info/success/warning/error). *(Done — see `internals.md`
+  §13b and `examples/tree`.)*
 
 ### Later / nice-to-have
 

@@ -25,6 +25,7 @@ go run ./examples/editor     # text editor: menus, open/save, find/replace, moda
 go run ./examples/paint      # freehand drawing: mouse capture, multi-button, custom widget
 go run ./examples/clipboard  # OS clipboard: system-wide copy/paste via ui.WithClipboard
 go run ./examples/dragdrop   # drag-and-drop: move items between panels, ghost + highlight
+go run ./examples/tree       # Tree (expand/collapse/keyboard) + Toast notifications
 ```
 
 What each one exercises:
@@ -52,6 +53,7 @@ What each one exercises:
 | `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, color/brush controls |
 | `clipboard`| OS-backed clipboard via the opt-in `clipboard` package + `ui.WithClipboard`: copy/paste with other apps |
 | `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
+| `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

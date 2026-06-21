@@ -646,6 +646,54 @@ so any widget can have one.
 
 ---
 
+## 13a. Tree (`ui/tree.go`)
+
+A self-drawing hierarchical list, structured like `List` (§15) but over a node
+tree instead of a flat slice.
+
+- **Model.** `TreeNode{Label, Value any, children, parent, expanded}`. Build with
+  `NewTreeNode(label, children…)` / `Add`; hand the top-level nodes to
+  `NewTree(roots…)`. `Value` carries caller data so a handler can recover the
+  model object behind a row.
+- **Flattening.** `rows()` walks the forest preorder, descending only into
+  `expanded` parents, returning `[]treeRow{node, depth}` — the visible rows in
+  display order. Everything (draw, hit-testing, keyboard) works off this list, so
+  collapsed subtrees simply don't appear. It is recomputed on demand (trees are
+  small); no cached flat list to invalidate.
+- **Layout.** Row height mirrors `List` (`"Ag"` + padding). Each row reserves a
+  fixed chevron column then indents the label by `depth*treeIndent`. The chevron
+  (a 2-line `>`/`⌄` drawn with `DrawLine`) is painted only for parents.
+- **Input.** Click in the chevron column toggles expansion; click elsewhere
+  selects (so selecting never collapses). Wheel scrolls; Up/Down move the
+  selection, Home/End jump, **Right** expands (or steps to the first child if
+  already open), **Left** collapses (or steps to the parent), Enter toggles a
+  parent or fires `OnActivate` on a leaf. `OnSelect` fires only on change.
+- Like other self-drawing widgets it exposes no child `Widget`s, so hit-testing
+  resolves to the `Tree` itself and it handles all row interaction.
+
+## 13b. Toasts (`ui/toast.go`)
+
+Transient, non-interactive notifications owned by the `App` (not tree widgets),
+in the same family as tooltips/popups.
+
+- **Lifecycle.** `App.ShowToast(msg, opts…)` appends a `Toast{message, kind,
+  duration, elapsed}` to `App.toasts` and returns the handle. `advanceToasts(dt)`
+  runs each frame from `update` (right after `advanceFrame`), ages every toast and
+  drops expired ones (compacting in place and niling the tail so dropped toasts
+  aren't pinned by the backing array). `Dismiss()` shortens `duration` to
+  `elapsed+fade-out` so an early dismiss still fades rather than cutting.
+- **Opacity.** `alpha()` ramps 0→1 over `toastFadeIn`, holds at 1, then 1→0 over
+  the final `toastFadeOut`. Timing counts fixed frame deltas (like tooltips/
+  animations), so it is deterministic in tests.
+- **Rendering.** `drawToasts` (called in `App.draw` between `drawDrag` and
+  `drawTooltip`) stacks them from the bottom-right upward, newest at the bottom,
+  each sized to its (possibly multi-line) text. Color comes from `ToastKind`
+  (info → theme primary/on-primary; success/warning/error → fixed green/amber/red
+  with white text); every color is run through `withAlpha` for the fade. Toasts
+  are never hit-tested, so input passes through to the widgets beneath them.
+
+---
+
 ## 14. Text editing internals
 
 ### 14.1 `TextField` (`ui/textfield.go`) — single line
@@ -686,6 +734,7 @@ computed per visual row.
 | `TextArea` | textarea.go | multi-line, soft-wrap, selection, clipboard |
 | `ScrollView` | scrollview.go | viewport + wheel + draggable thumb |
 | `List` | list.go | selectable rows, wheel, keyboard, per-row hover |
+| `Tree` | tree.go | hierarchical `TreeNode`s, expand/collapse chevrons, keyboard nav, scroll |
 | `Table` | table.go | header + weighted columns, selectable scrollable body |
 | `DropdownCombo` | dropdown.go | opens a popup `List` |
 | `MenuBar`/`Menu`/`MenuItem` | menu.go | popup menus, hover-switch between titles |
@@ -695,8 +744,8 @@ computed per visual row.
 | `SplitPane` | splitter.go | draggable divider, ratio + min sizes, nests |
 | `Image` | image.go | displays `render.Image` with `FitContain/Stretch/None` |
 
-Self-drawing multi-row widgets (`List`, `Table`, `MenuBar`, `TabContainer`,
-`SplitPane`) draw their "rows/cells/divider" themselves and return only their
+Self-drawing multi-row widgets (`List`, `Tree`, `Table`, `MenuBar`,
+`TabContainer`, `SplitPane`) draw their "rows/cells/divider" themselves and return only their
 real child widgets (or none) from `Children()`, so hit-testing returns the
 widget itself for the self-drawn regions and it handles those clicks. They get
 per-row hover via the pointer-move-to-hovered dispatch (§10.3).

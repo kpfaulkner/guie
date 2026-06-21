@@ -42,6 +42,7 @@ type App struct {
 	bus         *EventBus
 
 	overlays []*Popup // open popups, bottom-to-top
+	toasts   []*Toast // active transient notifications, oldest-first
 
 	// per-frame hooks and running animations (advanced each frame in update)
 	frameCbs []func(dt float64)
@@ -187,6 +188,7 @@ func (a *App) update(in render.InputState) error {
 	// Run frame callbacks and animations first, so any value changes they make
 	// are laid out and drawn this same frame.
 	a.advanceFrame(nominalFrameDelta)
+	a.advanceToasts(nominalFrameDelta)
 	// Keep layout current before hit-testing, then dispatch input.
 	a.layoutIfNeeded()
 	a.dispatchPointer(in)
@@ -459,6 +461,7 @@ func (a *App) draw(c render.Canvas) {
 	}
 	a.drawOverlays(c)
 	a.drawDrag(c)
+	a.drawToasts(c)
 	a.drawTooltip(c)
 }
 
