@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"image"
 	"image/color"
 
 	"github.com/kpfaulkner/guie/geom"
@@ -23,6 +24,12 @@ type Config struct {
 	Background color.Color
 	// Resizable allows the user to resize the host window.
 	Resizable bool
+	// Icon holds one or more window/taskbar icon images, ordered by preference
+	// (typically the same icon at several sizes). The driver/OS picks the
+	// best-matching size. If empty, the platform's default icon is used. These are
+	// standard image.Image values, so applications set the icon without importing
+	// any graphics backend.
+	Icon []image.Image
 }
 
 // Hooks are the per-frame callbacks a Driver invokes while running the loop.

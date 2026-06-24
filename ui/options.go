@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"image/color"
 
 	"github.com/kpfaulkner/guie/render"
@@ -29,6 +30,14 @@ func WithBackground(c color.Color) AppOption {
 // WithResizable controls whether the host window can be resized.
 func WithResizable(v bool) AppOption {
 	return func(a *App) { a.cfg.Resizable = v }
+}
+
+// WithIcon sets the window/taskbar icon. Provide one or more images, ideally the
+// same icon at several sizes (e.g. 16, 32, 48, 256 px); the OS picks the best
+// fit. Decode them with the standard image package — for example image.Decode on
+// an embedded PNG — so applications need no graphics-backend dependency.
+func WithIcon(icons ...image.Image) AppOption {
+	return func(a *App) { a.cfg.Icon = icons }
 }
 
 // WithTheme sets the app's theme.

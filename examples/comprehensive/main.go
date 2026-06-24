@@ -49,6 +49,7 @@ func main() {
 		ui.WithResizable(true),
 		ui.WithTheme(th),
 		ui.WithShadows(true),
+		ui.WithDebugBounds(true),
 	)
 
 	// Shared status line + a tiny reporting helper used throughout.

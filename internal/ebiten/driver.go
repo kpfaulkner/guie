@@ -36,6 +36,9 @@ func (d *Driver) Run(cfg render.Config, hooks render.Hooks) error {
 	}
 	ebiten.SetWindowSize(cfg.Width, cfg.Height)
 	ebiten.SetWindowTitle(cfg.Title)
+	if len(cfg.Icon) > 0 {
+		ebiten.SetWindowIcon(cfg.Icon)
+	}
 	if cfg.Resizable {
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	}
