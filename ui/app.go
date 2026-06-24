@@ -6,6 +6,8 @@
 package ui
 
 import (
+	"image/color"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -31,6 +33,7 @@ type App struct {
 	theme     theme.Theme
 	clipboard render.Clipboard
 	shadows   bool // draw drop shadows under overlays/tooltips
+	debug     bool // draw a debug outline around every widget's bounds
 
 	mu      sync.Mutex  // guards pending
 	pending []func()    // work queued via Do, run at the start of each frame
@@ -74,6 +77,7 @@ func NewApp(opts ...AppOption) *App {
 		driver:  ebitenbackend.New(),
 		theme:   theme.Default(),
 		shadows: true,
+		debug:   os.Getenv("GUIE_DEBUG_BOUNDS") != "",
 		cfg: render.Config{
 			Title:     "guie",
 			Width:     800,
@@ -135,6 +139,12 @@ func (a *App) Events() *EventBus { return a.bus }
 
 // SetShadows enables or disables overlay/tooltip drop shadows at runtime.
 func (a *App) SetShadows(v bool) { a.shadows = v }
+
+// SetDebugBounds enables or disables the debug overlay that strokes an outline
+// around every widget's bounds, making layout boundaries visible. It can also
+// be enabled at startup with the GUIE_DEBUG_BOUNDS environment variable or the
+// WithDebugBounds option.
+func (a *App) SetDebugBounds(v bool) { a.debug = v }
 
 // SetContent installs w as the root of the widget tree. The root is sized to
 // fill the surface. SetContent may be called before or after Run.
@@ -512,6 +522,39 @@ func (a *App) draw(c render.Canvas) {
 	a.drawDrag(c)
 	a.drawToasts(c)
 	a.drawTooltip(c)
+	if a.debug {
+		n := 0
+		drawDebugBounds(c, a.root, &n)
+		for _, p := range a.overlays {
+			drawDebugBounds(c, p.content, &n)
+		}
+	}
+}
+
+// drawDebugBounds strokes a 1px outline around w and every descendant, giving
+// each widget its own colour so adjacent and nested boundaries are easy to tell
+// apart. It draws on top of the normal frame and ignores clipping so even
+// children that overflow their parent are visible. n counts widgets in
+// traversal order, which is stable frame to frame, so colours don't flicker.
+func drawDebugBounds(c render.Canvas, w Widget, n *int) {
+	if w == nil || !w.Visible() {
+		return
+	}
+	c.StrokeRect(w.Bounds(), debugBoundsColour(*n), 1)
+	*n++
+	for _, ch := range w.Children() {
+		drawDebugBounds(c, ch, n)
+	}
+}
+
+// debugBoundsColour returns a distinct, semi-transparent colour for the i-th
+// widget in the debug overlay. Hues are spread by the golden-angle increment so
+// successive widgets land far apart on the colour wheel.
+func debugBoundsColour(i int) color.Color {
+	const golden = 0.61803398875
+	c := hsvToRGB(float64(i)*golden, 0.9, 1.0)
+	c.A = 0xAA
+	return c
 }
 
 func (a *App) resize(width, height int) {

@@ -69,3 +69,11 @@ func WithFontSize(size float64) AppOption {
 func WithShadows(v bool) AppOption {
 	return func(a *App) { a.shadows = v }
 }
+
+// WithDebugBounds turns on the debug overlay that strokes an outline around
+// every widget's bounds, making layout boundaries visible. It can also be
+// toggled at runtime with App.SetDebugBounds or enabled via the
+// GUIE_DEBUG_BOUNDS environment variable. Off by default.
+func WithDebugBounds(v bool) AppOption {
+	return func(a *App) { a.debug = v }
+}
