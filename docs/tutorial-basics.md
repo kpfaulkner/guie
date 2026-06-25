@@ -246,5 +246,7 @@ What's happening, top to bottom:
   `ui.LabelColour(...)`) control colours; `SetBackground`, `SetBorder` and
   `SetCornerRadius` on a container let you draw panels.
 
-A good next read is [`examples/layouts`](../examples/layouts) for the layout
-engine and [`examples/widgets`](../examples/widgets) for runtime state changes.
+Good next reads are the [containers and widget placement tutorial](tutorial-containers-and-placement.md)
+for the layout engine in depth, and the [events and stacked widgets tutorial](tutorial-events-and-overlays.md)
+for input handling, dialogs and overlays — or jump straight to
+[`examples/layouts`](../examples/layouts) and [`examples/widgets`](../examples/widgets).
