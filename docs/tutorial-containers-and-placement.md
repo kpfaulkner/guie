@@ -14,6 +14,27 @@ answers it.
 
 ---
 
+## The layouts at a glance
+
+guie ships four layouts plus two container-like widgets. Reach for them like
+this:
+
+| Layout | Arranges | Reach for it when… |
+| --- | --- | --- |
+| `ui.VBox(spacing)` | children in a column | stacking rows top to bottom |
+| `ui.HBox(spacing)` | children in a row | placing items left to right |
+| `ui.NewGrid(cols, spacing)` | children in a grid | you want aligned columns *and* rows |
+| `ui.NewStack()` | children in one shared rect | centering, or overlaying widgets |
+| `ui.NewScrollView()` *(widget)* | one child in a scrollable viewport | content is taller than the space |
+| `ui.HSplit` / `ui.VSplit` *(widget)* | two children + a draggable divider | the user should resize the panes |
+
+The first four are **layouts** you attach with `SetLayout`; the last two are
+**widgets** with their own behaviour (covered in §8). All of them are driven by
+the same two per-child knobs — `Weight` and `Align` — which §2 explains. And
+because the layout is just a two-method interface, you can write your own (§9).
+
+---
+
 ## 1. The placement model
 
 A `Container` doesn't position its own children. It holds them and delegates the
@@ -135,6 +156,35 @@ bar.Add(ui.NewContainer(), ui.Weight(1))        // invisible spacer
 bar.Add(ui.NewButton("Settings"))               // pushed to the right edge
 ```
 
+### Box is the "flex" layout
+
+`VBox` and `HBox` are just `Box` with a fixed direction. The general form is
+`ui.NewBox(dir)` where `dir` is `geom.Vertical` or `geom.Horizontal` — handy when
+the direction is data-driven:
+
+```go
+dir := geom.Vertical
+if wide {
+    dir = geom.Horizontal     // same children, lay them out as a row instead
+}
+c.SetLayout(ui.NewBox(dir))
+```
+
+A `Box` with weights *is* the framework's flexbox: minimums first, then leftover
+space shared by weight. There's no separate flex layout to learn.
+
+### When there isn't enough room
+
+Weight only ever distributes *leftover* space. If the children's minimums already
+exceed what's available, there's nothing to share — `Box` lays them out at their
+minimums anyway, so they overflow the content rectangle. Because a container
+clips its children to that rectangle (§7), the overflow is simply cut off rather
+than drawn over neighbours.
+
+The fix is almost always a `ScrollView` (§8): wrap the over-tall content so the
+user can scroll instead of losing it. A weighted child *shrinking* below its
+minimum is not a thing `Box` does — minimums are honoured first, every time.
+
 ---
 
 ## 4. Grid: rows and columns at once
@@ -167,9 +217,28 @@ grid.Add(wide, ui.Span(2, 1))       // covers two columns
 `Align` still applies *inside* a cell (or cell block): the default `AlignStretch`
 makes the child fill its cell, while `AlignCenter` centres it at natural size.
 
-> Uneven columns or rows? The underlying `Grid` struct has `ColWeights` and
-> `RowWeights` fields that weight individual tracks the way `Box` weights
-> children — construct the `Grid` directly when you need that.
+### Uneven columns and rows
+
+`NewGrid` gives every track an equal share. When you want some columns wider than
+others — a narrow label column beside a wide field column, say — build the `Grid`
+struct directly and set `ColWeights` (and/or `RowWeights`). These weight the
+*tracks* exactly the way `Weight` weights `Box` children:
+
+```go
+form := ui.NewContainer()
+form.SetLayout(&ui.Grid{
+    Columns:    2,
+    Spacing:    8,
+    ColWeights: []int{1, 3},   // column 2 is three times as wide as column 1
+})
+form.Add(ui.NewLabel("Name:"))
+form.Add(ui.NewTextField())
+form.Add(ui.NewLabel("Email:"))
+form.Add(ui.NewTextField())
+```
+
+A missing or zero weight collapses that track, so `ColWeights: []int{0, 1}` makes
+the first column shrink to its content and the second take everything else.
 
 ---
 
@@ -300,7 +369,74 @@ root.Add(split, ui.Weight(1))
 
 ---
 
-## 9. Putting it together
+## 9. Writing your own layout
+
+The built-in layouts are not magic — a layout is just a two-method interface:
+
+```go
+type Layout interface {
+    Measure(items []Item) geom.Size            // minimum content size
+    Arrange(items []Item, content geom.Rect)   // set each child's bounds
+}
+```
+
+Each `Item` pairs a child (`it.Widget`) with the per-child data it was added with
+(`it.Data` — the `Weight`, `Align` and `Span` you passed to `Add`). `Measure`
+reports how much room the children need (this becomes the container's `MinSize`);
+`Arrange` receives the content rectangle (already inset by padding) and calls
+`SetBounds` on each child. A layout is free to honour or ignore the per-child
+data — `Stack`, for instance, reads only `Align`.
+
+Here's a complete, working layout — a stripped-down column — to show the whole
+shape in one screen:
+
+```go
+import "math"
+
+// Column stacks children top to bottom at their natural height, each stretched
+// to the full content width, with Gap pixels between them.
+type Column struct{ Gap float64 }
+
+func (c Column) Measure(items []ui.Item) geom.Size {
+    var w, h float64
+    for i, it := range items {
+        m := it.Widget.MinSize()
+        w = math.Max(w, m.W)        // widest child sets the width
+        h += m.H                    // heights accumulate
+        if i > 0 {
+            h += c.Gap              // a gap between each pair
+        }
+    }
+    return geom.Size{W: w, H: h}
+}
+
+func (c Column) Arrange(items []ui.Item, content geom.Rect) {
+    y := content.Y
+    for _, it := range items {
+        h := it.Widget.MinSize().H
+        it.Widget.SetBounds(geom.Rect{X: content.X, Y: y, W: content.W, H: h})
+        y += h + c.Gap
+    }
+}
+```
+
+Use it like any built-in layout:
+
+```go
+c := ui.NewContainer()
+c.SetLayout(Column{Gap: 8})
+c.Add(ui.NewLabel("first"))
+c.Add(ui.NewButton("second"))
+```
+
+You rarely need this — `VBox`/`HBox`/`Grid`/`Stack` cover almost everything — but
+the interface is the extension point for arrangements the built-ins don't do: a
+wrapping flow layout, a masonry/brick layout, a radial dial. They all follow the
+same recipe: measure the children, then hand each one a rectangle.
+
+---
+
+## 10. Putting it together
 
 A small app exercising boxes, weight, alignment, a grid with a span, a stacked
 panel and a card — resize the window and watch every piece reflow.
@@ -394,7 +530,7 @@ What to notice:
 
 ---
 
-## 10. Where to go next
+## 11. Where to go next
 
 - **Events and overlays** — [events and stacked widgets](tutorial-events-and-overlays.md)
   covers input handling and floating dialogs/menus, the natural follow-on to
