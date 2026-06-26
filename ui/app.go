@@ -133,6 +133,23 @@ func (a *App) SetFont(f render.FontFace) {
 	a.needsLayout = true
 }
 
+// SetTheme replaces the app's theme at runtime and triggers a re-layout. Widgets
+// resolve their palette colours, font and corner radius through the theme, so
+// the whole UI restyles on the next frame — except per-widget overrides (e.g.
+// LabelColour) and a Container's own SetBackground/SetBorder/SetCornerRadius,
+// which are explicit values you must re-apply yourself. If the new theme leaves
+// Font or FontSize unset, the current values are kept.
+func (a *App) SetTheme(t theme.Theme) {
+	if t.Font == nil {
+		t.Font = a.theme.Font
+	}
+	if t.FontSize == 0 {
+		t.FontSize = a.theme.FontSize
+	}
+	a.theme = t
+	a.needsLayout = true
+}
+
 // Events returns the global event bus for subscribing to events across the
 // whole UI.
 func (a *App) Events() *EventBus { return a.bus }
