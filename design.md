@@ -655,3 +655,71 @@ See `internals.md` §14.3.
 21. **Display Images** - Can images be displayed in canvases? Or something else?
 
 Build a tiny example app alongside each step to exercise the new pieces.
+
+---
+
+## ROADMAP (post-grilling, 2026-07)
+
+Direction (locked): **public open-source release first, then build real
+applications on it.** The catalog is broad and mostly done; the remaining work is
+depth (perf, a11y, native feel), consistency, and presentation — not more
+widgets. This roadmap captures a grilling pass over "what else should guie have,
+compared to mature toolkits (Fyne, Qt, GTK, Flutter, egui, WPF, Slint)."
+
+### Release strategy & the freeze gate
+
+| Area | Decision |
+|---|---|
+| Versioning | Tag **v0.x** (semver "may break"), not v1 — honest about instability. |
+| API freeze | Do a consistency audit of every exported symbol in `ui`/`geom`/`render`/`theme`, then freeze — but only **after building a real app** to shake out warts (dogfooding is the freeze gate, not a checklist). |
+| Pre-freeze rule | Anything that adds/reshapes **public API surface** must land (at least in *shape*) before freeze. Purely internal work can land after. |
+| Launch bar | `LICENSE` (done) + `CONTRIBUTING` + CI (`.github/workflows`) + a strong README + push to GitHub. Docs site / playground / gallery come **later**. |
+
+### Pre-freeze — API-surface work (must land, or lock shape, before v0.x)
+
+These reshape public API and are hard/churny to retrofit after freeze.
+
+| Feature | Decision / scope |
+|---|---|
+| Data binding | Thin **optional** `Observable[T]` layered on existing callbacks (callbacks stay primary, mirrors the event-bus pattern). **Keep it dead simple** — no reactive rewrite. |
+| Accessibility (seam) | Add `Role` / `AccessibleName` / `AccessibleState` to `BaseWidget` + a `SemanticNode` tree-walk. **Annotate simple widgets now** (Button, Label, Checkbox, Radio, TextField); complex self-drawing widgets (List, Tree, Table) and OS bridges (UIAutomation / AT-SPI / NSAccessibility) **deferred** (like IME). Assert the semantic tree headlessly via `guitest`. |
+| i18n (seam-safety) | Ensure text layout does **not** assume `x-advance == Σ per-rune widths`, so a future bidi pass can land without an API break. (Translations/locale formatting itself is additive — see below.) |
+| Custom-draw widget | Public, blessed **`CanvasWidget`** — a thin `BaseWidget` wrapper taking a `func(c render.Canvas, bounds geom.Rect)` draw callback + an input callback. The escape hatch for charts, viz, diagram/drawing surfaces, game HUDs. The `render.Canvas` seam already exists. |
+| Theming | Ship a **dark theme + runtime theme switch** now; verify every widget reads `theme` in `Draw` (no colours cached at construction) — the switch is a correctness check on the theming architecture being frozen. OS light/dark **auto-detect deferred** (opt-in bridge). |
+| Multi-window | **Lock the `App`/`Window` API shape** so it doesn't bake in a single-window assumption (e.g. `App.MainWindow()` singleton); **implement lazily** when a real app needs it. Inherently desktop-only (no WASM). |
+| Rich text | Reserve an attributed-text / **`[]TextSpan`** type and ship a basic **`RichText`** widget (multi-style spans + clickable links). Keep plain `Label` simple/fast. **Markdown deferred** (layer on top / userland). |
+| Text undo | Built-in **undo/redo inside `TextField`/`TextArea`** (a correctness expectation of the widget). App-level command history stays userland. |
+| Window geometry | Small helper to persist/restore window **size + position** (mostly non-OS-specific; "which monitor" restore needs backend help later). |
+
+### OSS-release milestone (additive; around/just after release)
+
+| Feature | Decision / scope |
+|---|---|
+| WASM target | **Supported + advertised.** Whole repo builds clean for `GOOS=js GOARCH=wasm` today (verified). Guard OS opt-in packages (clipboard, dialogs) behind build tags. Browser runtime smoke-test + docs-site playground to follow. |
+| In-app dialogs | `MessageBox` / `Confirm` + an **in-surface file chooser** built from existing List/Tree/TextField. Pure `ui`, cross-platform incl. WASM. |
+| Translations / locale | App-level translation strings + locale-aware date/number formatting. Additive display layer; no widget rewrite. |
+| Redraw-when-dirty | Skip the whole frame draw when the tree isn't dirty, using the existing `Invalidate` signal (needs `ebiten.SetScreenClearedEveryFrame(false)`). Kills idle CPU/battery cheaply. |
+| Launch collateral | `CONTRIBUTING`, CI workflow, README polish, GitHub. |
+
+### Real-app-hardening milestone (later, mostly internal)
+
+| Feature | Decision / scope |
+|---|---|
+| True dirty-region redraw | Repaint only changed rects (the hard version of the perf work; item 15). Justified by weak hardware / Raspberry Pi. |
+| Native file/save dialogs | Opt-in `dialog/native` package (Win32 / NSOpenPanel / GTK), mirroring the `clipboard` package. |
+| A11y OS bridges | UIAutomation / AT-SPI / NSAccessibility bridges feeding the semantic tree. |
+| Complex-widget a11y | Semantic annotation of List / Tree / Table (per-row/node roles, selection, expansion). |
+| OS light/dark detect | Opt-in bridge to follow the system theme. |
+
+### Deferred (revisit when a real app demands it)
+
+RTL / bidi text rendering (seam kept safe) · full multi-window implementation ·
+OS notifications · system tray / minimize-to-tray · trackpad/gesture &
+multitouch input · OS/file drag-and-drop (per DRAG-AND-DROP scope).
+
+### Out of scope / userland
+
+Form validation (compose a `Label` under the field) · app-level undo/command
+history · markdown parsing · app preferences / recent-files storage · charts &
+data-viz (build on `CanvasWidget`) · printing / PDF export · video / media
+playback · responsive layout breakpoints.
