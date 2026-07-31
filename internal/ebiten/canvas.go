@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -37,6 +38,22 @@ type clipEntry struct {
 }
 
 func newCanvas() *canvas { return &canvas{scale: 1} }
+
+// whitePixel returns a shared 1×1 opaque-white image used as the source for
+// cheap axis-aligned fills. Created lazily on first use (on the UI goroutine,
+// once graphics are initialized) and reused for the program's lifetime.
+var (
+	whitePixelOnce sync.Once
+	whitePixelImg  *ebiten.Image
+)
+
+func whitePixel() *ebiten.Image {
+	whitePixelOnce.Do(func() {
+		whitePixelImg = ebiten.NewImage(1, 1)
+		whitePixelImg.Fill(color.White)
+	})
+	return whitePixelImg
+}
 
 // reset rebinds the canvas to surface for a new frame at the given device scale,
 // clearing the clip stack.
@@ -89,14 +106,35 @@ func (c *canvas) Fill(clr color.Color) {
 	c.top().target.Fill(clr)
 }
 
+// FillRect fills an axis-aligned rectangle by drawing a scaled 1×1 white image
+// tinted to clr. This is far cheaper than tessellating an antialiased vector
+// path: rectangles need no antialiasing, and ebiten batches every same-source
+// DrawImage into a single draw call with a tiny vertex buffer. (The vector path
+// generates per-rect triangle/command buffers that pool to a huge high-water
+// mark when thousands of rects are drawn — e.g. a treemap.)
 func (c *canvas) FillRect(r geom.Rect, clr color.Color) {
 	r = c.scaleRect(r)
-	vector.FillRect(c.top().target, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), clr, true)
+	if r.W <= 0 || r.H <= 0 {
+		return
+	}
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(r.W, r.H)
+	op.GeoM.Translate(r.X, r.Y)
+	op.ColorScale.ScaleWithColor(clr)
+	c.top().target.DrawImage(whitePixel(), op)
 }
 
+// StrokeRect outlines a rectangle as four thin filled edges (drawn inside the
+// rect), reusing FillRect's cheap path instead of an antialiased vector stroke.
 func (c *canvas) StrokeRect(r geom.Rect, clr color.Color, width float64) {
-	r = c.scaleRect(r)
-	vector.StrokeRect(c.top().target, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), float32(width*c.scale), clr, true)
+	if width <= 0 || r.W <= 0 || r.H <= 0 {
+		return
+	}
+	w := math.Min(width, math.Min(r.W, r.H)) // clamp so edges don't overlap-invert
+	c.FillRect(geom.Rect{X: r.X, Y: r.Y, W: r.W, H: w}, clr)          // top
+	c.FillRect(geom.Rect{X: r.X, Y: r.Y + r.H - w, W: r.W, H: w}, clr) // bottom
+	c.FillRect(geom.Rect{X: r.X, Y: r.Y, W: w, H: r.H}, clr)          // left
+	c.FillRect(geom.Rect{X: r.X + r.W - w, Y: r.Y, W: w, H: r.H}, clr) // right
 }
 
 // roundRectPath builds a rounded-rectangle path, clamping the radius to half the

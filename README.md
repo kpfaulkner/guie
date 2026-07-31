@@ -109,6 +109,10 @@ go test ./path/to/myui   # just your package
   `TypeKey`.
 - `h.Resize(w, h)` reports a new surface size; `h.App` exposes the app so you can
   read widget state in assertions.
+- `h.RequestClose()` simulates the user closing the window and reports whether the
+  close was allowed — false when an `App.OnCloseRequest` handler vetoed it (the
+  loop keeps running, so `Step` still works afterwards). `h.CloseHandled()` reports
+  whether the app asked the backend to stop closing the window by itself.
 
 ### Asserting what was drawn
 

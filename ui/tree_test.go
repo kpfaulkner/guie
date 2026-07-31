@@ -56,6 +56,24 @@ func TestTreeFlattenRespectsExpansion(t *testing.T) {
 	}
 }
 
+func TestTreeRevealExpandsAncestors(t *testing.T) {
+	_, tree, a, a1, _, _ := treeFixture(t)
+
+	// A is collapsed, so a1 is hidden.
+	if idx := indexOfNode(tree.rows(), a1); idx != -1 {
+		t.Fatalf("a1 should be hidden while A is collapsed, got row %d", idx)
+	}
+
+	tree.Reveal(a1)
+
+	if !a.Expanded() {
+		t.Fatal("Reveal(a1) should expand its ancestor A")
+	}
+	if idx := indexOfNode(tree.rows(), a1); idx == -1 {
+		t.Fatal("a1 should be visible after Reveal")
+	}
+}
+
 func TestTreeChevronClickTogglesRowClickSelects(t *testing.T) {
 	_, tree, a, _, _, _ := treeFixture(t)
 

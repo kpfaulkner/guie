@@ -24,6 +24,12 @@ func New() render.Driver { return &Driver{} }
 func (d *Driver) SetIMEEnabled(on bool)  {}
 func (d *Driver) SetIMERect(r geom.Rect) {}
 
+// SetCloseHandled satisfies render.CloseInterceptor. With it on, EBiten stops
+// closing the window itself and reports the request through IsWindowBeingClosed,
+// which Update turns into the framework's CloseRequested hook. EBiten accepts this
+// before RunGame as well as during the loop, and it is a no-op off the desktop.
+func (d *Driver) SetCloseHandled(handled bool) { ebiten.SetWindowClosingHandled(handled) }
+
 // Run configures the host window and runs the EBiten game loop, invoking the
 // framework's hooks each frame. It blocks until the window closes or a hook
 // returns an error.
@@ -73,7 +79,19 @@ type game struct {
 // Update polls input and forwards it to the framework's Update hook. A
 // render.ErrTerminated result is mapped to EBiten's clean-termination sentinel
 // so the loop stops and RunGame returns nil.
+//
+// A pending window-close request is handled first, so no frame is processed on
+// the way out. EBiten reports the request as an edge: IsWindowBeingClosed is true
+// for exactly the tick after the OS asked, and clears itself, so a veto is simply
+// not terminating — there is no flag to reset. Without SetCloseHandled the window
+// is already going away, so the hook's answer cannot hold it back; terminating
+// either way keeps the shutdown clean.
 func (g *game) Update() error {
+	if ebiten.IsWindowBeingClosed() {
+		if g.hooks.CloseRequested == nil || g.hooks.CloseRequested() || !ebiten.IsWindowClosingHandled() {
+			return ebiten.Termination
+		}
+	}
 	if g.hooks.Update == nil {
 		return nil
 	}

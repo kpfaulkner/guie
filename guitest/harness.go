@@ -111,6 +111,19 @@ func (h *Harness) IMERect() geom.Rect { return h.driver.imeRect }
 // Err returns the first error returned by the framework's Update hook, if any.
 func (h *Harness) Err() error { return h.err }
 
+// RequestClose simulates the user asking the OS to close the window and reports
+// whether the close was allowed. It mirrors what a real driver does with
+// render.Hooks.CloseRequested: with no handler installed (App.OnCloseRequest) the
+// close always proceeds, so this returns true. A false result means the app
+// vetoed the close; the loop is unaffected either way, so Step still works after
+// one.
+func (h *Harness) RequestClose() bool { return h.driver.requestClose() }
+
+// CloseHandled reports whether the app has asked the backend to stop closing the
+// window by itself — true while a close handler is installed via
+// App.OnCloseRequest.
+func (h *Harness) CloseHandled() bool { return h.driver.closeHandled }
+
 // Resize reports a new logical surface size to the app (re-layout happens on the
 // next Step).
 func (h *Harness) Resize(width, height int) *Harness {

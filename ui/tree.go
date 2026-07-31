@@ -110,6 +110,24 @@ func (t *Tree) SetSelected(n *TreeNode) {
 	}
 }
 
+// Reveal makes n visible: it expands every ancestor of n (so n is not hidden
+// under a collapsed parent) and scrolls the view so n's row is on screen. Use
+// it after selecting a node programmatically — e.g. from another view — so the
+// selection is actually seen. It is a no-op for a nil node.
+func (t *Tree) Reveal(n *TreeNode) {
+	if n == nil {
+		return
+	}
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		p.expanded = true
+	}
+	t.clamp()
+	if i := indexOfNode(t.rows(), n); i >= 0 {
+		t.scrollTo(i)
+	}
+	t.Invalidate()
+}
+
 // Expand shows n's children (no-op for a leaf) and re-lays-out.
 func (t *Tree) Expand(n *TreeNode) {
 	if n != nil && !n.Leaf() && !n.expanded {

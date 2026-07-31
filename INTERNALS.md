@@ -128,12 +128,17 @@ macOS, Ctrl+C on Windows/Linux).
 ### 3.5 Loop seam (`render/driver.go`)
 
 - `Config` — `Title`, `Width`, `Height`, `Background`, `Resizable`.
-- `Hooks` — `Update(InputState) error`, `Draw(Canvas)`, `Resize(w, h int)`.
+- `Hooks` — `Update(InputState) error`, `Draw(Canvas)`, `Resize(w, h int)`,
+  `CloseRequested() bool`.
 - `Driver.Run(Config, Hooks) error` — sets up the window and runs the blocking
   loop, invoking hooks each frame.
 - `ErrTerminated` — a sentinel a hook may return from `Update` to request a
   clean shutdown; the driver must treat it as a normal stop (`Run` returns
   `nil`, not the error). This is how `App.Quit()` works (§8).
+- `CloseInterceptor{SetCloseHandled(bool)}` — an optional capability the
+  framework type-asserts on the `Driver`, the counterpart to `CloseRequested`.
+  Without it the platform closes the window and a veto cannot hold: the hook is
+  only a notification. It may be called before `Run` (no window yet) or during.
 
 ### 3.6 Clipboard (`render/clipboard.go`)
 
@@ -212,6 +217,14 @@ Package name `ebitenbackend`. The only place that touches EBiten.
   - `Update()` polls input, calls `hooks.Update`. **If the hook returns
     `render.ErrTerminated`, it is mapped to `ebiten.Termination`** so the loop
     stops cleanly and `RunGame` returns nil. Other errors propagate.
+  - **Window close** is handled *before* `hooks.Update`, so no frame is processed
+    on the way out. `ebiten.IsWindowBeingClosed()` is an **edge** — true for
+    exactly the tick after the OS asked, then cleared by EBiten — so vetoing is
+    just *not* returning `Termination`; there is no flag to reset. The close
+    proceeds when there is no `CloseRequested` hook, when it returns true, or when
+    closing is not being handled (EBiten is already taking the window away, so a
+    veto is moot). `SetCloseHandled` (`render.CloseInterceptor`) maps straight to
+    `ebiten.SetWindowClosingHandled`, which EBiten accepts before `RunGame` too.
   - `Draw(screen)` rebinds the canvas to `screen`, clears to the background, then
     calls `hooks.Draw`.
   - `LayoutF(outsideW, outsideH)` (with `Layout` kept as the integer fallback)
@@ -325,6 +338,15 @@ its theme and clipboard).
 - `Run()` calls `driver.Run(cfg, Hooks{update, draw, resize})` — blocks.
 - `Quit()` (goroutine-safe via `atomic.Bool`) makes the next `update` return
   `render.ErrTerminated`.
+- `OnCloseRequest(fn)` installs a veto for OS close requests and toggles
+  `CloseInterceptor.SetCloseHandled(fn != nil)` on the driver, so an app that
+  never registers one keeps the platform's default closing behaviour. `Run`
+  always passes `closeRequested` as the hook; it returns true when no handler is
+  installed. The handler runs on the UI goroutine before the frame's input is
+  dispatched, with queued `Do` work drained first (so it sees state produced by
+  background work), and may open a modal — returning false keeps the loop alive
+  until the app calls `Quit()` itself. Registerable at any time, before or
+  during `Run`.
 
 ### 8.3 Per-frame `update(in)`
 

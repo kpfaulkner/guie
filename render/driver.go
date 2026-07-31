@@ -43,6 +43,33 @@ type Hooks struct {
 	// Resize is called when the logical surface size changes, including once at
 	// startup. It is invoked before the first Update.
 	Resize func(width, height int)
+	// CloseRequested is called when the user asks the OS to close the window (the
+	// title-bar close button, Alt+F4, the dock menu). Returning true lets the
+	// close proceed and the loop stop; returning false vetoes it and the loop
+	// keeps running, which is how an application prompts about unsaved work and
+	// quits later on its own terms.
+	//
+	// A Driver must call it before that frame's Update, so no frame is processed
+	// on the way out. A veto is only honoured while close interception is on (see
+	// CloseInterceptor); without that capability the platform closes the window
+	// itself and the hook is advisory.
+	CloseRequested func() bool
+}
+
+// CloseInterceptor is an optional capability a Driver may implement to let the
+// framework veto window closing. The framework type-asserts a Driver for it and
+// toggles it as an application installs or clears its close handler; a Driver
+// without it simply lets the platform close the window, and Hooks.CloseRequested
+// cannot hold it back.
+//
+// It may be called before Run (while there is no window yet) and at any point
+// afterwards, so implementations must tolerate both.
+type CloseInterceptor interface {
+	// SetCloseHandled asks the platform to stop closing the window by itself
+	// (true) or to resume doing so (false). While handled, the Driver reports
+	// close requests through Hooks.CloseRequested and stops the loop only if that
+	// hook allows it.
+	SetCloseHandled(handled bool)
 }
 
 // Driver runs the platform main loop and bridges it to the backend-neutral

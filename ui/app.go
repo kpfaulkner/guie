@@ -28,7 +28,8 @@ import (
 // from a background goroutine.
 type App struct {
 	driver    render.Driver
-	ime       render.IMEController // non-nil if the driver supports IME
+	ime       render.IMEController    // non-nil if the driver supports IME
+	closer    render.CloseInterceptor // non-nil if the driver can defer window closing
 	cfg       render.Config
 	theme     theme.Theme
 	clipboard render.Clipboard
@@ -38,6 +39,8 @@ type App struct {
 	mu      sync.Mutex  // guards pending
 	pending []func()    // work queued via Do, run at the start of each frame
 	quit    atomic.Bool // set by Quit to stop the loop
+
+	closeReq func() bool // set by OnCloseRequest; vetoes window closing when it returns false
 
 	root        Widget
 	ctx         *treeContext
@@ -102,6 +105,10 @@ func NewApp(opts ...AppOption) *App {
 	// Detect optional IME support on the (possibly custom) driver.
 	if c, ok := a.driver.(render.IMEController); ok {
 		a.ime = c
+	}
+	// Detect optional close interception, needed to veto a window close.
+	if c, ok := a.driver.(render.CloseInterceptor); ok {
+		a.closer = c
 	}
 
 	a.bus = newEventBus()
@@ -176,14 +183,49 @@ func (a *App) SetContent(w Widget) {
 	a.needsLayout = true
 }
 
+// OnCloseRequest registers fn to run when the user asks the OS to close the
+// window (the title-bar close button, Alt+F4). Returning true lets the window
+// close; returning false keeps the app running, so fn can show an
+// unsaved-changes dialog and call Quit once the user has decided. Passing nil
+// clears the handler and restores the default (closing straight away).
+//
+// fn runs on the UI goroutine, at the start of the frame the request arrives and
+// before that frame's input is dispatched, so it may open a modal. It may be
+// registered or replaced at any time, before or during Run.
+//
+// Vetoing needs a driver that implements render.CloseInterceptor; the default
+// driver does. With one that does not, the platform closes the window regardless
+// and fn is only a last-chance notification.
+func (a *App) OnCloseRequest(fn func() bool) {
+	a.closeReq = fn
+	// Only ask the platform to hold the window open while a handler wants a say,
+	// so an app that never registers one keeps the default closing behaviour.
+	if a.closer != nil {
+		a.closer.SetCloseHandled(fn != nil)
+	}
+}
+
 // Run starts the main loop. It blocks until the window is closed or an error
 // occurs.
 func (a *App) Run() error {
 	return a.driver.Run(a.cfg, render.Hooks{
-		Update: a.update,
-		Draw:   a.draw,
-		Resize: a.resize,
+		Update:         a.update,
+		Draw:           a.draw,
+		Resize:         a.resize,
+		CloseRequested: a.closeRequested,
 	})
+}
+
+// closeRequested asks the app's close handler whether the window may close,
+// draining queued Do work first so the handler sees the state background work has
+// already produced (e.g. a save that completed during this frame). With no
+// handler installed the close proceeds.
+func (a *App) closeRequested() bool {
+	if a.closeReq == nil {
+		return true
+	}
+	a.runPending()
+	return a.closeReq()
 }
 
 // Do schedules fn to run on the UI goroutine at the start of the next frame.

@@ -149,6 +149,10 @@ type driver struct {
 	// IME state recorded via render.IMEController, for test assertions.
 	imeEnabled bool
 	imeRect    geom.Rect
+
+	// closeHandled records the last render.CloseInterceptor toggle: true while the
+	// app has a close handler installed and expects to veto closes.
+	closeHandled bool
 }
 
 func newDriver() *driver { return &driver{} }
@@ -166,6 +170,21 @@ func (d *driver) Run(cfg render.Config, hooks render.Hooks) error {
 		hooks.Resize(d.width, d.height)
 	}
 	return nil
+}
+
+// SetCloseHandled satisfies render.CloseInterceptor so the harness exercises the
+// App's close-handler wiring. The value is recorded for assertions.
+func (d *driver) SetCloseHandled(handled bool) { d.closeHandled = handled }
+
+// requestClose invokes the framework's CloseRequested hook and reports whether
+// the close may proceed. A veto only counts while interception is on, matching a
+// real driver: otherwise the platform has already taken the window away.
+func (d *driver) requestClose() bool {
+	if d.hooks.CloseRequested == nil {
+		return true
+	}
+	allowed := d.hooks.CloseRequested()
+	return allowed || !d.closeHandled
 }
 
 // resize reports a new logical surface size to the framework.
