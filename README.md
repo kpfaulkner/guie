@@ -109,6 +109,9 @@ go test ./path/to/myui   # just your package
   `TypeKey`.
 - `h.Resize(w, h)` reports a new surface size; `h.App` exposes the app so you can
   read widget state in assertions.
+- `h.DropFiles(map[string][]byte)` simulates dropping files from a file manager at
+  the current mouse position (name → content) and steps one frame to deliver them,
+  so `OnFileDrop` routing and bubbling are testable headlessly.
 - `h.RequestClose()` simulates the user closing the window and reports whether the
   close was allowed — false when an `App.OnCloseRequest` handler vetoed it (the
   loop keeps running, so `Step` still works afterwards). `h.CloseHandled()` reports

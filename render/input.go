@@ -1,6 +1,10 @@
 package render
 
-import "github.com/kpfaulkner/guie/geom"
+import (
+	"io/fs"
+
+	"github.com/kpfaulkner/guie/geom"
+)
 
 // MouseButton identifies a mouse button.
 type MouseButton int
@@ -153,4 +157,15 @@ type InputState struct {
 	// Composition is the IME preedit being composed this frame, or the zero
 	// value when not composing. Only backends that support IME populate it.
 	Composition Composition
+
+	// DroppedFiles holds the files the user dropped onto the window this frame,
+	// or nil when nothing was dropped. It is an edge, not a level: it is set for
+	// exactly the frame the drop arrives, so it must be consumed then.
+	//
+	// The payload is a filesystem rather than a list of paths, because a path is
+	// not always available — in a browser there is no filesystem path at all, and
+	// the desktop backend does not expose one. Entry names are base names; the
+	// only route to a file's content is through the FS. Names may include
+	// directories; the framework passes them through unfiltered.
+	DroppedFiles fs.FS
 }

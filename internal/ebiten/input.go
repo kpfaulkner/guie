@@ -50,6 +50,13 @@ func pollInput() render.InputState {
 	in.KeysReleased = mapKeys(inpututil.AppendJustReleasedKeys(nil))
 	in.Runes = ebiten.AppendInputChars(nil)
 	in.Modifiers = pollModifiers()
+	// EBiten reports dropped files for the single tick after the OS drop, then
+	// clears them, which is the edge InputState.DroppedFiles describes. A nil FS
+	// (no drop) must stay nil rather than becoming an empty non-nil FS, so the
+	// framework can test it directly.
+	if dropped := ebiten.DroppedFiles(); dropped != nil {
+		in.DroppedFiles = dropped
+	}
 
 	return in
 }

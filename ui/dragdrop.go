@@ -48,6 +48,11 @@ type dragConfig struct {
 	onLeave func()                          // ghost left the widget
 	onOver  func(DragData, geom.Point)      // ghost moved while inside
 	onDrop  func(DragData, geom.Point) bool // dropped here; return true if accepted
+
+	// OS file drops. Deliberately not part of the session above: the OS reports
+	// only the completed drop, so there is no source, ghost, or enter/over/leave
+	// phase to hook.
+	onFileDrop func(FileDrop, geom.Point) bool
 }
 
 func (b *BaseWidget) ensureDrag() *dragConfig {
@@ -95,6 +100,20 @@ func (b *BaseWidget) OnDragOver(fn func(d DragData, pos geom.Point)) { b.ensureD
 // OnDrop registers a callback fired when the payload is released over the widget.
 // Return true if the drop was accepted (reported back to the source's OnDragEnd).
 func (b *BaseWidget) OnDrop(fn func(d DragData, pos geom.Point) bool) { b.ensureDrag().onDrop = fn }
+
+// OnFileDrop registers a handler for files dropped onto this widget from outside
+// the application (a file manager, a browser). pos is the cursor position at the
+// drop. Return true to consume the drop; returning false lets it bubble to the
+// ancestors, so a leaf can claim the drops it understands and a container can
+// catch the rest.
+//
+// This is not the in-process drag-and-drop above and shares nothing with it: an OS
+// drag has no source widget and reports nothing before the drop, so OnDragEnter,
+// OnDragOver and OnDragLeave never fire for one. The payload is file content, not
+// paths — see FileDrop.
+func (b *BaseWidget) OnFileDrop(fn func(d FileDrop, pos geom.Point) bool) {
+	b.ensureDrag().onFileDrop = fn
+}
 
 // dragOf returns the drag configuration of any widget (all widgets embed
 // BaseWidget, so the accessor is always present), or nil if it never opted in.

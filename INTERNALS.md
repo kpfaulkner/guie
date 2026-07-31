@@ -114,6 +114,11 @@ cost is roughly constant regardless of how much has been drawn.
 - `KeysDown`/`KeysPressed`/`KeysReleased []Key`
 - `Runes []rune` (text input)
 - `Modifiers ModifierSet`
+- `DroppedFiles fs.FS` — files dropped onto the window from outside the app, nil
+  when none. An **edge**: set for exactly the frame the drop arrives (EBiten
+  clears its own state after that tick), so it must be consumed then. `io/fs`
+  rather than paths, because the backend exposes none and a browser has none;
+  entry names are base names, so a dropped file has no reloadable path (§11c).
 
 `ButtonSet`/`ModifierSet` are bitsets with `Set`/`Has`. `Key`, `MouseButton`,
 `Modifier` are framework-defined enums (the backend maps native codes onto
@@ -629,6 +634,48 @@ overridable via `SetDragGhost`, or nil so targets indicate the drop via
 
 Only the left button initiates a drag. Deferred: edge auto-scroll, copy/move drop
 effects. See `examples/dragdrop`.
+
+## 11c. OS file drops (`ui/app.go`, `ui/event.go`)
+
+Files dragged in from a file manager. **Deliberately not §11b with a different
+payload:** the OS reports only the completed drop, so there is no source widget,
+no ghost, no threshold, no Escape-cancel and no enter/over/leave phase. Wiring
+those callbacks to a file drag would advertise events that can never fire.
+
+- **Seam.** `InputState.DroppedFiles fs.FS` (§3.4), an edge. The EBiten backend
+  fills it from `ebiten.DroppedFiles()` in `pollInput`, leaving it nil when there
+  is no drop so the framework can test the field directly.
+- **Payload.** `FileDrop{FS fs.FS; Names []string}` on `Event.Files`, plus
+  `FileDrop.ReadFile(name)` for the common case. `App.dispatchFileDrop` reads the
+  root entries **once** per drop, so N widgets in the bubble chain don't each walk
+  the filesystem. Names are passed through unfiltered — GLFW can hand over a
+  directory and the framework cannot know whether the app wants it, so apps use
+  `fs.Stat`.
+- **Routing.** `dispatchFileDrop` runs after pointer/keyboard dispatch (hover
+  state settled), hit-tests `MousePos`, and bubbles `EventFileDrop` up the parent
+  chain. Overlays are honoured exactly as in `dispatchPointer`: a modal confines
+  the hit to its content and a drop on the blocked background is discarded. A drop
+  that hits nothing falls back to the root — it still belongs to the window.
+- **Why the cursor position is trustworthy.** GLFW's drop callback carries no
+  position, and during a drag the OS owns the mouse. It works because the backend
+  **polls** `window.GetCursorPos()` every tick rather than relying on the
+  cursor-position callback, and the drop callback fires on *release* — the drag is
+  already over, so the polled position is the release point. Confirmed on Windows
+  with real drags onto individual grid cells; macOS/X11 not yet checked.
+- **Bubbling consults both paths.** The walk tries `HandleEvent` *and* the
+  `onFileDrop` callback at each level, unlike `dispatch` (which only calls
+  `HandleEvent`). A widget that overrides `HandleEvent` — as custom containers do —
+  would otherwise shadow its own registered handler. The event is published to the
+  bus once, like every other event.
+- **Testing.** `guitest.Harness.DropFiles(map[string][]byte)` builds an
+  `fstest.MapFS` and delivers it on the next `Step` at the harness's mouse
+  position, then clears it (honouring the edge). Routing, bubbling, modal
+  blocking, multi-file payloads and bus publication are all covered headlessly in
+  `guitest/filedrop_test.go`; the GLFW callback itself stays a manual check, like
+  the close hook.
+
+Not supported: dragging files *out* of the window (EBiten surfaces no drag
+source), and any feedback while the file is dragged over the window.
 
 ---
 

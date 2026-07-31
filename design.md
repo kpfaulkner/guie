@@ -482,10 +482,12 @@ attempts from a Windows dev box):
 In-process drag-and-drop: pick up data/a widget from a **drag source**, drag it
 over the tree, and release it on a **drop target** that accepts it. Covers
 list/table row reordering, dragging items between panels, dragging tabs and
-palette→canvas drops. Cross-application / OS file drops are **out of scope** for
-now — like the OS clipboard, that is a backend-seam concern (EBiten would have to
-surface native drop events) for a later opt-in package; this is the in-surface
-engine such a bridge would feed.
+palette→canvas drops.
+
+Cross-application **OS file drops** are a separate, much smaller mechanism —
+EBiten surfaces the drop but nothing else about the drag — and are specified in
+*OS file drops* below. The two share the vocabulary and nothing else; neither is
+built on the other.
 
 ### Mechanism — layered on pointer capture
 
@@ -556,10 +558,139 @@ widget, or disabled so targets show their own insert indicator via `OnDragOver`.
 | Ghost | Default = translucent `RenderTarget` snapshot of source; overridable/none. |
 | Cancel | Escape, or release off any accepting target. |
 | Bus | Drag lifecycle is observable; per-widget callbacks remain primary. |
-| Scope | In-process only; OS/file drops deferred to a future backend bridge. |
+| Scope | In-process payloads only. OS file drops are a separate mechanism (below), not a `DragData` source. |
 
 Deferred for v1: edge auto-scroll over a `ScrollView`, copy-vs-move drop effects,
 multi-button drags.
+
+---
+
+### OS file drops
+
+Dropping files from the desktop (Explorer / Finder / a browser's file list) onto
+the window. Requested by a real app — the NWF viewer, whose stated design is
+"select an NWF file **(or drag and drop)**" — which is the trigger this was
+waiting on.
+
+*(Implemented — see `INTERNALS.md` §11c. The spec below is the design as locked.)*
+
+**This is not the in-process engine with a different payload.** The OS hands over
+*one thing*: the fact that a drop happened, and the files. There is no source
+widget, no ghost, no threshold, no Escape-cancel, and — critically — **no
+enter/over/leave stream**, because GLFW reports only the completed drop, not the
+drag that preceded it. Modelling it as a `DragData` source would advertise
+callbacks (`OnDragEnter`, `OnDragOver`) that could never fire.
+
+#### Mechanism
+
+```
+Explorer drag ─release─▶ GLFW drop callback (paths)
+        └─▶ EBiten: inputstate.DroppedFiles = VirtualFS(paths)   [cleared after one tick]
+              └─▶ Driver.pollInput → render.InputState.DroppedFiles (fs.FS, nil = none)
+                    └─▶ App.update: hit-test at the cursor → EventFileDrop, bubbling
+```
+
+Like `WindowBeingClosed` (see the window-close hook), `DroppedFiles` is an
+**edge**: EBiten clears it after the tick that reads it, so the framework must
+consume it the frame it arrives and must not treat it as a level.
+
+#### Payload: `fs.FS`, not paths
+
+The payload is an `io/fs.FS` plus the entry names, **not** a `[]string` of file
+paths. Three reasons, in increasing order of importance:
+
+1. **EBiten does not expose paths.** `ebiten.DroppedFiles()` returns a virtual FS
+   whose root entries are `filepath.Base(path)`; the absolute paths GLFW handed
+   over are kept private inside it. Paths are simply not available to ask for.
+2. **`render` may not leak backend types** (core principle). `io/fs` is stdlib, so
+   the seam stays backend-neutral for free.
+3. **WASM.** In a browser there is no filesystem path at all, only file contents.
+   An `fs.FS` payload is what lets browser drops work *at all*, and the roadmap
+   advertises WASM as supported. A path-shaped API would be desktop-only and would
+   have to be broken later.
+
+The cost is real and must be stated: **a dropped file has no reloadable path.** An
+app can read its bytes and its base name, and nothing more — no reload-from-disk,
+no save-in-place, no "recent files" entry that survives a restart. Apps that need
+those must keep the native file dialog for that job.
+
+#### Position and routing
+
+The drop is routed by **hit-testing the cursor position** at the tick the drop
+arrives, then dispatching `EventFileDrop` to the deepest widget under it and
+**bubbling** through the ancestors like every other event — so a leaf can claim a
+drop and the window as a whole can catch everything else, with no extra
+mechanism.
+
+This depends on the cursor position being current at the drop tick, which is not
+obvious: the OS owns the mouse during a drag, and GLFW's drop callback carries no
+position of its own. It holds because EBiten **polls** `window.GetCursorPos()`
+from the OS every tick (`internal/ui/input_glfw.go`) rather than relying on the
+cursor-position callback, and the drop callback fires on *release* — by which
+point the drag is over and the polled position is the release point.
+
+**Confirmed on Windows** by dropping files onto individual tiles in the NWF
+viewer: they land on the tile under the cursor. macOS and X11 are unverified — if
+the position turns out stale there, the fallback is window-level drops on that
+platform, dispatching to the root, and `OnFileDrop`'s position argument would have
+to go rather than be left lying.
+
+#### API — mirrors the `OnX` convention
+
+```go
+// render (seam)
+type InputState struct {
+    // ...
+    // DroppedFiles holds files the user dropped on the window this frame, or nil
+    // if none were. It is an edge: it is set for exactly the frame the drop
+    // arrives. Entry names are base names; the FS is the only way to the content.
+    DroppedFiles fs.FS
+}
+
+// ui
+type FileDrop struct {
+    FS    fs.FS    // the dropped files
+    Names []string // root entry names, read once by the App
+}
+
+// BaseWidget, stored in the existing lazy dragConfig
+func (b *BaseWidget) OnFileDrop(fn func(d FileDrop, pos geom.Point) bool)
+```
+
+`Event` gains a `Files FileDrop` field (as `EventWheel` has `Wheel` and
+`EventComposition` has `Comp`), and `EventFileDrop` joins the `EventType` set.
+The handler returns true to consume the drop and stop it bubbling. The App reads
+the root entries once so that N widgets in the bubble chain do not each walk the
+FS.
+
+Names are passed through **unfiltered**: GLFW can hand over a directory, and the
+framework does not know whether an app wants it. Apps that only accept files call
+`fs.Stat`. Filtering by extension is likewise the app's business.
+
+#### Testing
+
+`guitest` grows `Harness.DropFiles(files map[string][]byte)`, which builds an
+`fstest.MapFS` and delivers it on the next `Step` at the harness's current mouse
+position — so routing, bubbling and consumption are all assertable headlessly.
+The EBiten half (the GLFW callback) stays a manual check, exactly as the
+window-close hook does.
+
+#### Design decisions (locked)
+
+| Area | Decision |
+|---|---|
+| Relationship to in-process DnD | Separate mechanism. Shares no state, no session, no `DragData`. |
+| Lifecycle | **Drop-only.** No enter/over/leave/cancel — GLFW reports nothing before the drop. |
+| Seam | `InputState.DroppedFiles fs.FS`, an edge (one frame), nil when no drop. |
+| Payload | `FileDrop{FS fs.FS, Names []string}` — content, not paths (WASM-safe; EBiten exposes no paths). |
+| Consequence | A dropped file has **no reloadable path**; reload/save-in-place need the native dialog. |
+| Routing | Hit-test at the cursor, dispatch to the deepest widget, bubble to the root. |
+| Position | From the tick's polled cursor position. Verified on Windows with real drags; macOS/X11 unverified (fallback there: window-level only). |
+| Config API | `OnFileDrop(func(FileDrop, geom.Point) bool)` on `BaseWidget`, in the existing lazy `dragConfig`. |
+| Directories & filtering | Names passed through unfiltered; the app decides (`fs.Stat`, extension checks). |
+| Multi-file | All names delivered in one event; the app chooses what to do with more than one. |
+| Bus | Published like every other event. |
+| Testing | `guitest.Harness.DropFiles` headlessly; the GLFW callback manually. |
 
 ---
 
@@ -690,6 +821,7 @@ These reshape public API and are hard/churny to retrofit after freeze.
 | Rich text | Reserve an attributed-text / **`[]TextSpan`** type and ship a basic **`RichText`** widget (multi-style spans + clickable links). Keep plain `Label` simple/fast. **Markdown deferred** (layer on top / userland). |
 | Text undo | Built-in **undo/redo inside `TextField`/`TextArea`** (a correctness expectation of the widget). App-level command history stays userland. |
 | Window geometry | Small helper to persist/restore window **size + position** (mostly non-OS-specific; "which monitor" restore needs backend help later). |
+| OS file drops | `InputState.DroppedFiles` (`fs.FS`) + `EventFileDrop` + `OnFileDrop` — public API on the seam, the widget and the event set, so the shape must land pre-freeze. Small: EBiten already surfaces the drop. Spec in *DRAG-AND-DROP → OS file drops*. |
 
 ### OSS-release milestone (additive; around/just after release)
 
@@ -715,7 +847,9 @@ These reshape public API and are hard/churny to retrofit after freeze.
 
 RTL / bidi text rendering (seam kept safe) · full multi-window implementation ·
 OS notifications · system tray / minimize-to-tray · trackpad/gesture &
-multitouch input · OS/file drag-and-drop (per DRAG-AND-DROP scope).
+multitouch input · **dragging files *out* of the window** (the reverse direction —
+EBiten surfaces no drag source, so it needs a real OS bridge, unlike inbound file
+drops which are now pre-freeze work).
 
 ### Out of scope / userland
 

@@ -7,6 +7,7 @@ package ui
 
 import (
 	"image/color"
+	"io/fs"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -268,8 +269,77 @@ func (a *App) update(in render.InputState) error {
 	a.layoutIfNeeded()
 	a.dispatchPointer(in)
 	a.dispatchKeyboard(in)
+	a.dispatchFileDrop(in)
 	a.reportIMERect()
 	return nil
+}
+
+// dispatchFileDrop delivers files dropped from outside the application to the
+// widget under the cursor, bubbling to its ancestors until one consumes it. It
+// runs after pointer dispatch so hover state for this frame is already settled.
+//
+// InputState.DroppedFiles is an edge — set for this frame only — so there is
+// nothing to clear afterwards and nothing to carry over.
+func (a *App) dispatchFileDrop(in render.InputState) {
+	if in.DroppedFiles == nil || a.root == nil {
+		return
+	}
+	names, err := fileDropNames(in.DroppedFiles)
+	if err != nil || len(names) == 0 {
+		return
+	}
+	pos := in.MousePos
+	// Honour overlays the same way pointer dispatch does: a modal blocks the tree
+	// beneath it, so a drop onto the blocked background is discarded rather than
+	// reaching widgets the user cannot see or click.
+	var target Widget
+	if m := a.modalActive(); m != nil {
+		target = hitTest(m.content, pos)
+		if target == nil {
+			return
+		}
+	} else if hit, inPopup := a.overlayHit(pos); inPopup {
+		target = hit
+	} else {
+		target = hitTest(a.root, pos)
+	}
+	// A drop just outside the root (or on a gap between widgets) still belongs to
+	// the window, so fall back to the root rather than dropping it on the floor.
+	if target == nil {
+		target = a.root
+	}
+	ev := Event{
+		Type:      EventFileDrop,
+		Pos:       pos,
+		Files:     FileDrop{FS: in.DroppedFiles, Names: names},
+		Modifiers: in.Modifiers,
+	}
+	// Bubble like dispatch, but consult the OnFileDrop callback as well as
+	// HandleEvent at each level: widgets that override HandleEvent (as custom
+	// containers do) would otherwise shadow their own registered handler.
+	for w := target; w != nil; w = w.Parent() {
+		if w.HandleEvent(&ev) {
+			break
+		}
+		if c := dragOf(w); c != nil && c.onFileDrop != nil && c.onFileDrop(ev.Files, pos) {
+			break
+		}
+	}
+	a.bus.publish(ev)
+}
+
+// fileDropNames lists the root entries of a dropped filesystem. It is read once
+// per drop so the widgets in the bubble chain share the result.
+func fileDropNames(fsys fs.FS) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names, nil
 }
 
 // dispatch sends ev to target and bubbles it up through the ancestors until a

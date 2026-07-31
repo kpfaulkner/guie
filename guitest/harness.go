@@ -1,6 +1,9 @@
 package guitest
 
 import (
+	"io/fs"
+	"testing/fstest"
+
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
 	"github.com/kpfaulkner/guie/theme"
@@ -42,6 +45,7 @@ type Harness struct {
 	keysPressed  []render.Key
 	keysReleased []render.Key
 	runes        []rune
+	dropped      fs.FS // files for the next Step, from DropFiles
 }
 
 // New builds an App wired to the headless backend at the given logical size and
@@ -68,6 +72,21 @@ func New(width, height int, opts ...ui.AppOption) *Harness {
 // App.SetContent).
 func (h *Harness) SetContent(w ui.Widget) { h.App.SetContent(w) }
 
+// DropFiles simulates the user dropping files from outside the application onto
+// the window at the current mouse position, and runs one frame to deliver them.
+// The map is name → content; names are base names, as a real drop provides.
+//
+// It mirrors the backend contract: the files are visible for exactly the frame
+// they arrive, so a later Step sees no drop.
+func (h *Harness) DropFiles(files map[string][]byte) *Recording {
+	mapped := make(fstest.MapFS, len(files))
+	for name, data := range files {
+		mapped[name] = &fstest.MapFile{Data: data}
+	}
+	h.dropped = mapped
+	return h.Step()
+}
+
 // Step runs one frame with the currently accumulated input, stores and returns
 // the frame's Recording, and clears the per-frame input edges (held mouse
 // buttons and keys persist).
@@ -84,6 +103,7 @@ func (h *Harness) Step() *Recording {
 		Runes:         h.runes,
 		Modifiers:     h.mods,
 		Composition:   h.composition,
+		DroppedFiles:  h.dropped,
 	}
 	rec, err := h.driver.step(in)
 	if err != nil {
@@ -94,6 +114,7 @@ func (h *Harness) Step() *Recording {
 	h.pressed, h.released = 0, 0
 	h.wheel = geom.Point{}
 	h.keysPressed, h.keysReleased, h.runes = nil, nil, nil
+	h.dropped = nil // a drop is an edge: one frame only
 	return rec
 }
 
