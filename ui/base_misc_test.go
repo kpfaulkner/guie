@@ -105,7 +105,7 @@ func TestTextFieldMoveRight(t *testing.T) {
 }
 
 func TestTextAreaCutSelection(t *testing.T) {
-	a := NewApp()
+	a := newMemApp()
 	ta := NewTextArea()
 	a.SetContent(ta) // mount so the clipboard is available
 	ta.SetText("hello")

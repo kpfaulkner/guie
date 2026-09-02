@@ -1,9 +1,11 @@
 // Package clipboard provides an OS-backed render.Clipboard so guie text
 // widgets can exchange text with other applications via the system clipboard.
 //
-// It is deliberately a separate, opt-in package: importing it pulls in a
-// platform clipboard dependency, keeping the core ui/render packages
-// dependency-free and cross-platform. Wire it into an app with ui.WithClipboard:
+// Most applications do not need to import this package: ui.NewApp installs an
+// OS-backed clipboard by default (lazily, falling back to an in-process one
+// where the platform clipboard is unavailable). Use it directly only to control
+// initialisation yourself - for example to report the failure rather than
+// degrade silently:
 //
 //	cb, err := clipboard.New()
 //	if err != nil {

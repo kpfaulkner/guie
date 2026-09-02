@@ -101,7 +101,7 @@ func NewApp(opts ...AppOption) *App {
 		a.cfg.Background = a.theme.Palette.Background
 	}
 	if a.clipboard == nil {
-		a.clipboard = &memClipboard{}
+		a.clipboard = &defaultClipboard{}
 	}
 	// Detect optional IME support on the (possibly custom) driver.
 	if c, ok := a.driver.(render.IMEController); ok {
@@ -123,12 +123,6 @@ func NewApp(opts ...AppOption) *App {
 	}
 	return a
 }
-
-// memClipboard is the default in-process Clipboard (no OS integration).
-type memClipboard struct{ text string }
-
-func (c *memClipboard) ReadText() string   { return c.text }
-func (c *memClipboard) WriteText(s string) { c.text = s }
 
 // Theme returns the app's active theme.
 func (a *App) Theme() theme.Theme { return a.theme }

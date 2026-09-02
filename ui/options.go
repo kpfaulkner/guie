@@ -45,8 +45,10 @@ func WithTheme(t theme.Theme) AppOption {
 	return func(a *App) { a.theme = t }
 }
 
-// WithClipboard supplies a custom clipboard (e.g. an OS-backed one). By default
-// the app uses a simple in-process clipboard.
+// WithClipboard replaces the clipboard. By default the app uses the OS
+// clipboard, falling back to an in-process one where the platform clipboard is
+// unavailable; pass this to force in-process behaviour or to supply a custom
+// implementation.
 func WithClipboard(c render.Clipboard) AppOption {
 	return func(a *App) { a.clipboard = c }
 }

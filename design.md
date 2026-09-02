@@ -380,9 +380,9 @@ Grouped by build priority.
 
 - High-DPI / scaling strategy (logical vs physical pixels). *(Done — device
   scale factor wired through the loop + canvas; see MACOS/CROSS-PLATFORM POLISH.)*
-- Clipboard and IME support for text fields. *(Done for clipboard — an
-  OS-backed clipboard ships in the opt-in `clipboard` package, injected via
-  `ui.WithClipboard`; see `examples/clipboard`. IME: the framework-side seam,
+- Clipboard and IME support for text fields. *(Done for clipboard — the OS
+  clipboard is the **default**, resolved lazily with an in-process fallback;
+  `ui.WithClipboard` overrides it. See `examples/clipboard`. IME: the framework-side seam,
   events, preedit rendering and tests are built — see IME below; the EBiten last
   mile is blocked upstream.)*
 - Animation/transition primitives (timeline vs per-frame). *(Done — per-frame
@@ -408,11 +408,14 @@ foundational pieces are already done: the **primary shortcut modifier**
 rendering is crisp while widgets stay logical). Remaining niceties to make it
 feel native, for a later date:
 
-- **OS clipboard integration.** *(Done.)* The default `Clipboard` is still the
-  in-process `memClipboard`, but apps can now opt into system-wide copy/paste by
-  passing `ui.WithClipboard(cb)` where `cb` comes from the new `clipboard`
-  package (`clipboard.New()`). It is a separate, opt-in package so the core
-  `ui`/`render` packages stay dependency-free; it's backed by
+- **OS clipboard integration.** *(Done, and now the default.)* `ui.NewApp`
+  installs an OS-backed clipboard, resolved lazily on the first copy or paste and
+  falling back to the in-process `memClipboard` if the platform clipboard is
+  unavailable. `ui.WithClipboard` still overrides it. This **reverses the earlier
+  opt-in decision**: with the in-process clipboard as the default, Ctrl+V from a
+  browser silently did nothing unless an app knew to wire the `clipboard` package
+  up, which reads as a broken widget rather than a design choice. The cost, taken
+  deliberately, is that `ui` now depends on the `clipboard` package. It's backed by
   `golang.design/x/clipboard` (CGo-free on Windows; uses the same CGo/X11
   toolchain EBiten already needs on macOS/Linux — no external `xclip` binary).
   See `examples/clipboard`.
@@ -988,7 +991,7 @@ These reshape public API and are hard/churny to retrofit after freeze.
 
 | Feature | Decision / scope |
 |---|---|
-| WASM target | **Supported + advertised.** Whole repo builds clean for `GOOS=js GOARCH=wasm` today (verified). Guard OS opt-in packages (clipboard, dialogs) behind build tags. Browser runtime smoke-test + docs-site playground to follow. |
+| WASM target | **Supported + advertised.** Whole repo builds clean for `GOOS=js GOARCH=wasm` today (verified), the `clipboard` package included — a runtime failure there degrades to the in-process fallback. Guard remaining OS opt-in packages (dialogs) behind build tags. Browser runtime smoke-test + docs-site playground to follow. |
 | In-app dialogs | `MessageBox` / `Confirm` + an **in-surface file chooser** built from existing List/Tree/TextField. Pure `ui`, cross-platform incl. WASM. |
 | Translations / locale | App-level translation strings + locale-aware date/number formatting. Additive display layer; no widget rewrite. |
 | Redraw-when-dirty | Skip the whole frame draw when the tree isn't dirty, using the existing `Invalidate` signal (needs `ebiten.SetScreenClearedEveryFrame(false)`). Kills idle CPU/battery cheaply. |

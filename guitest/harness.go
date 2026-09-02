@@ -48,6 +48,13 @@ type Harness struct {
 	dropped      fs.FS // files for the next Step, from DropFiles
 }
 
+// memClipboard is the harness's in-process clipboard: deterministic, and
+// isolated from whatever the machine running the tests has copied.
+type memClipboard struct{ text string }
+
+func (c *memClipboard) ReadText() string   { return c.text }
+func (c *memClipboard) WriteText(s string) { c.text = s }
+
 // New builds an App wired to the headless backend at the given logical size and
 // returns a Harness to drive it. Extra ui.AppOptions are applied after the
 // headless defaults (driver, size, deterministic font), so a caller may override
@@ -59,6 +66,10 @@ func New(width, height int, opts ...ui.AppOption) *Harness {
 		ui.WithDriver(d),
 		ui.WithSize(width, height),
 		ui.WithFont(f),
+		// Headless tests must not touch the real OS clipboard (the App's
+		// default), which would read and clobber whatever the developer running
+		// them had copied. Copy and paste still round-trip within the harness.
+		ui.WithClipboard(&memClipboard{}),
 	}
 	app := ui.NewApp(append(base, opts...)...)
 	h := &Harness{App: app, Font: f, driver: d}

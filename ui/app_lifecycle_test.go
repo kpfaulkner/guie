@@ -50,8 +50,8 @@ func TestAppOptionDefaults(t *testing.T) {
 	if !a.shadows {
 		t.Error("shadows should default on")
 	}
-	if a.clipboard == nil {
-		t.Error("a default in-process clipboard should be installed")
+	if _, ok := a.clipboard.(*defaultClipboard); !ok {
+		t.Errorf("the OS-backed default clipboard should be installed, got %T", a.clipboard)
 	}
 }
 

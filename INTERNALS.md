@@ -147,15 +147,33 @@ macOS, Ctrl+C on Windows/Linux).
 
 ### 3.6 Clipboard (`render/clipboard.go`)
 
-`Clipboard{ ReadText() string; WriteText(string) }`. The default is an
-in-process implementation in `ui` (`memClipboard`); apps can inject an
-OS-backed one via `ui.WithClipboard`. An OS-backed implementation ships in the
-opt-in top-level `clipboard` package (`clipboard.New() (render.Clipboard,
-error)`), backed by `golang.design/x/clipboard`. It lives in its own package —
-not wired in by default — so the core `ui`/`render` packages stay
-dependency-free and cross-platform; only apps that import `clipboard` pull in
-the platform dependency. CGo-free on Windows; reuses the CGo/X11 toolchain
-EBiten already requires on macOS/Linux (no external `xclip` binary).
+`Clipboard{ ReadText() string; WriteText(string) }`.
+
+**The default is the OS clipboard** (`ui.defaultClipboard`, `ui/clipboard.go`),
+so Ctrl/Cmd+C/X/V exchange text with other applications out of the box. This
+reverses the original "core stays dependency-free, OS clipboard opt-in"
+decision: the opt-in default meant `Ctrl+V` from a browser silently did nothing
+in every app that did not know to wire it up, which reads as a broken widget
+rather than a design choice.
+
+- **Lazy.** `defaultClipboard` resolves on the *first copy or paste*, not in
+  `NewApp`: initialising the platform clipboard can fail or be slow, and an app
+  with no text widgets should pay neither cost. Resolution is a `sync.Once`.
+- **Falls back, never fails.** If `clipboard.New()` errors (headless, no display
+  server) or panics, `defaultClipboard` uses `memClipboard`, the in-process
+  implementation — the pre-existing behaviour, so copy/paste still round-trips
+  inside the app.
+- **Overridable.** `ui.WithClipboard` still replaces it, which is how tests pin
+  the in-process one (see below) and how an app supplies a custom implementation.
+- **The dependency.** `ui` now imports the top-level `clipboard` package, hence
+  `golang.design/x/clipboard`. CGo-free on Windows; reuses the CGo/X11 toolchain
+  EBiten already requires on macOS/Linux (no external `xclip` binary); compiles
+  for `js/wasm`, where a runtime failure degrades to the in-process fallback.
+
+**Tests must never use the default.** It reads and clobbers the real clipboard of
+whoever runs `go test`. `ui` tests construct apps through the `newMemApp` helper
+and `guitest.New` pins its own `memClipboard`, so both are deterministic and
+isolated.
 
 ---
 

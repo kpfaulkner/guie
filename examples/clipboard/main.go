@@ -1,10 +1,11 @@
-// Command clipboard demonstrates OS clipboard integration. By passing an
-// OS-backed clipboard via ui.WithClipboard, Ctrl/Cmd+C / X / V in guie text
-// widgets exchange text with other applications (your browser, editor, etc.),
-// not just within this app.
+// Command clipboard demonstrates OS clipboard integration: Ctrl/Cmd+C / X / V in
+// guie text widgets exchange text with other applications (your browser, editor,
+// etc.), not just within this app.
 //
-// The clipboard package is opt-in and lives outside the dependency-free core,
-// so apps that don't need system-wide copy/paste pay no extra dependency.
+// An app gets this for free - ui.NewApp installs an OS-backed clipboard by
+// default, falling back to an in-process one where the platform clipboard is
+// unavailable. This example wires it up explicitly only so it can *report* that
+// fallback in the status line instead of degrading silently.
 //
 // Run with: go run ./examples/clipboard
 package main

@@ -55,7 +55,7 @@ What each one exercises:
 | `images`  | `Image` widget (fit modes) + image buttons via `ui.LoadImage`/`ButtonImage` |
 | `editor`  | A text editor: `MenuBar`, file open/save, find/replace, custom modal dialogs, `TextArea` selection API |
 | `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, colour/brush controls |
-| `clipboard`| OS-backed clipboard via the opt-in `clipboard` package + `ui.WithClipboard`: copy/paste with other apps |
+| `clipboard`| OS clipboard: copy/paste with other apps. Works by default now — this example wires it explicitly to report initialisation failure |
 | `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
 | `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
 | `ime`     | Inline IME preedit drawn underlined at the caret via `EventComposition`; uses a simulated composition since EBiten exposes no real IME |

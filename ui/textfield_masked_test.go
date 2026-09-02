@@ -34,7 +34,7 @@ func newFillingCanvas() *fillingCanvas {
 // maskedTestField mounts a text field in a real (headless) app so it resolves a
 // theme and font, gives it bounds, and returns it with the owning app.
 func maskedTestField(text string, masked bool) (*TextField, *App) {
-	app := NewApp()
+	app := newMemApp()
 	var opts []TextFieldOption
 	if masked {
 		opts = append(opts, Masked())
@@ -222,7 +222,7 @@ func TestMaskedPreeditIsMasked(t *testing.T) {
 }
 
 func TestMaskedPlaceholderIsDrawnUnmasked(t *testing.T) {
-	app := NewApp()
+	app := newMemApp()
 	tf := NewTextField(Masked(), Placeholder("Password"))
 	app.SetContent(tf)
 	tf.SetFont(DefaultFont(16))
