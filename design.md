@@ -342,7 +342,9 @@ Grouped by build priority.
 
 - **Checkbox** — boolean toggle, `OnChange(bool)`.
 - **RadioButton** / **RadioGroup** — mutually exclusive selection.
-- **TextField** — single-line text entry (uses `TextInput`/focus/caret).
+- **TextField** — single-line text entry (uses `TextInput`/focus/caret). Optionally
+  **masked** for credential entry — see *MASKED TEXT INPUT*. *(Masking done —
+  `INTERNALS.md` §14.4.)*
 - **ScrollBar** + **ScrollView** — clip + offset content; vertical & horizontal.
 
 ### Third wave
@@ -754,6 +756,164 @@ See `internals.md` §14.3.
 
 ---
 
+## MASKED TEXT INPUT (PASSWORD FIELDS)
+
+*(Implemented — see `INTERNALS.md` §14.4. The spec below is the design as
+locked.)*
+
+`TextField` can hide what it holds: an API key, a password, a token. The field
+still edits, selects, scrolls and pastes exactly as it does today - only what
+reaches the screen changes.
+
+Driven by a real app: vectorworks-watcher asks the user to paste a
+Lighting-Paperwork API key into a window that may be on a projector, in a screen
+share or in a support screenshot. This is a widget-library feature rather than an
+application one, because the alternative - the app drawing its own field - means
+reimplementing selection, scrolling, IME and clipboard.
+
+### API - deliberately two symbols
+
+```go
+func Masked() TextFieldOption           // construct masked
+func (t *TextField) SetMasked(v bool)   // toggle at runtime (a "Show" button)
+```
+
+No getter. `Placeholder` has no accessor either, and `SetFont` has no `Font()` -
+a caller with a reveal toggle already knows which way it set the field.
+Pre-freeze, the fewer exported symbols the better; a getter is additive if
+something ever needs one.
+
+Mask glyph: the constant `maskRune = '\u2022'` (BULLET). Not an option, for the
+same reason - `MaskRune(r rune)` can be added later without breaking anything,
+whereas an option shipped now is frozen.
+
+The default face carries it: measured through `text.GoTextFace` over
+`goregular.TTF` (the face `internal/ebiten/font.go` loads), U+2022 advances
+5.609px at size 16, against 12.0px for an unmapped rune falling back to the
+replacement glyph. A caller supplying a face without it gets that replacement
+glyph across the whole field, and **no test will catch it** - the headless font
+measures every rune identically, so the substitution is invisible to `guitest`.
+That is the one failure mode this decision accepts, and it is why `MaskRune`
+exists as a named additive escape hatch rather than being ruled out.
+
+### Mechanism - one accessor, and one contract
+
+The naive implementation substitutes the text in `Draw`. That is wrong, and
+visibly so: the same rune slice is measured in four other places, so a
+display-only substitution leaves the caret, the click-to-position mapping, the
+selection highlight and the horizontal scroll all computing against the real
+text while the user looks at the mask. Every one of them lands in the wrong
+place the moment the mask glyph's advance differs from the real character's -
+which, in a proportional font, is almost always.
+
+So masking is one unexported accessor that every text-measuring and
+text-drawing path goes through:
+
+```go
+// display returns what the field shows: the real runes, or one mask rune per
+// real rune when masked.
+func (t *TextField) display() []rune
+```
+
+**The contract, and the whole reason this is a display-only change: `display()`
+returns exactly `len(t.runes)` runes.** One mask glyph per real rune, never a
+fixed-width placeholder and never a single collapsed glyph. Because the count is
+preserved, every existing caret index, selection bound and scroll offset stays
+valid with no index translation anywhere. A future change that breaks the 1:1
+rule breaks the caret, silently.
+
+Call sites to route through it:
+
+| Path | What it does today | Why it must change |
+|---|---|---|
+| `Draw` | `DrawText(string(t.runes), ...)` | draws the secret |
+| `Draw`, selection highlight | `f.Measure(string(t.runes[:lo]))`, `[:hi]` | highlight lands on the wrong span |
+| `caretVisualWidth` | `f.Measure(string(t.runes[:t.caret]))` | caret drawn at the wrong x |
+| `caretIndexAt` | `caretIndexForX(t.runes, ...)` | a click puts the caret in the wrong place |
+| `updateScroll` | via `caretVisualWidth` | covered by the above, but named so it is not missed |
+| `imeCaretRect` | via `caretVisualWidth` | candidate window points at the wrong spot |
+
+### The preedit leaks, and is the easiest path to miss
+
+`Draw`'s composing branch draws `pre + t.preedit + post` in one call and
+measures the underline from the real text. A masked field driven through an IME
+therefore renders the in-progress composition in the clear - the one part of the
+content that was never in `t.runes` and so is not covered by `display()`.
+
+**Decision: mask the preedit too**, one mask rune per preedit rune, with the
+underline still drawn beneath it. The alternative - refusing composition while
+masked - is a worse surprise: a field that silently will not accept typed input
+looks broken, whereas dots appearing as you compose looks like every other
+password field. `caretVisualWidth`'s preedit measurement follows the same rule.
+
+Pasting an API key never triggers this. Someone typing a password on a machine
+with an IME active does, which is exactly the case a widget library has to get
+right on the user's behalf.
+
+### Clipboard: copy and cut are blocked while masked
+
+`copySelection` and `cutSelection` do nothing while `masked` is true. Paste is
+untouched - putting a secret in is the point.
+
+There is deliberately no separate "revealed" state inside the widget. Revealing
+*is* `SetMasked(false)`, so an app with a Show toggle gets readback for free
+through the same rule, and the widget keeps one condition rather than two
+behaviours. That matters because blocking copy outright would make a stored key
+unrecoverable from the UI, which is at odds with the reason the toggle exists.
+
+`Text()` and `OnChange` always carry the real text: masking is presentation, not
+storage, and an app that could not read back what the user typed would be unable
+to save it.
+
+The placeholder is drawn unmasked. It is not the secret, and a row of dots where
+a prompt should be tells the user nothing.
+
+### Interactions with roadmap items - name them now
+
+- **Accessibility (seam)**, Pre-freeze: that row lists `TextField` among the
+  widgets to annotate immediately. A masked field must not expose its content
+  through `AccessibleName`/`AccessibleState` - the semantic tree is a second
+  rendering path, and masking it in `Draw` alone would leak it there.
+- **Text undo**, Pre-freeze: undo history holds the real text. That is correct
+  and not a leak (undo never renders anything the field would not), and is
+  written down so nobody later "fixes" it into storing masked text and corrupts
+  the buffer.
+- **TextArea** stays unmasked, and this does not generalise to it. A multi-line
+  secret is not a real thing, and the wrapping/line-measuring paths would double
+  the surface for no case anyone has.
+
+### Whitespace, for callers
+
+A masked field makes leading and trailing whitespace invisible, and `paste()`
+already flattens newlines to spaces. A caller taking a credential should trim
+what it reads before using or storing it - otherwise a key copied out of a web
+page or an email fails authentication later with nothing on screen to explain
+it.
+
+### Tests (`guitest`)
+
+The headless font measures a fixed advance per rune (`guitest/backend.go`:
+`Measure` counts runes), which sets what these tests can and cannot prove. They
+verify **index bookkeeping** - that every path uses `display()` and that counts
+line up. They cannot prove **proportional geometry**, because headlessly the
+mask glyph and the real character are the same width by construction. The 1:1
+rune-count contract is what carries that half, which is why it is stated as a
+contract rather than left as an implementation detail.
+
+- A masked field draws neither the text nor any substring of it
+  (`Recording.HasText`, `TextContaining`), and draws `len(text)` mask runes.
+- `Text()` returns the real text while masked; `OnChange` reports the real text.
+- `SetMasked(false)` reveals, `SetMasked(true)` re-masks, and a redraw follows.
+- Clicking at a given x lands on the same caret index masked and unmasked.
+- Selection highlight spans the same rect masked and unmasked.
+- Copy and cut are no-ops while masked and work once revealed; paste works in
+  both states.
+- A composition (`Harness.Compose`) draws no preedit text while masked, and the
+  committed text is still the real text.
+- The placeholder is drawn unmasked on an empty, unfocused, masked field.
+
+---
+
 ## IMPLEMENTATION PLAN
 
 1. **Skeleton & backend seam** — `geom` types, `render.Canvas`/`Input`
@@ -821,6 +981,7 @@ These reshape public API and are hard/churny to retrofit after freeze.
 | Rich text | Reserve an attributed-text / **`[]TextSpan`** type and ship a basic **`RichText`** widget (multi-style spans + clickable links). Keep plain `Label` simple/fast. **Markdown deferred** (layer on top / userland). |
 | Text undo | Built-in **undo/redo inside `TextField`/`TextArea`** (a correctness expectation of the widget). App-level command history stays userland. |
 | Window geometry | Small helper to persist/restore window **size + position** (mostly non-OS-specific; "which monitor" restore needs backend help later). |
+| Masked text input | `Masked()` option + `SetMasked` on `TextField`, so a credential can be entered without being displayed. Public API, so pre-freeze. Spec in *MASKED TEXT INPUT*. *(Done — `INTERNALS.md` §14.4.)* |
 | OS file drops | `InputState.DroppedFiles` (`fs.FS`) + `EventFileDrop` + `OnFileDrop` — public API on the seam, the widget and the event set, so the shape must land pre-freeze. Small: EBiten already surfaces the drop. Spec in *DRAG-AND-DROP → OS file drops*. |
 
 ### OSS-release milestone (additive; around/just after release)

@@ -888,6 +888,62 @@ no preedit or candidate-window API — see §16).
   harness drives the whole lifecycle headlessly via `Compose`/`CommitText`/
   `CancelComposition`, independent of EBiten's limitations.
 
+### 14.4 Masked input (`ui/textfield.go`)
+
+`TextField` can hide what it holds (a password, an API key). Two exported
+symbols only: the `Masked()` option and `SetMasked(bool)` for a runtime "Show"
+toggle. There is no getter, and the mask glyph is the unexported constant
+`maskRune = '•'` (BULLET) rather than an option, so `MaskRune(r)` stays
+additive later. `TextArea` is deliberately not masked.
+
+**The contract.** Masking is *not* a substitution in `Draw`: the same rune slice
+is measured by the caret, the click-to-index mapping, the selection highlight
+and the horizontal scroll, so a display-only swap would leave all four computing
+against the real text. Instead every text-measuring and text-drawing path goes
+through one accessor:
+
+```go
+func (t *TextField) maskRunes(rs []rune) []rune // 1 mask rune per rune, or rs
+func (t *TextField) display() []rune            // maskRunes(t.runes)
+```
+
+**`display()` returns exactly `len(t.runes)` runes.** One mask glyph per real
+rune, never a fixed-width placeholder and never a collapsed glyph. Because the
+count is preserved, every caret index, selection bound and scroll offset stays
+valid with no index translation. A change that breaks the 1:1 rule breaks the
+caret, silently.
+
+Routed call sites: `Draw` (text, selection highlight, preedit string and the
+underline's `ux0`/`ux1`), `caretVisualWidth` (both the committed prefix and the
+preedit prefix), `caretIndexAt`, and via `caretVisualWidth` also `updateScroll`
+and `imeCaretRect`.
+
+**The preedit is masked too.** It lives outside `t.runes`, so `display()` does
+not cover it and the composing branch would render an in-progress password in
+the clear; `maskRunes` is applied to it directly. Refusing composition while
+masked was rejected as the worse surprise - a field that silently will not
+accept typed input looks broken.
+
+**Clipboard.** `copySelection` and `cutSelection` are full no-ops while masked
+(cut is suppressed entirely, not merely "delete without copying"). Paste is
+untouched. There is no separate "revealed" state: revealing *is*
+`SetMasked(false)`, so a Show toggle gets readback through the same rule.
+`Text()` and `OnChange` always carry the real text - masking is presentation,
+not storage. The placeholder is drawn unmasked.
+
+**Known gaps.** A face lacking U+2022 renders the replacement glyph across the
+whole field (the bundled `goregular` face has it: 5.609px advance at size 16).
+A masked field makes leading/trailing whitespace invisible, so callers should
+trim a credential before storing it. When the accessibility seam lands, a masked
+field must not expose its content via `AccessibleName`/`AccessibleState` - the
+semantic tree is a second rendering path. Text undo history holds the *real*
+text; that is correct and must not be "fixed" into storing masked text.
+
+**Tests** (`ui/textfield_masked_test.go`, `package ui`) use the bundled
+proportional font, so they prove geometry as well as bookkeeping: the caret
+index and the selection highlight are asserted against mask advances, which
+differ from the real text's.
+
 ---
 
 ## 15. Widget catalogue (quick reference)
@@ -899,7 +955,7 @@ no preedit or candidate-window API — see §16).
 | `Button` | button.go | text and/or icon, hover/press/focus, keyboard activate |
 | `Checkbox` | checkbox.go | check glyph, `OnChange(bool)` |
 | `RadioButton`/`RadioGroup` | radio.go | circular indicators, group exclusivity |
-| `TextField` | textfield.go | single-line edit + selection + clipboard |
+| `TextField` | textfield.go | single-line edit + selection + clipboard; optional masking (§14.4) |
 | `TextArea` | textarea.go | multi-line, soft-wrap, selection, clipboard |
 | `ScrollView` | scrollview.go | viewport + wheel + draggable thumb |
 | `List` | list.go | selectable rows, wheel, keyboard, per-row hover |

@@ -1,7 +1,7 @@
 // Command controls demonstrates the form widgets added in step 6: TextField,
 // Checkbox, RadioButton/RadioGroup, Slider and ProgressBar. Tab between the
 // focusable controls; type in the field; drag or arrow-key the slider to drive
-// the progress bar.
+// the progress bar. The "Key" row is a masked field with a Show/Hide toggle.
 //
 // Run with: go run ./examples/controls
 package main
@@ -42,6 +42,25 @@ func main() {
 	field.OnChange(func(s string) { echo.SetText("you typed: " + s) })
 	root.Add(labeledRow("Name:", field))
 	root.Add(echo)
+
+	// Masked field with a Show toggle. Text() still returns the real value.
+	secret := ui.NewTextField(ui.Masked(), ui.Placeholder("API key"))
+	shown := false
+	reveal := ui.NewButton("Show")
+	reveal.OnClick(func() {
+		shown = !shown
+		secret.SetMasked(!shown)
+		if shown {
+			reveal.SetText("Hide")
+		} else {
+			reveal.SetText("Show")
+		}
+	})
+	secretRow := ui.NewContainer()
+	secretRow.SetLayout(ui.HBox(10))
+	secretRow.Add(secret, ui.Weight(1))
+	secretRow.Add(reveal)
+	root.Add(labeledRow("Key:", secretRow))
 
 	// Checkbox.
 	check := ui.NewCheckbox("Enable feature")

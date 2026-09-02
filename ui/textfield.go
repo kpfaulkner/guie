@@ -10,6 +10,11 @@ import (
 // textFieldPadding is the inner padding around a text field's content.
 var textFieldPadding = geom.Insets{Top: 5, Right: 8, Bottom: 5, Left: 8}
 
+// maskRune is the glyph a masked field shows in place of each real rune. It is
+// not configurable: a MaskRune option can be added later without breaking
+// anything, whereas an option shipped now would be frozen.
+const maskRune = '•' // BULLET
+
 // caretIndexForX returns the caret index in line whose boundary is nearest the
 // local x coordinate (x measured from the start of the text).
 func caretIndexForX(line []rune, x float64, f render.FontFace) int {
@@ -48,6 +53,7 @@ type TextField struct {
 	preedit      string // IME composition (uncommitted) shown inline at the caret
 	preeditCaret int    // caret position within preedit, in runes
 
+	masked      bool // display mask runes instead of the real text
 	placeholder string
 	onChange    func(string)
 	onSubmit    func(string)
@@ -60,6 +66,11 @@ type TextFieldOption func(*TextField)
 
 // Placeholder sets text shown when the field is empty and unfocused.
 func Placeholder(s string) TextFieldOption { return func(t *TextField) { t.placeholder = s } }
+
+// Masked constructs the field showing one mask glyph per character instead of
+// its contents, for passwords, API keys and other credentials. Text and
+// OnChange still carry the real text: masking is presentation, not storage.
+func Masked() TextFieldOption { return func(t *TextField) { t.masked = true } }
 
 // NewTextField returns an empty TextField.
 func NewTextField(opts ...TextFieldOption) *TextField {
@@ -99,6 +110,35 @@ func (t *TextField) SetFont(f render.FontFace) {
 	t.font = f
 	t.Invalidate()
 }
+
+// SetMasked turns masking on or off at runtime, so an app can offer a "Show"
+// toggle next to a credential field.
+func (t *TextField) SetMasked(v bool) {
+	t.masked = v
+	t.Invalidate()
+}
+
+// maskRunes returns one mask rune per rune in rs while masked, otherwise rs
+// itself. The result must not be mutated: unmasked it aliases rs.
+func (t *TextField) maskRunes(rs []rune) []rune {
+	if !t.masked || len(rs) == 0 {
+		return rs
+	}
+	out := make([]rune, len(rs))
+	for i := range out {
+		out[i] = maskRune
+	}
+	return out
+}
+
+// display returns what the field shows: the real runes, or one mask rune per
+// real rune when masked.
+//
+// Contract: display() returns exactly len(t.runes) runes. That 1:1 rule is why
+// masking is a display-only change - every caret index, selection bound and
+// scroll offset stays valid with no index translation anywhere. A change that
+// collapses or pads the mask breaks the caret silently.
+func (t *TextField) display() []rune { return t.maskRunes(t.runes) }
 
 // Focusable reports whether the field can take focus (only when enabled).
 func (t *TextField) Focusable() bool { return t.Enabled() }
@@ -229,12 +269,20 @@ func (t *TextField) selectedText() string {
 }
 
 func (t *TextField) copySelection() {
+	if t.masked {
+		return
+	}
 	if cb := t.clipboard(); cb != nil && t.hasSelection() {
 		cb.WriteText(t.selectedText())
 	}
 }
 
 func (t *TextField) cutSelection() {
+	// Cut is a no-op while masked, not "delete without copying": the whole
+	// operation is suppressed, and revealing (SetMasked(false)) re-enables it.
+	if t.masked {
+		return
+	}
 	if !t.hasSelection() {
 		return
 	}
@@ -255,7 +303,7 @@ func (t *TextField) paste() {
 // caretIndexAt maps an absolute x coordinate to a caret index.
 func (t *TextField) caretIndexAt(absX float64) int {
 	inner := t.Bounds().Inset(textFieldPadding)
-	return caretIndexForX(t.runes, absX-inner.X+t.scrollX, t.face())
+	return caretIndexForX(t.display(), absX-inner.X+t.scrollX, t.face())
 }
 
 // --- IME preedit ---
@@ -284,9 +332,10 @@ func (t *TextField) setPreedit(text string, caret int) {
 // caretVisualWidth returns the caret's x offset from the text origin, including
 // the preedit prefix while composing.
 func (t *TextField) caretVisualWidth(f render.FontFace) float64 {
-	w := f.Measure(string(t.runes[:t.caret])).W
+	d := t.display()
+	w := f.Measure(string(d[:t.caret])).W
 	if t.composing() {
-		pr := []rune(t.preedit)
+		pr := t.maskRunes([]rune(t.preedit))
 		w += f.Measure(string(pr[:t.preeditCaret])).W
 	}
 	return w
@@ -338,24 +387,30 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	// only draw the highlight when not composing.
 	if t.hasSelection() && !t.composing() {
 		lo, hi := t.selRange()
-		x0 := inner.X - t.scrollX + f.Measure(string(t.runes[:lo])).W
-		x1 := inner.X - t.scrollX + f.Measure(string(t.runes[:hi])).W
+		d := t.display()
+		x0 := inner.X - t.scrollX + f.Measure(string(d[:lo])).W
+		x1 := inner.X - t.scrollX + f.Measure(string(d[:hi])).W
 		canvas.FillRect(geom.Rect{X: x0, Y: inner.Y, W: x1 - x0, H: inner.H}, t.ColourOf(RolePrimary))
 	}
 
 	textColour := t.ColourOf(RoleText)
 	originX := inner.X - t.scrollX
 	if t.composing() {
-		// Insert the preedit into the displayed text at the caret and underline it.
-		pre := string(t.runes[:t.caret])
-		post := string(t.runes[t.caret:])
-		canvas.DrawText(pre+t.preedit+post, geom.Point{X: originX, Y: y}, f, textColour)
+		// Insert the preedit into the displayed text at the caret and underline
+		// it. The preedit is masked too: a field that silently refused typed
+		// input would look broken, whereas dots appearing as you compose look
+		// like every other password field.
+		d := t.display()
+		pre := string(d[:t.caret])
+		post := string(d[t.caret:])
+		pe := string(t.maskRunes([]rune(t.preedit)))
+		canvas.DrawText(pre+pe+post, geom.Point{X: originX, Y: y}, f, textColour)
 		ux0 := originX + f.Measure(pre).W
-		ux1 := originX + f.Measure(pre+t.preedit).W
+		ux1 := originX + f.Measure(pre+pe).W
 		uy := inner.Y + inner.H - 2
 		canvas.DrawLine(geom.Point{X: ux0, Y: uy}, geom.Point{X: ux1, Y: uy}, textColour, 1)
 	} else {
-		canvas.DrawText(string(t.runes), geom.Point{X: originX, Y: y}, f, textColour)
+		canvas.DrawText(string(t.display()), geom.Point{X: originX, Y: y}, f, textColour)
 	}
 
 	if t.focused {
