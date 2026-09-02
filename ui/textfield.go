@@ -423,8 +423,19 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	}
 }
 
+// contentWidth is the drawn width of everything the field shows: its text (or
+// mask) plus any IME preedit inserted at the caret.
+func (t *TextField) contentWidth(f render.FontFace) float64 {
+	w := f.Measure(string(t.display())).W
+	if t.composing() {
+		w += f.Measure(string(t.maskRunes([]rune(t.preedit)))).W
+	}
+	return w
+}
+
 // updateScroll adjusts scrollX so the caret (including any preedit) stays within
-// the visible width.
+// the visible width, and so the text never scrolls further than it has content
+// to scroll.
 func (t *TextField) updateScroll(f render.FontFace, width float64) {
 	caretW := t.caretVisualWidth(f)
 	if caretW-t.scrollX > width {
@@ -432,6 +443,15 @@ func (t *TextField) updateScroll(f render.FontFace, width float64) {
 	}
 	if caretW-t.scrollX < 0 {
 		t.scrollX = caretW
+	}
+	// Without this the offset only ever grows to follow the caret and is never
+	// reduced when the field gets more room. A field laid out narrow, filled
+	// with text that overflowed it, and then widened - a resized window, a
+	// weighted cell in a table that starts at its minimum - kept the old offset
+	// and drew its text off to the left of the box, clipped mid-string, for
+	// text that now fits comfortably.
+	if max := maxF(0, t.contentWidth(f)-width); t.scrollX > max {
+		t.scrollX = max
 	}
 	if t.scrollX < 0 {
 		t.scrollX = 0

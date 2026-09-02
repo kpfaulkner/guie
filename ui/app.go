@@ -695,4 +695,56 @@ func (a *App) layoutIfNeeded() {
 	a.root.Layout()
 	a.layoutOverlays()
 	a.needsLayout = false
+	a.dropDetachedFocus()
+}
+
+// dropDetachedFocus clears the focus when the focused widget is no longer part
+// of the tree.
+//
+// Focus is a pointer to a Widget, and removing a widget from its parent does not
+// go through the App - so an app that rebuilds part of its UI (a table redrawn
+// from fresh data, a panel swapped out) leaves the App still delivering every
+// keystroke to a widget that is no longer on screen. The field the user is
+// looking at appears to stop accepting input, and nothing recovers it but
+// clicking elsewhere and back.
+//
+// Run after a layout pass rather than every frame: every structural change goes
+// through Add, Remove, SetLayout or SetContent, and all of them Invalidate, so a
+// detached widget cannot escape the next layout.
+func (a *App) dropDetachedFocus() {
+	if a.focused == nil || a.attached(a.focused) {
+		return
+	}
+	a.setFocus(nil)
+}
+
+// attached reports whether w is reachable from the root or from any open
+// overlay. Overlays are searched too: a popup's content is not part of the root
+// tree, and focus inside an open menu is perfectly valid.
+func (a *App) attached(w Widget) bool {
+	if contains(a.root, w) {
+		return true
+	}
+	for _, p := range a.overlays {
+		if contains(p.content, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// contains reports whether target is parent or one of its descendants.
+func contains(parent, target Widget) bool {
+	if parent == nil {
+		return false
+	}
+	if parent == target {
+		return true
+	}
+	for _, child := range parent.Children() {
+		if contains(child, target) {
+			return true
+		}
+	}
+	return false
 }
