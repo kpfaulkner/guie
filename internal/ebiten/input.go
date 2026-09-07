@@ -24,10 +24,20 @@ var mouseButtons = []struct {
 
 // pollInput captures the current frame's EBiten input as a backend-neutral
 // render.InputState.
-func pollInput() render.InputState {
+//
+// scale is the current device scale factor. EBiten reports the cursor in the
+// coordinate space of the game screen, which the driver sizes in physical
+// pixels so HiDPI rendering stays crisp, so the position must be divided back
+// down to the logical pixels the framework lays out and hit-tests in. On a
+// 1x display this is a no-op; at 2x an undivided position lands at double the
+// intended coordinates and every hit test misses.
+func pollInput(scale float64) render.InputState {
+	if scale <= 0 {
+		scale = 1
+	}
 	cx, cy := ebiten.CursorPosition()
 	in := render.InputState{
-		MousePos: geom.Point{X: float64(cx), Y: float64(cy)},
+		MousePos: geom.Point{X: float64(cx) / scale, Y: float64(cy) / scale},
 	}
 
 	for _, m := range mouseButtons {

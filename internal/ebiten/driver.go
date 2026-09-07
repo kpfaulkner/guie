@@ -95,7 +95,7 @@ func (g *game) Update() error {
 	if g.hooks.Update == nil {
 		return nil
 	}
-	if err := g.hooks.Update(pollInput()); err != nil {
+	if err := g.hooks.Update(pollInput(g.scale)); err != nil {
 		if errors.Is(err, render.ErrTerminated) {
 			return ebiten.Termination
 		}
