@@ -36,6 +36,18 @@ func (a *App) updateTooltip(pos geom.Point) {
 	}
 }
 
+// tooltipPending reports whether a tooltip is still waiting on its hover delay.
+//
+// The delay counts Update ticks from the frame the pointer stops on, and the
+// pointer standing still is precisely the absence of input, so those ticks have
+// to be held open here or they never happen. The test is the hover, not the
+// counter: every frame the pointer moves resets the counter, so the last frame
+// of a movement - the one that decides whether frames continue - always leaves
+// it at zero.
+func (a *App) tooltipPending() bool {
+	return a.tooltipText == "" && a.hovered != nil && a.hovered.Tooltip() != ""
+}
+
 func (a *App) hideTooltip() {
 	a.tooltipTicks = 0
 	a.tooltipText = ""

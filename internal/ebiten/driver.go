@@ -30,6 +30,31 @@ func (d *Driver) SetIMERect(r geom.Rect) {}
 // before RunGame as well as during the loop, and it is a no-op off the desktop.
 func (d *Driver) SetCloseHandled(handled bool) { ebiten.SetWindowClosingHandled(handled) }
 
+// SetContinuousFrames and RequestFrame satisfy render.FrameScheduler, which is
+// what keeps an idle window from costing a core on macOS.
+//
+// FPSModeVsyncOffMinimum calls Update and Draw only on new input or on
+// ScheduleFrame, so an idle window presents nothing at all. Both calls are
+// deprecated as of ebiten v2.5 and both are still implemented in v2.9.9. The
+// suggested replacement, SetScreenClearedEveryFrame(false), is a different
+// thing: it skips clearing the surface but still presents a frame every
+// refresh, so it cannot help a cost that is per present. Nothing else in the
+// API stops the loop, so this is a deliberate use of a deprecated call.
+//
+// Both are concurrent-safe in ebiten, which is what lets RequestFrame be called
+// from a background goroutine and the mode be switched mid-loop.
+func (d *Driver) SetContinuousFrames(on bool) {
+	if on {
+		ebiten.SetFPSMode(ebiten.FPSModeVsyncOn)
+		return
+	}
+	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMinimum)
+}
+
+// RequestFrame schedules a single frame. It does nothing in continuous mode,
+// where a frame is coming anyway.
+func (d *Driver) RequestFrame() { ebiten.ScheduleFrame() }
+
 // Run configures the host window and runs the EBiten game loop, invoking the
 // framework's hooks each frame. It blocks until the window closes or a hook
 // returns an error.

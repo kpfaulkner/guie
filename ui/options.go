@@ -64,6 +64,13 @@ func WithDriver(d render.Driver) AppOption {
 	}
 }
 
+// WithContinuousRedraw presents a frame every display refresh instead of only
+// on demand, from the first frame on. See App.SetContinuousRedraw for when an
+// app needs it; App.Invalidate at the point of the change is the cheaper answer.
+func WithContinuousRedraw(v bool) AppOption {
+	return func(a *App) { a.alwaysDraw = v }
+}
+
 // WithFont sets the default text face used by widgets that don't override it.
 func WithFont(f render.FontFace) AppOption {
 	return func(a *App) { a.theme.Font = f }

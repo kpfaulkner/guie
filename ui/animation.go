@@ -66,6 +66,13 @@ func (an *Animation) OnDone(fn func()) *Animation {
 // updates or custom animation that must run on the UI goroutine. Multiple
 // callbacks may be registered; they run in registration order, before layout
 // and input dispatch each frame.
+//
+// A registered callback keeps the app presenting every display refresh for as
+// long as it is registered, because that is the only way "once per frame" can
+// be honoured - and an idle window that presents nothing is otherwise most of
+// what the frame pacing buys (see App.Invalidate). For periodic work, a
+// time.Ticker calling App.Do is both cheaper and honest about its timing;
+// OnFrame is for work that genuinely belongs to a frame.
 func (a *App) OnFrame(fn func(dt float64)) {
 	if fn != nil {
 		a.frameCbs = append(a.frameCbs, fn)

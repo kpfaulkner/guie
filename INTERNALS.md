@@ -145,6 +145,12 @@ macOS, Ctrl+C on Windows/Linux).
   Without it the platform closes the window and a veto cannot hold: the hook is
   only a notification. It may be called before `Run` (no window yet) or during.
 
+- `FrameScheduler{SetContinuousFrames(bool), RequestFrame()}` — an optional
+  capability that lets the framework decide when frames happen instead of one
+  per display refresh. A driver must start continuous; the `App` switches it to
+  on-demand once the first frame is drawn (§8.5). `RequestFrame` is safe from
+  any goroutine.
+
 ### 3.6 Clipboard (`render/clipboard.go`)
 
 `Clipboard{ ReadText() string; WriteText(string) }`.
@@ -383,17 +389,66 @@ Order matters:
 4. `dispatchPointer(in)` (§10).
 5. `dispatchKeyboard(in)` (§10).
 
+6. `syncFrames()` — put the driver in the frame mode the current state calls
+   for (§8.5).
+
 ### 8.4 Per-frame `draw(c)`
 
 `root.Draw` → `drawOverlays` (popups, each modal preceded by a scrim) →
 `drawTooltip`. So overlays paint above content, and the tooltip above
 everything.
 
-### 8.5 Concurrency model
+### 8.5 Frame pacing
+
+Presenting is what a frame costs. On macOS an ebiten window with an empty
+`Draw` burns ~14% of a core at 60Hz and ~0.6% presenting only on demand; the
+same window drawing 400 strings goes from 44% to 3.4%. Windows pays the same
+kind of idle bill: `examples/framepacing` measured 14% of a core presenting
+every refresh against 0.4% on demand.
+
+The trade is not free at the other end. `FPSModeVsyncOffMinimum` presents an
+input-scheduled frame immediately rather than at the next vertical blank, so a
+window being actively moved over can present faster than the display refreshes
+- measured over 100 frames/sec on a 59Hz panel, costing ~17% of a core against
+~11% for the same motion presenting continuously. Idle is much cheaper;
+sustained interaction is somewhat dearer.
+
+So the `App` presents on demand where the driver supports it
+(`render.FrameScheduler`, §3.5). The driver starts continuous and is switched
+off after the first `draw`, never before: a backend may need frames to get its
+window up.
+
+`needsFrames()` decides when frames must keep coming with no input arriving:
+running animations, live toasts, registered `OnFrame` callbacks, and a hovered
+widget whose tooltip has not appeared yet. Anything on that list holds the app
+at continuous presenting and releases it when it finishes.
+
+The tooltip case tests the hover, not the delay counter: the counter is reset by
+every frame the pointer moves, so the last frame of a movement - the one that
+decides whether frames go on - always reads zero, and gating on it would stop
+frames before the delay ever counted.
+
+Everything else asks for single frames:
+
+- input — the driver schedules those itself,
+- `App.Do` — so background work reaches the screen,
+- `App.Quit` — an idle window runs no `update`, so nothing would see the flag,
+- `App.Invalidate` — the public escape hatch for a change the framework cannot
+  see, safe from any goroutine.
+
+`App.SetContinuousRedraw(true)` opts out entirely, for a widget whose `Draw`
+reads something the framework does not know about (the clock, say).
+
+`OnFrame` is the trap: it is the only periodic hook, so an app using one for
+"every N seconds" work never reaches the idle floor. A `time.Ticker` calling
+`App.Do` is cheaper and does not lie about its timing — `dt` is a fixed nominal
+step, not measured.
+
+### 8.6 Concurrency model
 
 `App` and the widget tree are **not safe for concurrent use**. The only
-goroutine-safe methods are `Do` (queues a func, mutex-guarded) and `Quit`.
-Background goroutines update the UI via `app.Do(func(){ ... })`, which runs at
+goroutine-safe methods are `Do` (queues a func, mutex-guarded), `Quit` and
+`Invalidate`. Background goroutines update the UI via `app.Do(func(){ ... })`, which runs at
 the top of the next frame on the loop goroutine. This is documented on `App`.
 
 ---

@@ -31,6 +31,7 @@ type App struct {
 	driver    render.Driver
 	ime       render.IMEController    // non-nil if the driver supports IME
 	closer    render.CloseInterceptor // non-nil if the driver can defer window closing
+	frames    render.FrameScheduler   // non-nil if the driver can gate frames
 	cfg       render.Config
 	theme     theme.Theme
 	clipboard render.Clipboard
@@ -42,6 +43,14 @@ type App struct {
 	quit    atomic.Bool // set by Quit to stop the loop
 
 	closeReq func() bool // set by OnCloseRequest; vetoes window closing when it returns false
+
+	// Frame pacing. A driver that can gate frames starts continuous and is
+	// switched to on-demand once the first frame is on screen, then back and
+	// forth as work that needs a clock comes and goes (see needsFrames).
+	// alwaysDraw opts the whole app out and keeps every refresh presenting.
+	alwaysDraw bool
+	continuous bool
+	drawn      bool
 
 	root        Widget
 	ctx         *treeContext
@@ -110,6 +119,12 @@ func NewApp(opts ...AppOption) *App {
 	// Detect optional close interception, needed to veto a window close.
 	if c, ok := a.driver.(render.CloseInterceptor); ok {
 		a.closer = c
+	}
+	// Detect optional frame gating. A driver that has it starts continuous, so
+	// the window is up and painted before frames are allowed to stop.
+	if f, ok := a.driver.(render.FrameScheduler); ok {
+		a.frames = f
+		a.continuous = true
 	}
 
 	a.bus = newEventBus()
@@ -226,6 +241,9 @@ func (a *App) closeRequested() bool {
 // Do schedules fn to run on the UI goroutine at the start of the next frame.
 // It is safe to call from any goroutine and is the supported way to update the
 // UI from background work.
+//
+// It asks for a frame, so background work reaches the screen without the app
+// having to know whether frames are currently being presented.
 func (a *App) Do(fn func()) {
 	if fn == nil {
 		return
@@ -233,11 +251,47 @@ func (a *App) Do(fn func()) {
 	a.mu.Lock()
 	a.pending = append(a.pending, fn)
 	a.mu.Unlock()
+	a.Invalidate()
+}
+
+// Invalidate asks for one frame to be drawn. It is safe to call from any
+// goroutine.
+//
+// Frames are presented on demand where the driver supports it (see
+// render.FrameScheduler), so a change the framework cannot see - state a
+// background goroutine has already written, without going through Do - reaches
+// the screen only when something asks for a frame. Input, animations, toasts
+// and Do ask on their own; this is for everything else.
+//
+// It is a no-op with a driver that presents continuously, and a frame asked for
+// before Run may be dropped, since there is no window yet to draw into.
+func (a *App) Invalidate() {
+	if a.frames != nil {
+		a.frames.RequestFrame()
+	}
+}
+
+// SetContinuousRedraw turns on-demand presenting off (true) or back on (false).
+//
+// On-demand is the default and is what makes an idle window nearly free; this
+// is the escape hatch for an app that changes what it draws without telling the
+// framework - a custom widget whose Draw reads the clock, say - and would
+// otherwise sit on a stale frame. Prefer Invalidate at the point of the change.
+func (a *App) SetContinuousRedraw(on bool) {
+	a.alwaysDraw = on
+	a.syncFrames()
 }
 
 // Quit requests a clean shutdown of the main loop; Run then returns nil. It is
 // safe to call from any goroutine.
-func (a *App) Quit() { a.quit.Store(true) }
+//
+// It asks for a frame: the flag is read in Update, and an idle on-demand window
+// runs no Update until something wakes it, so without this the app would keep
+// its window open until the user happened to move the mouse.
+func (a *App) Quit() {
+	a.quit.Store(true)
+	a.Invalidate()
+}
 
 // runPending drains and runs work queued via Do, on the UI goroutine.
 func (a *App) runPending() {
@@ -265,7 +319,35 @@ func (a *App) update(in render.InputState) error {
 	a.dispatchKeyboard(in)
 	a.dispatchFileDrop(in)
 	a.reportIMERect()
+	a.syncFrames()
 	return nil
+}
+
+// needsFrames reports whether anything on the UI side is running off the frame
+// clock and so needs frames to keep coming without input.
+//
+// Frame callbacks are in the list deliberately: OnFrame is the only periodic
+// hook the framework offers, so an app using one for "every few seconds" work
+// keeps presenting every refresh and gives up the idle floor. A timer plus Do
+// is the cheaper shape.
+func (a *App) needsFrames() bool {
+	return len(a.anims) > 0 || len(a.frameCbs) > 0 || len(a.toasts) > 0 ||
+		a.tooltipPending()
+}
+
+// syncFrames puts the driver in the frame mode the current state calls for,
+// switching only on a change. It runs on the UI goroutine, at the end of each
+// Update and after the first frame is drawn.
+func (a *App) syncFrames() {
+	if a.frames == nil {
+		return
+	}
+	want := a.alwaysDraw || !a.drawn || a.needsFrames()
+	if want == a.continuous {
+		return
+	}
+	a.frames.SetContinuousFrames(want)
+	a.continuous = want
 }
 
 // dispatchFileDrop delivers files dropped from outside the application to the
@@ -651,6 +733,13 @@ func (a *App) draw(c render.Canvas) {
 		for _, p := range a.overlays {
 			drawDebugBounds(c, p.content, &n)
 		}
+	}
+	// The window has content now, so frames may stop. Held until here rather
+	// than decided in Update, because a backend can need frames of its own to
+	// get a window on screen and must not be stopped before it has one.
+	if !a.drawn {
+		a.drawn = true
+		a.syncFrames()
 	}
 }
 

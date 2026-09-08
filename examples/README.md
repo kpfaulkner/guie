@@ -30,6 +30,7 @@ go run ./examples/ime        # inline IME preedit rendering (simulated compositi
 go run ./examples/widgets2   # numeric Stepper + busy Spinner
 go run ./examples/datepicker # inline month calendar (DatePicker)
 go run ./examples/colourpicker # HSV colour picker (swatch + H/S/V sliders)
+go run ./examples/framepacing # on-demand frame presenting (-stats, -continuous to compare)
 ```
 
 What each one exercises:
@@ -62,6 +63,7 @@ What each one exercises:
 | `widgets2`| `Stepper` (min/max/step/decimals, buttons + arrows + wheel, `OnChange`) and the indeterminate busy `Spinner` (`Start`/`Stop`) |
 | `datepicker`| `DatePicker` inline calendar + `DateField` popup variant: month nav, click + keyboard day selection, `OnChange(time.Time)` |
 | `colourpicker`| `ColourPicker`: swatch + hue/saturation/value/alpha gradient sliders (transparency over a checkerboard), `OnChange(color.Color)` |
+| `framepacing`| On-demand presenting: a live frame counter and clock that stop when the window idles, `App.Invalidate`, `App.SetContinuousRedraw`/`ui.WithContinuousRedraw`, and what brings frames back (input, animations, toasts, a pending tooltip, `App.Do`); `-stats` prints frames/sec and `-continuous` runs the same window the old way for comparison |
 
 Note: application code never imports EBiten. Widgets and apps talk only to the
 `ui`, `geom`, `render` and `theme` packages; EBiten lives behind the backend.

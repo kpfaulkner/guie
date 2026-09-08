@@ -83,6 +83,31 @@ type Driver interface {
 	Run(cfg Config, hooks Hooks) error
 }
 
+// FrameScheduler is an optional capability a Driver may implement to let the
+// framework choose when frames happen instead of presenting one every display
+// refresh. The framework type-asserts a Driver for it; a Driver without it
+// simply keeps presenting continuously, which is correct, just not free.
+//
+// It exists because presenting is what a frame costs. On macOS an ebiten window
+// with an empty Draw burns roughly 14% of a core at 60Hz and 0.6% presenting
+// only on demand, and the same window drawing 400 strings drops from 44% to
+// 3.4% - the drawing is charged per frame, so not running the frame is what
+// removes it.
+//
+// A Driver must start in continuous mode: the framework switches it off once
+// the first frame is on screen, so a backend that needs frames to get a window
+// up is not stopped before it has one.
+type FrameScheduler interface {
+	// SetContinuousFrames chooses between presenting every display refresh
+	// (true) and presenting only on input or on RequestFrame (false). It is
+	// called from the UI goroutine, both before Run and during the loop.
+	SetContinuousFrames(on bool)
+	// RequestFrame asks for one frame, for a change the Driver cannot see for
+	// itself - work finishing on a background goroutine, say. It must be safe
+	// to call from any goroutine, and before Run, where it may be dropped.
+	RequestFrame()
+}
+
 // IMEController is an optional capability a Driver may implement to support
 // input method editors. The framework type-asserts a Driver for it; when absent,
 // IME degrades to committed-text-only (no inline preedit, no candidate-window
