@@ -168,14 +168,21 @@ func TestPendingTooltipKeepsFramesComing(t *testing.T) {
 	}
 }
 
-// A pointer resting where there is no tooltip to show must not hold frames.
+// A pointer resting where there is no tooltip to show must not hold frames. The
+// hover fade runs for a few frames after the pointer arrives, then frames stop.
 func TestHoverWithoutATooltipDoesNotKeepFramesComing(t *testing.T) {
 	a, d, b := tooltipApp(t)
 	b.SetTooltip("")
 
 	moveTo(t, a, geom.Point{X: 20, Y: 20})
+	if !d.last() {
+		t.Error("the hover fade should be presenting frames while it runs")
+	}
+	for range fadeFrames {
+		moveTo(t, a, geom.Point{X: 20, Y: 20})
+	}
 	if d.last() {
-		t.Error("presenting every refresh while hovering a widget with no tooltip")
+		t.Error("presenting every refresh after the hover fade finished")
 	}
 }
 

@@ -58,6 +58,7 @@ func main() {
 		r := table.Row(i)
 		status.SetText(fmt.Sprintf("Selected: %s (%s)", r[0], r[1]))
 	})
+	table.SetStriped(true)
 	table.SetRows(people)
 
 	root.Add(table, ui.Weight(1))

@@ -15,11 +15,12 @@ const (
 // draggable with the mouse, and adjustable with Left/Right while focused.
 type Slider struct {
 	BaseWidget
-	value    float64
-	dragging bool
-	hover    bool
-	focused  bool
-	onChange func(float64)
+	value     float64
+	dragging  bool
+	hover     bool
+	hoverFade fade // eases toward 1 while hovered
+	focused   bool
+	onChange  func(float64)
 }
 
 // SliderOption configures a Slider.
@@ -77,13 +78,10 @@ func (s *Slider) Draw(canvas render.Canvas) {
 	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: x1, Y: y}, s.ColourOf(RoleBorder), 3)
 	canvas.DrawLine(geom.Point{X: x0, Y: y}, geom.Point{X: hx, Y: y}, s.ColourOf(RolePrimary), 3)
 
-	handle := s.ColourOf(RolePrimary)
-	if s.hover || s.dragging {
-		handle = s.ColourOf(RoleAccent)
-	}
+	handle := mixColour(s.ColourOf(RolePrimary), s.ColourOf(RoleAccent), s.hoverFade.level)
 	canvas.FillCircle(geom.Point{X: hx, Y: y}, sliderHandle, handle)
 	if s.focused {
-		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColourOf(RoleAccent), 1)
+		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColourOf(RoleAccent), focusRingWidth)
 	}
 }
 
@@ -98,6 +96,7 @@ func (s *Slider) setFromX(x float64) {
 
 // HandleEvent drives dragging and keyboard adjustment.
 func (s *Slider) HandleEvent(ev *Event) bool {
+	defer s.syncFade()
 	if !s.Enabled() {
 		return false
 	}
@@ -148,4 +147,13 @@ func clamp01(v float64) float64 {
 		return 1
 	}
 	return v
+}
+
+// syncFade points the handle's highlight fade at hover-or-drag.
+func (s *Slider) syncFade() {
+	t := 0.0
+	if s.hover || s.dragging {
+		t = 1
+	}
+	s.fadeTo(&s.hoverFade, t)
 }

@@ -40,6 +40,8 @@ type TextArea struct {
 	preedit      string // IME composition (uncommitted) shown inline at the caret
 	preeditCaret int    // caret position within preedit, in runes
 
+	hist editStack[textPos, areaSel] // undo/redo history
+
 	wrap      bool
 	wrapWidth float64 // content width used for the last wrap pass
 
@@ -170,6 +172,7 @@ func (t *TextArea) SetText(s string) {
 	t.caretRow = len(t.lines) - 1
 	t.caretCol = len(t.lines[t.caretRow])
 	t.collapse()
+	t.hist.clear() // loading content is not an edit; do not undo into the old text
 	t.fireChange()
 }
 
@@ -320,21 +323,6 @@ func (t *TextArea) selRange() (sr, sc, er, ec int) {
 	return t.caretRow, t.caretCol, t.anchorRow, t.anchorCol
 }
 
-func (t *TextArea) deleteSelection() {
-	sr, sc, er, ec := t.selRange()
-	if sr == er {
-		ln := t.lines[sr]
-		t.lines[sr] = append(ln[:sc], ln[ec:]...)
-	} else {
-		head := append([]rune{}, t.lines[sr][:sc]...)
-		merged := append(head, t.lines[er][ec:]...)
-		t.lines = append(t.lines[:sr+1], t.lines[er+1:]...)
-		t.lines[sr] = merged
-	}
-	t.caretRow, t.caretCol = sr, sc
-	t.collapse()
-}
-
 func (t *TextArea) setCaret(row, col int, extend bool) {
 	if row < 0 {
 		row = 0
@@ -361,78 +349,191 @@ func (t *TextArea) selectAll() {
 }
 
 // --- editing ---
+//
+// Every change to the text goes through replace, which records it for undo and
+// fires OnChange once. Undo and Redo apply recorded edits with splice directly,
+// so they do not record themselves. Edits are addressed by (row, col), not rune
+// offset, so a keystroke does not walk the whole document.
+
+// textPos is a (row, col) position in the text.
+type textPos struct{ row, col int }
+
+// areaSel is the caret and selection anchor, saved with each edit.
+type areaSel struct{ cr, cc, ar, ac int }
+
+func (t *TextArea) sel() areaSel {
+	return areaSel{t.caretRow, t.caretCol, t.anchorRow, t.anchorCol}
+}
+
+func (t *TextArea) setSel(s areaSel) {
+	t.caretRow, t.caretCol, t.anchorRow, t.anchorCol = s.cr, s.cc, s.ar, s.ac
+}
+
+// endPos returns where text rs ends if it starts at at.
+func endPos(at textPos, rs []rune) textPos {
+	for _, r := range rs {
+		if r == '\n' {
+			at.row++
+			at.col = 0
+		} else {
+			at.col++
+		}
+	}
+	return at
+}
+
+// textBetween returns the text from..to (document order), lines joined by '\n'.
+func (t *TextArea) textBetween(from, to textPos) []rune {
+	if from.row == to.row {
+		return append([]rune(nil), t.lines[from.row][from.col:to.col]...)
+	}
+	out := append([]rune(nil), t.lines[from.row][from.col:]...)
+	for r := from.row + 1; r < to.row; r++ {
+		out = append(out, '\n')
+		out = append(out, t.lines[r]...)
+	}
+	out = append(out, '\n')
+	return append(out, t.lines[to.row][:to.col]...)
+}
+
+// splice replaces the text from..to with with ('\n' separates lines). It builds
+// fresh line slices so recorded edits never alias the live text.
+func (t *TextArea) splice(from, to textPos, with []rune) {
+	head, tail := t.lines[from.row][:from.col], t.lines[to.row][to.col:]
+	parts := [][]rune{{}}
+	for _, r := range with {
+		if r == '\n' {
+			parts = append(parts, []rune{})
+			continue
+		}
+		parts[len(parts)-1] = append(parts[len(parts)-1], r)
+	}
+	join := func(a, b, c []rune) []rune {
+		out := make([]rune, 0, len(a)+len(b)+len(c))
+		out = append(append(append(out, a...), b...), c...)
+		return out
+	}
+	if len(parts) == 1 {
+		line := join(head, parts[0], tail)
+		if from.row == to.row { // typing and in-line deletes: no line-list change
+			t.lines[from.row] = line
+			return
+		}
+		parts[0] = line
+	} else {
+		parts[0] = join(head, parts[0], nil)
+		last := len(parts) - 1
+		parts[last] = join(nil, parts[last], tail)
+	}
+	out := make([][]rune, 0, len(t.lines)-(to.row-from.row)+len(parts)-1)
+	out = append(out, t.lines[:from.row]...)
+	out = append(out, parts...)
+	out = append(out, t.lines[to.row+1:]...)
+	t.lines = out
+}
+
+// replace swaps the text from..to for with, leaves the caret after the new text
+// and records the edit. Replacing a selection never merges with neighbouring
+// edits.
+func (t *TextArea) replace(from, to textPos, with []rune, kind editKind) {
+	if from == to && len(with) == 0 {
+		return
+	}
+	before := t.sel()
+	if t.hasSelection() {
+		kind = kindOther
+	}
+	removed := t.textBetween(from, to)
+	t.splice(from, to, with)
+	end := endPos(from, with)
+	t.caretRow, t.caretCol = end.row, end.col
+	t.collapse()
+	t.hist.add(textEdit[textPos, areaSel]{
+		at: from, removed: removed, inserted: append([]rune(nil), with...),
+		before: before, after: t.sel(), kind: kind,
+	})
+	t.fireChange()
+}
+
+// selOrCaret returns the selection bounds, or the caret twice if there is none:
+// the range an insertion replaces.
+func (t *TextArea) selOrCaret() (from, to textPos) {
+	sr, sc, er, ec := t.selRange()
+	return textPos{sr, sc}, textPos{er, ec}
+}
+
+// Undo reverts the most recent edit and restores the caret and selection from
+// before it. It reports false if there is nothing to undo.
+func (t *TextArea) Undo() bool {
+	e, ok := t.hist.popUndo()
+	if !ok {
+		return false
+	}
+	t.splice(e.at, endPos(e.at, e.inserted), e.removed)
+	t.setSel(e.before)
+	t.hist.redo = append(t.hist.redo, e)
+	t.hist.seal()
+	t.fireChange()
+	return true
+}
+
+// Redo re-applies the most recently undone edit. It reports false if there is
+// nothing to redo.
+func (t *TextArea) Redo() bool {
+	e, ok := t.hist.popRedo()
+	if !ok {
+		return false
+	}
+	t.splice(e.at, endPos(e.at, e.removed), e.inserted)
+	t.setSel(e.after)
+	t.hist.undo = append(t.hist.undo, e)
+	t.hist.seal()
+	t.fireChange()
+	return true
+}
+
+// CanUndo reports whether Undo has anything to revert.
+func (t *TextArea) CanUndo() bool { return len(t.hist.undo) > 0 }
+
+// CanRedo reports whether Redo has anything to re-apply.
+func (t *TextArea) CanRedo() bool { return len(t.hist.redo) > 0 }
+
+// ClearHistory forgets all undo and redo steps.
+func (t *TextArea) ClearHistory() { t.hist.clear() }
 
 func (t *TextArea) insertRune(r rune) {
-	if t.hasSelection() {
-		t.deleteSelection()
-	}
-	ln := t.line()
-	ln = append(ln, 0)
-	copy(ln[t.caretCol+1:], ln[t.caretCol:])
-	ln[t.caretCol] = r
-	t.lines[t.caretRow] = ln
-	t.caretCol++
-	t.collapse()
-	t.fireChange()
+	from, to := t.selOrCaret()
+	t.replace(from, to, []rune{r}, kindType)
 }
 
 func (t *TextArea) insertNewline() {
-	if t.hasSelection() {
-		t.deleteSelection()
-	}
-	ln := t.line()
-	tail := append([]rune{}, ln[t.caretCol:]...)
-	t.lines[t.caretRow] = ln[:t.caretCol]
-	t.lines = append(t.lines, nil)
-	copy(t.lines[t.caretRow+2:], t.lines[t.caretRow+1:])
-	t.lines[t.caretRow+1] = tail
-	t.caretRow++
-	t.caretCol = 0
-	t.collapse()
-	t.fireChange()
+	from, to := t.selOrCaret()
+	t.replace(from, to, []rune{'\n'}, kindOther)
 }
 
 func (t *TextArea) deleteBack() {
-	if t.hasSelection() {
-		t.deleteSelection()
-		t.fireChange()
-		return
-	}
-	if t.caretCol > 0 {
-		ln := t.line()
-		t.lines[t.caretRow] = append(ln[:t.caretCol-1], ln[t.caretCol:]...)
-		t.caretCol--
-		t.collapse()
-		t.fireChange()
-		return
-	}
-	if t.caretRow > 0 {
-		prev := t.lines[t.caretRow-1]
-		t.caretCol = len(prev)
-		t.lines[t.caretRow-1] = append(prev, t.line()...)
-		t.lines = append(t.lines[:t.caretRow], t.lines[t.caretRow+1:]...)
-		t.caretRow--
-		t.collapse()
-		t.fireChange()
+	caret := textPos{t.caretRow, t.caretCol}
+	switch {
+	case t.hasSelection():
+		from, to := t.selOrCaret()
+		t.replace(from, to, nil, kindOther)
+	case t.caretCol > 0:
+		t.replace(textPos{t.caretRow, t.caretCol - 1}, caret, nil, kindBackspace)
+	case t.caretRow > 0: // join with the previous line
+		t.replace(textPos{t.caretRow - 1, len(t.lines[t.caretRow-1])}, caret, nil, kindBackspace)
 	}
 }
 
 func (t *TextArea) deleteForward() {
-	if t.hasSelection() {
-		t.deleteSelection()
-		t.fireChange()
-		return
-	}
-	ln := t.line()
-	if t.caretCol < len(ln) {
-		t.lines[t.caretRow] = append(ln[:t.caretCol], ln[t.caretCol+1:]...)
-		t.fireChange()
-		return
-	}
-	if t.caretRow < len(t.lines)-1 {
-		t.lines[t.caretRow] = append(ln, t.lines[t.caretRow+1]...)
-		t.lines = append(t.lines[:t.caretRow+1], t.lines[t.caretRow+2:]...)
-		t.fireChange()
+	caret := textPos{t.caretRow, t.caretCol}
+	switch {
+	case t.hasSelection():
+		from, to := t.selOrCaret()
+		t.replace(from, to, nil, kindOther)
+	case t.caretCol < len(t.line()):
+		t.replace(caret, textPos{t.caretRow, t.caretCol + 1}, nil, kindDelete)
+	case t.caretRow < len(t.lines)-1: // join with the next line
+		t.replace(caret, textPos{t.caretRow + 1, 0}, nil, kindDelete)
 	}
 }
 
@@ -462,42 +563,8 @@ func (t *TextArea) insertString(s string) {
 	if s == "" {
 		return
 	}
-	if t.hasSelection() {
-		t.deleteSelection()
-	}
-	parts := strings.Split(s, "\n")
-	if len(parts) == 1 {
-		rs := []rune(parts[0])
-		ln := t.line()
-		out := make([]rune, 0, len(ln)+len(rs))
-		out = append(out, ln[:t.caretCol]...)
-		out = append(out, rs...)
-		out = append(out, ln[t.caretCol:]...)
-		t.lines[t.caretRow] = out
-		t.caretCol += len(rs)
-	} else {
-		ln := t.line()
-		tail := append([]rune{}, ln[t.caretCol:]...)
-		first := append([]rune{}, ln[:t.caretCol]...)
-		first = append(first, []rune(parts[0])...)
-		t.lines[t.caretRow] = first
-
-		newLines := make([][]rune, len(parts)-1)
-		for i := 1; i < len(parts); i++ {
-			newLines[i-1] = []rune(parts[i])
-		}
-		lastIdx := len(newLines) - 1
-		finalCol := len(newLines[lastIdx])
-		newLines[lastIdx] = append(newLines[lastIdx], tail...)
-
-		rest := append([][]rune{}, t.lines[t.caretRow+1:]...)
-		t.lines = append(t.lines[:t.caretRow+1], newLines...)
-		t.lines = append(t.lines, rest...)
-		t.caretRow += len(parts) - 1
-		t.caretCol = finalCol
-	}
-	t.collapse()
-	t.fireChange()
+	from, to := t.selOrCaret()
+	t.replace(from, to, []rune(s), kindOther)
 }
 
 func (t *TextArea) copySelection() {
@@ -511,8 +578,8 @@ func (t *TextArea) cutSelection() {
 		return
 	}
 	t.copySelection()
-	t.deleteSelection()
-	t.fireChange()
+	from, to := t.selOrCaret()
+	t.replace(from, to, nil, kindOther)
 }
 
 func (t *TextArea) paste() {
@@ -551,7 +618,8 @@ func (t *TextArea) composing() bool { return t.preedit != "" }
 // selection, so the eventual commit lands at the caret.
 func (t *TextArea) setPreedit(text string, caret int) {
 	if text != "" && t.preedit == "" && t.hasSelection() {
-		t.deleteSelection()
+		from, to := t.selOrCaret()
+		t.replace(from, to, nil, kindOther)
 	}
 	t.preedit = text
 	n := len([]rune(text))
@@ -603,11 +671,7 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 	b := t.Bounds()
 	rad := t.cornerRadius()
 	canvas.FillRoundRect(b, rad, t.ColourOf(RoleSurface))
-	border := t.ColourOf(RoleBorder)
-	if t.focused {
-		border = t.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(b, rad, border, 1)
+	strokeFocusable(canvas, b, rad, t.ColourOf(RoleBorder), t.ColourOf(RoleAccent), t.focused)
 
 	inner := b.Inset(textAreaPadding)
 	lh := t.lineHeight()
@@ -799,6 +863,7 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 	case EventFocusLost:
 		t.focused = false
 		t.dragging = false
+		t.hist.seal()
 		t.preedit = ""
 		t.preeditCaret = 0
 		return true
@@ -835,6 +900,16 @@ func (t *TextArea) handleKey(k render.Key, mods render.ModifierSet) bool {
 			return true
 		case render.KeyV:
 			t.paste()
+			return true
+		case render.KeyZ:
+			if extend {
+				t.Redo()
+			} else {
+				t.Undo()
+			}
+			return true
+		case render.KeyY:
+			t.Redo()
 			return true
 		}
 	}
@@ -904,4 +979,18 @@ func (t *TextArea) moveVertical(delta int, extend bool) {
 	r := rows[ni]
 	col := r.start + caretIndexForX(t.lines[r.lr][r.start:r.end], x, t.face())
 	t.setCaret(r.lr, col, extend)
+}
+
+// ReplaceRange replaces the text between rune offsets start and end (order
+// independent, clamped to the text) with s, and leaves the caret after s with no
+// selection. Offsets index Text(), as in SelectRange and Find. Unlike SetText it
+// is recorded as a single undoable step, so it suits find/replace and other
+// programmatic edits, and it fires OnChange.
+func (t *TextArea) ReplaceRange(start, end int, s string) {
+	if start > end {
+		start, end = end, start
+	}
+	sr, sc := t.offsetToPos(start)
+	er, ec := t.offsetToPos(end)
+	t.replace(textPos{sr, sc}, textPos{er, ec}, []rune(s), kindOther)
 }

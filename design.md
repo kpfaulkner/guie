@@ -873,7 +873,7 @@ a prompt should be tells the user nothing.
 
 ### Interactions with roadmap items - name them now
 
-- **Accessibility (seam)**, Pre-freeze: that row lists `TextField` among the
+- **Accessibility (seam)**, now deferred (see ROADMAP -> Deferred): when it lands it lists `TextField` among the
   widgets to annotate immediately. A masked field must not expose its content
   through `AccessibleName`/`AccessibleState` - the semantic tree is a second
   rendering path, and masking it in `Draw` alone would leak it there.
@@ -917,6 +917,397 @@ contract rather than left as an implementation detail.
 
 ---
 
+## TEXT UNDO / REDO (TextField, TextArea)
+
+*(Implemented - `ui/undo.go`, `ui/undo_test.go`; INTERNALS 14.5. Roadmap row: "Text undo", pre-freeze.)*
+
+Built-in undo and redo inside `TextField` and `TextArea`: Ctrl+Z / Ctrl+Shift+Z
+(Cmd on macOS) and a small method set so an app's Edit menu can drive it. This
+is a correctness expectation of the widgets, not a feature: a text box that
+loses ten minutes of typing to a stray Ctrl+X, with no way back, reads as
+broken. App-level command history (undo of non-text actions) stays userland.
+
+Today neither widget has any history. Every mutation edits the rune storage in
+place (`insert`, `deleteBack`, `deleteForward`, `insertString`, `cutSelection`,
+`deleteSelection`, `TextArea.insertNewline`) and `SetText` replaces it
+wholesale, so there is nothing to rewind.
+
+### API - deliberately small
+
+```go
+// Both TextField and TextArea:
+func (t *TextField) Undo() bool      // false if nothing to undo
+func (t *TextField) Redo() bool
+func (t *TextField) CanUndo() bool   // for enabling Edit-menu items
+func (t *TextField) CanRedo() bool
+func (t *TextField) ClearHistory()
+```
+
+- **Keys:** `ModPrimary+Z` undo; `ModPrimary+Shift+Z` redo; `ModPrimary+Y` redo
+  (Windows/Linux habit; harmless elsewhere). Handled in `handleKey` beside
+  copy/cut/paste, so the platform modifier map is the existing one.
+- **No option for depth or disabling**, pre-freeze: a package constant
+  (`undoDepth = 500` steps). `UndoLimit(n)` is additive if someone needs it;
+  a frozen option is not removable. Same reasoning as `MaskRune` (masked input).
+- Undo/redo **fire `OnChange`** with the new text, like any other change, and
+  keep the caret in view.
+- A disabled widget, or one mid-IME-composition, ignores the keys (the App
+  already withholds key events from the focused widget while composing).
+
+### What an edit is
+
+History records **edits, not snapshots.** A snapshot per step is O(text) each, so
+a TextArea holding a file costs the whole file per keystroke; an edit costs only
+what changed.
+
+```go
+// TextField: positions are rune indexes into runes.
+type fieldEdit struct {
+    at                     int
+    removed, inserted      []rune
+    before, after          fieldSel   // {caret, anchor}
+    kind                   editKind
+}
+
+// TextArea: positions are (row, col); text may contain '\n'.
+type areaEdit struct {
+    at                     pos        // {row, col} where removed/inserted start
+    removed, inserted      []rune
+    before, after          areaSel    // {caretRow, caretCol, anchorRow, anchorCol}
+    kind                   editKind
+}
+```
+
+One shared generic container holds the stacks and the coalescing policy:
+
+```go
+type undoStack[E any] struct { undo, redo []E; ... }
+```
+
+Undo of an edit removes `inserted` at `at`, re-inserts `removed`, and restores
+`before` (caret **and** selection, so undoing a cut re-selects the text). Redo
+is the reverse and restores `after`. TextArea addresses edits by `(row, col)`
+rather than rune offset on purpose: `posToOffset`/`offsetToPos` walk the lines,
+which would make every keystroke in a large document O(lines).
+
+### One mutation funnel
+
+Today a "replace the selection with a paste" is `deleteSelection` followed by an
+insert - two mutations that would record as two undo steps. Instead every
+editing path is rewritten onto one primitive per widget:
+
+```go
+func (t *TextField) replace(lo, hi int, with []rune, kind editKind)
+func (t *TextArea)  replace(from, to pos, with []rune, kind editKind)
+```
+
+`replace` captures `removed`, applies the change, sets the caret, records the
+edit, and fires `OnChange` once. `insert`, `deleteBack`, `deleteForward`,
+`insertString`, `cutSelection` and `insertNewline` become thin callers. This is
+the bulk of the work and it is also a simplification: change notification and
+history live in one place instead of at seven call sites. Undo/redo apply edits
+through the same low-level splice but do **not** record themselves.
+
+### Coalescing - when several edits are one step
+
+Per-keystroke undo is useless; per-paragraph is dangerous. Edits merge into the
+top step when all of these hold:
+
+- both are the same **mergeable kind**: typed rune, backspace, or forward delete.
+  Paste, cut, selection replacement, `Enter` and IME commits are `kindOther` and
+  never merge, so each is its own step;
+- the step is still **open** (not sealed, below);
+- they are **contiguous**: a typed rune lands at the end of the previous insert;
+  a backspace removes the rune immediately before the previous deletion; a
+  forward delete removes at the same position;
+- typing does not cross a **word boundary**: a whitespace rune typed after a
+  non-whitespace one starts a new step. So `hello world` undoes as `" world"`
+  then `"hello"`, which matches what users expect without a timer.
+
+A step is **sealed** (no further merging) by anything that is not an edit:
+caret or selection change (arrows, Home/End, mouse, select-all), losing focus,
+undo/redo, and `SetText`. No wall-clock rule: a timer would make history depend
+on typing speed and make headless tests non-deterministic.
+
+Coalescing needs no cap pre-freeze. One consequence is accepted and noted: an IME
+that commits multi-rune strings through repeated `EventText` runes with no
+whitespace (CJK) coalesces into long steps. Acceptable; revisit with a per-step
+rune cap if it proves annoying.
+
+A new edit **clears the redo stack**. History is capped at `undoDepth` steps,
+dropping the oldest.
+
+### SetText and programmatic edits
+
+`SetText` **clears history.** It is how apps load content (open a file, reset a
+form), and undoing back into the previous document is wrong. The consequence,
+stated plainly: a programmatic change through `SetText` is **not** undoable, so
+`examples/editor`'s replace-all, which called `SetText(strings.ReplaceAll(...))`,
+lost the user's history until it moved to `ReplaceRange` (see Open points).
+
+### Interactions
+
+- **Masked `TextField`:** history holds the real text. That is correct, not a leak:
+  undo never renders anything the field would not (already recorded in MASKED
+  TEXT INPUT, so nobody "fixes" it into storing mask runes and corrupts the
+  buffer). Undo is allowed while masked.
+- **Clipboard:** `copy` is not an edit. `cut` is one `kindOther` step; undoing it
+  restores the text and the selection but does not touch the clipboard.
+- **IME preedit:** uncommitted composition is not in the text, so it is never in
+  history; only the commit is, as `kindOther`.
+- **TextArea wrap:** wrapping is display only; edits are in logical (row, col)
+  space and unaffected.
+- **`CanvasWidget` and other custom widgets:** unaffected; they own their state.
+
+### Design decisions (locked)
+
+| Area | Decision |
+|---|---|
+| Representation | Edits (position + removed + inserted + before/after selection), not snapshots. |
+| Plumbing | One `replace` primitive per widget; all mutations go through it, so history and `OnChange` live in one place. |
+| TextArea addressing | `(row, col)`, not rune offset, to keep keystrokes O(1) in large documents. |
+| Public API | `Undo`/`Redo`/`CanUndo`/`CanRedo`/`ClearHistory` on both widgets. No options. |
+| Keys | `ModPrimary+Z`, `ModPrimary+Shift+Z`, `ModPrimary+Y`. |
+| Coalescing | Contiguous typed runes / backspaces / forward deletes, split at word boundaries; no timer. |
+| Never merges | Paste, cut, selection replacement, Enter, IME commit. |
+| Sealing | Caret/selection change, focus loss, undo/redo, `SetText`. |
+| `SetText` | Clears history; not undoable. |
+| Depth | `undoDepth = 500` constant, oldest dropped; redo cleared by any new edit. |
+| Selection | Undo restores the pre-edit caret and selection; redo the post-edit. |
+| Masked | Real text in history; undo allowed. |
+| Out of scope | App-level command history (userland, per ROADMAP). |
+
+### Tests (`guitest` / `ui`)
+
+- Type `abc`: one Undo empties the field; Redo restores it with the caret at the
+  end. `OnChange` fires with the right text each time.
+- Type `hello world`: Undo gives `hello`, a second gives empty.
+- Backspace run coalesces; a forward-delete run coalesces; moving the caret
+  between them splits the steps.
+- Caret move (arrow, click, Home) between typed runs splits them.
+- Paste over a selection is **one** step: Undo restores the original text and
+  the original selection. Cut: Undo restores text and selection.
+- A new edit after Undo clears Redo (`CanRedo()` false).
+- `SetText` clears both stacks.
+- Depth: 501 distinct steps leave 500 undoable, the oldest gone.
+- Masked field: type, Undo, Redo all work and the display stays masked
+  (`Recording` shows no real text at any point).
+- TextArea: Enter, multi-line paste, multi-line delete and selection across lines
+  each undo exactly; Undo of a line-joining Backspace re-splits the line; caret
+  and selection restored (row, col).
+- TextArea in a large document: a typing run's cost does not grow with line
+  count (assert `replace` makes no whole-document pass).
+- Disabled widget and active IME composition ignore Ctrl+Z.
+- Focus loss seals: type, blur, refocus, type: two steps.
+
+### Open points
+
+- **Undoable programmatic edits (done).** `ReplaceRange(start, end, s)` on both
+  widgets replaces a rune range (offsets into `Text()`, clamped, order
+  independent) as one `kindOther` step, leaving the caret after `s`, firing
+  `OnChange`. `examples/editor` replace-all uses it; `SetText` still clears
+  history. A whole-document replace stores the old and new text once each.
+- **Selection-only steps.** Select-all and caret moves are not undoable. Matches
+  most toolkits; noted because some editors do record them.
+- **Memory bound.** Depth is by step count, not bytes. Fifty 5 MB pastes would be
+  retained. Add a byte budget if a real app pastes large blobs.
+
+---
+
+## CANVASWIDGET (CUSTOM DRAW)
+
+*(Implemented - `ui/canvaswidget.go`, tests in `guitest/canvaswidget_test.go`. Roadmap row: "Custom-draw widget", pre-freeze.)*
+
+A public widget whose appearance and input handling are supplied as callbacks,
+so application code can draw charts, plots, diagram/paint surfaces, game HUDs
+and visualisers without defining a widget type.
+
+### Why it is not already possible
+
+It is. `examples/canvas` embeds `ui.BaseWidget`, overrides `Draw` and `MinSize`,
+and works. So `CanvasWidget` adds no capability. What it adds:
+
+- **No type, no boilerplate.** One-off surfaces become a constructor call with
+  closures over app state, not a struct plus `NewBase()` plus method set.
+- **A blessed, documented contract.** Today the rules (absolute coordinates,
+  when `Draw` runs, how to get keyboard input) are discoverable only by reading
+  `App`. A named widget is where they get written down and frozen.
+- **Correct defaults.** Clipping to bounds, focus handling, hover tracking and
+  redraw-on-demand done once, rather than re-derived (and gotten wrong) per app.
+
+It stays a thin wrapper. Anything wanting real structure (child widgets, own
+layout) should still embed `BaseWidget`, and the doc comment says so.
+
+### API - mirrors NewButton / ButtonOption
+
+```go
+type CanvasWidget struct { BaseWidget /* ... */ }
+
+type CanvasOption func(*CanvasWidget)
+
+func NewCanvasWidget(draw func(c render.Canvas, bounds geom.Rect), opts ...CanvasOption) *CanvasWidget
+
+// options
+func CanvasMinSize(w, h float64) CanvasOption // MinSize for layout; default 0x0
+func CanvasOnEvent(fn func(ev *Event) bool) CanvasOption
+func CanvasFocusable() CanvasOption           // join Tab order, receive keys/text
+
+// methods
+func (w *CanvasWidget) SetDraw(draw func(render.Canvas, geom.Rect))
+func (w *CanvasWidget) SetOnEvent(fn func(*Event) bool)
+func (w *CanvasWidget) Hovered() bool
+func (w *CanvasWidget) Focused() bool
+func (w *CanvasWidget) ToLocal(p geom.Point) geom.Point // absolute -> bounds origin
+```
+
+`NewCanvasWidget` takes `draw` positionally because a canvas without one draws
+nothing; options are for the genuinely optional parts. A nil `draw` is allowed
+(draws nothing) so a widget can be built before its renderer exists.
+
+`CanvasWidget` inherits the `BaseWidget` surface for free: `SetTooltip`,
+`SetContextMenu`, `OnFileDrop`, `SetDragSource`/`SetDropTarget`, visibility,
+enabled, colour roles. No wrapper methods for any of them.
+
+### Drawing contract
+
+- `bounds` is the widget's **absolute** rectangle, exactly what `Bounds()` returns
+  and what every other widget's `Draw` uses. `c` is the same canvas the rest of
+  the tree draws on, so coordinates are absolute too. Absolute (rather than
+  translated to a 0,0 origin) is the established convention; `ToLocal` is there
+  for callers who want to think locally.
+- The framework `PushClip(bounds)` before calling `draw` and `PopClip()` after, so
+  a callback cannot bleed over neighbours however it computes its geometry.
+- `draw` runs **only when a frame is presented**. Presenting is on demand
+  (INTERNALS 8.5), so a canvas that changes over time must ask for frames:
+  - state changed from an event callback: nothing to do, input already schedules
+    a frame;
+  - changed from another goroutine: `App.Do` / `App.Invalidate`;
+  - continuously animated: `App.Animate` or `App.OnFrame`, which hold the app at
+    continuous presenting while they run.
+  `w.Invalidate()` only requests a re-layout, not a frame, so it is not the way to repaint; use `App.Invalidate`.
+- `draw` must not mutate the widget tree. It reads theme colours via
+  `w.ColourOf(role)` so a canvas follows `App.SetTheme`; closures that cache
+  colours at construction defeat the runtime theme switch, so the doc comment
+  and example use `ColourOf`.
+- Text goes through `c.DrawText` / `c.MeasureText` with a `FontFace` the caller
+  supplies; the widget does not choose one.
+- Hit-testing and `Layout()` are inherited: a childless widget, hit anywhere in
+  its bounds.
+
+### Input contract
+
+A single `OnEvent` callback receives **every** event routed to the widget,
+rather than one callback per event type:
+
+```go
+ui.CanvasOnEvent(func(ev *ui.Event) bool {
+    switch ev.Type {
+    case ui.EventPointerDown: ...
+    case ui.EventPointerMove: ...
+    case ui.EventWheel:       ...
+    case ui.EventKeyDown:     ...
+    }
+    return true // consumed: stop bubbling
+})
+```
+
+Reasons: a drawing surface wants pointer down/move/up, wheel, keys and text
+together and switches on them anyway; one callback keeps `Event` the single
+vocabulary (no parallel canvas-specific event type to freeze); and new event
+types (touch, gesture) then arrive with no API change. The return value follows
+`HandleEvent`: true consumes, false lets the event bubble to ancestors.
+
+- **Pointer capture is automatic.** The App already routes `PointerMove` and
+  `PointerUp` to the widget that took the `PointerDown` until release, even when
+  the cursor leaves its bounds. A canvas gets drag/pan/draw for free; nothing to
+  opt into. Events carry **absolute** `Event.Pos`; use `ToLocal`.
+- **Hover** (`PointerEnter`/`Leave`) is tracked internally for `Hovered()` and
+  then passed to `OnEvent` like everything else.
+- **Keyboard and text** only arrive if `CanvasFocusable()` is set (the widget
+  returns true from `Focusable()`, so it joins Tab traversal and takes focus on
+  click). Default is not focusable: a pure display (chart, gauge) should not
+  steal Tab stops. `FocusGained`/`FocusLost` are delivered and tracked for
+  `Focused()`.
+- **Focus ring:** drawn by the widget **only when focusable**, via the shared
+  `strokeFocusable` helper (`ui/focus.go`), after `draw` returns, so keyboard
+  focus looks the same as every other control. No opt-out pre-freeze; a game HUD
+  that does not want a ring should not be focusable. Additive later if wrong.
+- **Disabled:** `SetEnabled(false)` stops event delivery as for any widget; the
+  callback can read `Enabled()` to dim its drawing.
+- Returning `false` for `PointerDown` behaves as for any non-consuming widget
+  (no special case).
+
+### Sizing
+
+`CanvasMinSize` feeds `MinSize()`. Default is zero, so callers normally give the
+widget a stretch weight in its `Box` so it takes the remaining space. The
+callback learns its real size each frame from `bounds`, so resize needs no
+handling. There is deliberately no `OnResize`: `Layout()` is the only place that
+would fire it and a self-drawing widget can derive everything from `bounds`.
+
+### Offscreen / cached rendering
+
+Redrawing a heavy canvas (thousands of points) each presented frame is wasteful
+when only the cursor moved. The seam already has `render.RenderTarget`
+(`ui.NewRenderTarget`, INTERNALS 3.3), so an app can render into a target and
+`DrawImage` it from `draw`. **No caching is built into `CanvasWidget` v1**:
+the invalidation policy (when is the cache stale?) is app knowledge and the
+widget cannot guess it. The doc comment shows the pattern. A built-in cache is
+additive if a real app wants one.
+
+### Accessibility
+
+Once the a11y seam lands, `CanvasWidget` gets a graphic/custom `Role` and an
+`AccessibleName` option. A canvas is opaque to assistive technology, so the name
+is all it can offer; the example sets one as a habit.
+
+### Design decisions (locked)
+
+| Area | Decision |
+|---|---|
+| Shape | One concrete widget, `NewCanvasWidget(draw, ...CanvasOption)`. Not an interface, not generic. |
+| Not a new capability | Embedding `BaseWidget` still works; it is the answer for anything with children or layout. |
+| Draw signature | `func(c render.Canvas, bounds geom.Rect)`, absolute coordinates, as the roadmap froze it. |
+| Clipping | Framework clips to bounds around the callback. |
+| Input | One `OnEvent(*Event) bool` for all event types; true consumes. |
+| Capture | Automatic, inherited from the dispatcher; no opt-in. |
+| Event coordinates | Absolute `Event.Pos`; `ToLocal` for local. |
+| Keyboard | Off by default; `CanvasFocusable()` opts in (Tab stop + keys + text). |
+| Focus ring | Drawn by the widget when focusable, via `strokeFocusable`. |
+| Redraw | On demand like everything else; time-varying canvases use `Animate`/`OnFrame`, or `App.Invalidate` from outside an event. Documented, not hidden. |
+| Theme | Callback reads colours via `ColourOf`, so `SetTheme` works. |
+| Background fill | No option; `draw` can `FillRect` first. One fewer frozen symbol. |
+| Caching | None built in; `RenderTarget` pattern documented. |
+| Resize | No callback; derive from `bounds`. |
+| Everything else | Tooltip, context menu, drag/drop, file drop inherited from `BaseWidget`. |
+
+### Tests (`guitest`)
+
+- The draw callback runs once per presented frame, receives `Bounds()`, and its
+  ops are clipped to them (`Recording` clip stack).
+- `SetDraw` swaps the renderer; a nil draw draws nothing and does not panic.
+- Press, move outside bounds, release: `OnEvent` sees all three (capture) with
+  absolute positions; `ToLocal` maps them.
+- Not focusable by default: Tab skips it and `KeyDown` never arrives. With
+  `CanvasFocusable`: Tab reaches it, keys and runes arrive, `Focused()` tracks,
+  and a focus ring is drawn.
+- `OnEvent` returning false bubbles to the parent; true does not.
+- A disabled widget receives no events.
+- Hover toggles `Hovered()` and the event still reaches `OnEvent`.
+- Captured state changed then `App.Invalidate()` redraws on the next frame with no
+  other input (the on-demand pacing path).
+- Theme switch: a callback using `ColourOf` picks up the new palette.
+
+### Open points
+
+- Export `ToLocal`/`Hovered`/`Focused`, or leave them to closures that hold the
+  widget? Lean: export. They are tiny, and otherwise every caller re-derives
+  hover from events.
+- Name: keep `CanvasWidget` (roadmap); plain `Canvas` would read as
+  `render.Canvas` at the call site.
+
+---
+
 ## IMPLEMENTATION PLAN
 
 1. **Skeleton & backend seam** — `geom` types, `render.Canvas`/`Input`
@@ -940,7 +1331,7 @@ contract rather than left as an implementation detail.
     capture.)*
 14. **Multi-window** — more than one top-level OS window, each with its own tree.
 15. **Dirty-region redraw** — only repaint changed regions instead of every frame.
-16. **Accessibility hooks** — expose roles/labels/state for assistive technology.
+16. **Accessibility hooks** — expose roles/labels/state for assistive technology. *(Deferred - see ROADMAP -> Deferred -> Accessibility.)*
 17. **Text editing enhancements** — soft word-wrap and selection/clipboard for
     `TextField` and `TextArea`.
 18. **Grid cell-spanning** — per-cell column/row spans in the `Grid` layout.
@@ -976,7 +1367,6 @@ These reshape public API and are hard/churny to retrofit after freeze.
 | Feature | Decision / scope |
 |---|---|
 | Data binding | Thin **optional** `Observable[T]` layered on existing callbacks (callbacks stay primary, mirrors the event-bus pattern). **Keep it dead simple** — no reactive rewrite. |
-| Accessibility (seam) | Add `Role` / `AccessibleName` / `AccessibleState` to `BaseWidget` + a `SemanticNode` tree-walk. **Annotate simple widgets now** (Button, Label, Checkbox, Radio, TextField); complex self-drawing widgets (List, Tree, Table) and OS bridges (UIAutomation / AT-SPI / NSAccessibility) **deferred** (like IME). Assert the semantic tree headlessly via `guitest`. |
 | i18n (seam-safety) | Ensure text layout does **not** assume `x-advance == Σ per-rune widths`, so a future bidi pass can land without an API break. (Translations/locale formatting itself is additive — see below.) |
 | Custom-draw widget | Public, blessed **`CanvasWidget`** — a thin `BaseWidget` wrapper taking a `func(c render.Canvas, bounds geom.Rect)` draw callback + an input callback. The escape hatch for charts, viz, diagram/drawing surfaces, game HUDs. The `render.Canvas` seam already exists. |
 | Theming | Ship a **dark theme + runtime theme switch** now; verify every widget reads `theme` in `Draw` (no colours cached at construction) — the switch is a correctness check on the theming architecture being frozen. OS light/dark **auto-detect deferred** (opt-in bridge). |
@@ -1015,9 +1405,126 @@ multitouch input · **dragging files *out* of the window** (the reverse directio
 EBiten surfaces no drag source, so it needs a real OS bridge, unlike inbound file
 drops which are now pre-freeze work).
 
+### Accessibility (deferred as a whole - decided, not yet scheduled)
+
+The whole a11y effort is deferred: the semantic seam, the simple-widget
+annotations and the OS bridges. It was previously pre-freeze (seam + simple
+widgets now, bridges later); that is withdrawn. Nothing exists in code yet.
+Because the seam is additive (new `BaseWidget` methods, a new optional backend
+interface), landing it after freeze does not break callers, with one exception
+to settle first - see the name clash below. Revisit before a real app has
+accessibility requirements, or before a v1 freeze.
+
+Scope when picked up (in order):
+
+1. Seam: role/name/state on `BaseWidget`, a `SemanticNode` + `App` tree walk,
+   `guitest` assertions (`Harness.Semantics()`). Annotate Button, Label,
+   Checkbox, Radio, TextField, `CanvasWidget` (graphic role + name option).
+2. Complex widgets: List / Tree / Table / Menu / Tabs via an optional
+   `SemanticChildren()` hook (they are self-drawn and expose few real children).
+3. OS bridges (UIAutomation / AT-SPI / NSAccessibility) behind an optional
+   `render` interface, like `IMEController`.
+
+Open design points to decide then:
+
+- **Name clash:** `Role*` constants are already the colour roles (`ColourRole`:
+  `RoleSurface`, `RolePrimary`...). The semantic type needs a distinct name
+  (e.g. `SemanticRole`), or the frozen API conflates the two. This is the one
+  thing worth deciding before freeze.
+- Role set, a state struct (checked/selected/expanded/disabled/focused/value/
+  min-max-now), and name vs value vs description (a field's value is not its name).
+- Derived defaults (Button derives its name from its text) vs overrides.
+- A labelled-by relation (`Label` naming a `TextField`), live regions (`Toast`),
+  hidden widgets dropping out of the tree, focused node, screen bounds.
+- **Actions** (invoke, focus, expand/collapse, set value, scroll): a bridge needs
+  them to drive widgets; reserve the shape in the node type, hard to retrofit.
+- A change notification (via the event bus), since on-demand presenting gives a
+  bridge no frame signal to poll.
+- Masked `TextField` must not leak its content into the tree (see MASKED TEXT
+  INPUT); needs a test when the tree exists.
+- Keyboard-parity audit: mouse-only paths (a `CanvasWidget` with no key handling).
+- Related, not blocking: high-contrast theme and reduced-motion for the fades.
+
 ### Out of scope / userland
 
 Form validation (compose a `Label` under the field) · app-level undo/command
 history · markdown parsing · app preferences / recent-files storage · charts &
 data-viz (build on `CanvasWidget`) · printing / PDF export · video / media
 playback · responsive layout breakpoints.
+
+---
+
+## STAGE 2 - UI / VISUAL POLISH
+
+Follows the roadmap above. Goal: richer look and feel without changing the
+widget model. Starting point is the current theme: a 9-role dark palette plus
+Font, FontSize and CornerRadius, with per-widget colour overrides
+(`SetColour(role, c)`) and `App.SetTheme` for runtime switching.
+
+### 2.1 Themes (low effort, high visible payoff)
+
+| Item | Scope |
+|---|---|
+| Light theme | `theme.LightPalette()` / `theme.Light()` alongside `DefaultPalette()`. |
+| High-contrast theme | Accessibility-oriented palette; verify focus and selection stay visible. |
+| Brand/custom themes | Document building a `theme.Palette` by hand; example in `examples/theming`. |
+| Theme switcher | Runtime light/dark/high-contrast toggle via `App.SetTheme`. Doubles as a correctness check that no widget caches colours at construction. |
+| OS light/dark detect | Opt-in bridge to follow the system theme (already deferred in roadmap). |
+
+### 2.2 Richer Theme model
+
+`design.md` (THEMING) planned `Spacing` and `Padding` on `Theme` but
+`theme/theme.go` does not have them yet. Add, then have widgets read them:
+
+- `Spacing` (default gap between widgets) and `Padding` (`geom.Insets`).
+- Border width.
+- Elevation / shadow strength (builds on `ui/shadow.go`).
+- Per-state colours: hover, pressed, focus, selected, disabled.
+- Keep additive: zero values fall back to current behaviour.
+
+### 2.3 Canvas capabilities (`render.Canvas`)
+
+Current API: rects, rounded rects, lines, circles, text, images, clip stack.
+Missing, to be added on the seam and implemented in `internal/ebiten` and
+`guitest`:
+
+- Gradients (linear, at least).
+- Opacity / alpha layer.
+- Blur (e.g. for shadows or modal backdrops).
+- Dashed strokes.
+- Per-corner radii.
+
+### 2.4 Animation
+
+`ui/animation.go` exists. Use it for:
+
+- Hover and press transitions on Button, Checkbox, Radio, Slider, Tabs.
+- Focus-ring fade.
+- Redraw stays on demand (see framepace work): animations must `Invalidate`
+  only while running.
+
+### 2.5 Widget polish
+
+- Focus rings consistent across all focusable widgets.
+- Table zebra striping, row hover, header styling.
+- Tab styling (active indicator, hover).
+- Audit every widget `Draw` for hard-coded colours; route through theme roles.
+
+### 2.6 Already planned elsewhere, relevant to UI
+
+`RichText` / `[]TextSpan`, public `CanvasWidget` (done), a11y (deferred),
+dirty-region redraw. Tracked in ROADMAP; do not duplicate.
+
+### 2.7 Suggested order
+
+1. Light + high-contrast themes and switcher (2.1).
+2. Extend `Theme` with state colours, spacing, border width (2.2).
+3. Hover/press transitions via animation (2.4).
+4. Widget polish pass (2.5).
+5. Canvas additions (2.3) as the above demand them.
+
+### 2.8 Testing
+
+Use `guitest` recorded drawing ops to assert theme colours reach each widget
+after `SetTheme`, and that state colours apply on hover/press/focus. Not yet
+verified against a real window.

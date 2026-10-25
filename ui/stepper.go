@@ -154,11 +154,7 @@ func (s *Stepper) Draw(canvas render.Canvas) {
 	rad := s.cornerRadius()
 
 	canvas.FillRoundRect(b, rad, s.ColourOf(RoleSurface))
-	border := s.ColourOf(RoleBorder)
-	if s.focused {
-		border = s.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(b, rad, border, 1)
+	strokeFocusable(canvas, b, rad, s.ColourOf(RoleBorder), s.ColourOf(RoleAccent), s.focused)
 
 	textColour := s.ColourOf(RoleText)
 	if !s.Enabled() {
@@ -174,10 +170,10 @@ func (s *Stepper) Draw(canvas render.Canvas) {
 	upRect := geom.Rect{X: col.X, Y: col.Y, W: col.W, H: col.H / 2}
 	downRect := geom.Rect{X: col.X, Y: midY, W: col.W, H: col.H / 2}
 	if s.hoverUp {
-		canvas.FillRect(upRect, lighten(s.ColourOf(RoleSurface), 1.25))
+		canvas.FillRect(upRect, tint(s.ColourOf(RoleSurface), tintHover))
 	}
 	if s.hoverDown {
-		canvas.FillRect(downRect, lighten(s.ColourOf(RoleSurface), 1.25))
+		canvas.FillRect(downRect, tint(s.ColourOf(RoleSurface), tintHover))
 	}
 	arrow := s.ColourOf(RoleText)
 	if !s.Enabled() {

@@ -35,12 +35,7 @@ type namedPalette struct {
 func palettes() []namedPalette {
 	return []namedPalette{
 		{"Dark", theme.DefaultPalette()},
-		{"Light", theme.Palette{
-			Background: rgb(0xf4f5f8), Surface: rgb(0xffffff),
-			Primary: rgb(0x3b6ea5), OnPrimary: rgb(0xffffff),
-			Text: rgb(0x1b1d22), TextMuted: rgb(0x6b6f7a),
-			Border: rgb(0xd0d3da), Accent: rgb(0x3b6ea5), Disabled: rgb(0xc8ccd4),
-		}},
+		{"Light", theme.LightPalette()},
 		{"Ocean", theme.Palette{
 			Background: rgb(0x0e1b22), Surface: rgb(0x142a33),
 			Primary: rgb(0x2bb3b0), OnPrimary: rgb(0x04201f),
@@ -141,6 +136,18 @@ func main() {
 	// --- Pickers (left column). Each button updates state then re-applies. ---
 	controls := ui.NewContainer()
 	controls.SetLayout(ui.VBox(10))
+
+	toggle := ui.NewButton("Toggle light / dark")
+	toggle.OnClick(func() {
+		if curPalette.IsDark() {
+			curPalette = theme.LightPalette()
+		} else {
+			curPalette = theme.DefaultPalette()
+		}
+		applyTheme()
+		status.SetText("Toggled to " + map[bool]string{true: "dark", false: "light"}[curPalette.IsDark()])
+	})
+	controls.Add(toggle)
 
 	controls.Add(ui.NewLabel("Palette"))
 	palRow := ui.NewContainer()

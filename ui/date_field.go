@@ -150,11 +150,7 @@ func (f *DateField) Draw(canvas render.Canvas) {
 	b := f.Bounds()
 	rad := f.cornerRadius()
 	canvas.FillRoundRect(b, rad, f.ColourOf(RoleSurface))
-	border := f.ColourOf(RoleBorder)
-	if f.focused || f.open {
-		border = f.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(b, rad, border, 1)
+	strokeFocusable(canvas, b, rad, f.ColourOf(RoleBorder), f.ColourOf(RoleAccent), f.focused || f.open)
 
 	textColour := f.ColourOf(RoleText)
 	if !f.hasValue {

@@ -53,7 +53,8 @@ type TextField struct {
 	preedit      string // IME composition (uncommitted) shown inline at the caret
 	preeditCaret int    // caret position within preedit, in runes
 
-	masked      bool // display mask runes instead of the real text
+	masked      bool                     // display mask runes instead of the real text
+	hist        editStack[int, fieldSel] // undo/redo history
 	placeholder string
 	onChange    func(string)
 	onSubmit    func(string)
@@ -95,6 +96,7 @@ func (t *TextField) SetText(s string) {
 	t.runes = []rune(s)
 	t.caret = len(t.runes)
 	t.anchor = t.caret
+	t.hist.clear() // loading content is not an edit; do not undo into the old text
 	t.fireChange()
 }
 
@@ -175,13 +177,6 @@ func (t *TextField) selRange() (lo, hi int) {
 	return t.caret, t.anchor
 }
 
-func (t *TextField) deleteSelection() {
-	lo, hi := t.selRange()
-	t.runes = append(t.runes[:lo], t.runes[hi:]...)
-	t.caret = lo
-	t.anchor = lo
-}
-
 // setCaret moves the caret, optionally extending the selection (keeping the
 // anchor); otherwise it collapses the selection.
 func (t *TextField) setCaret(pos int, extend bool) {
@@ -203,45 +198,113 @@ func (t *TextField) selectAll() {
 }
 
 // --- editing ---
+//
+// Every change to the text goes through replace, which records it for undo and
+// fires OnChange once. Undo and Redo apply recorded edits with splice directly,
+// so they do not record themselves.
+
+// fieldSel is the caret and selection anchor, saved with each edit.
+type fieldSel struct{ caret, anchor int }
+
+func (t *TextField) sel() fieldSel { return fieldSel{t.caret, t.anchor} }
+
+// splice replaces runes [lo,hi) with with, building a fresh slice so recorded
+// edits never alias the live text.
+func (t *TextField) splice(lo, hi int, with []rune) {
+	out := make([]rune, 0, len(t.runes)-(hi-lo)+len(with))
+	out = append(out, t.runes[:lo]...)
+	out = append(out, with...)
+	out = append(out, t.runes[hi:]...)
+	t.runes = out
+}
+
+// replace swaps runes [lo,hi) for with, leaves the caret after the new text and
+// records the edit. Replacing a selection never merges with neighbouring edits.
+func (t *TextField) replace(lo, hi int, with []rune, kind editKind) {
+	if lo == hi && len(with) == 0 {
+		return
+	}
+	before := t.sel()
+	if before.caret != before.anchor {
+		kind = kindOther
+	}
+	removed := append([]rune(nil), t.runes[lo:hi]...)
+	t.splice(lo, hi, with)
+	t.caret = lo + len(with)
+	t.anchor = t.caret
+	t.hist.add(textEdit[int, fieldSel]{
+		at: lo, removed: removed, inserted: append([]rune(nil), with...),
+		before: before, after: t.sel(), kind: kind,
+	})
+	t.fireChange()
+}
+
+// Undo reverts the most recent edit and restores the caret and selection from
+// before it. It reports false if there is nothing to undo.
+func (t *TextField) Undo() bool {
+	e, ok := t.hist.popUndo()
+	if !ok {
+		return false
+	}
+	t.splice(e.at, e.at+len(e.inserted), e.removed)
+	t.caret, t.anchor = e.before.caret, e.before.anchor
+	t.hist.redo = append(t.hist.redo, e)
+	t.hist.seal()
+	t.fireChange()
+	return true
+}
+
+// Redo re-applies the most recently undone edit. It reports false if there is
+// nothing to redo.
+func (t *TextField) Redo() bool {
+	e, ok := t.hist.popRedo()
+	if !ok {
+		return false
+	}
+	t.splice(e.at, e.at+len(e.removed), e.inserted)
+	t.caret, t.anchor = e.after.caret, e.after.anchor
+	t.hist.undo = append(t.hist.undo, e)
+	t.hist.seal()
+	t.fireChange()
+	return true
+}
+
+// CanUndo reports whether Undo has anything to revert.
+func (t *TextField) CanUndo() bool { return len(t.hist.undo) > 0 }
+
+// CanRedo reports whether Redo has anything to re-apply.
+func (t *TextField) CanRedo() bool { return len(t.hist.redo) > 0 }
+
+// ClearHistory forgets all undo and redo steps.
+func (t *TextField) ClearHistory() { t.hist.clear() }
 
 func (t *TextField) insert(r rune) {
-	if t.hasSelection() {
-		t.deleteSelection()
-	}
-	t.runes = append(t.runes, 0)
-	copy(t.runes[t.caret+1:], t.runes[t.caret:])
-	t.runes[t.caret] = r
-	t.caret++
-	t.anchor = t.caret
-	t.fireChange()
+	lo, hi := t.selRange()
+	t.replace(lo, hi, []rune{r}, kindType)
 }
 
 func (t *TextField) deleteBack() {
 	if t.hasSelection() {
-		t.deleteSelection()
-		t.fireChange()
+		lo, hi := t.selRange()
+		t.replace(lo, hi, nil, kindOther)
 		return
 	}
 	if t.caret == 0 {
 		return
 	}
-	t.runes = append(t.runes[:t.caret-1], t.runes[t.caret:]...)
-	t.caret--
-	t.anchor = t.caret
-	t.fireChange()
+	t.replace(t.caret-1, t.caret, nil, kindBackspace)
 }
 
 func (t *TextField) deleteForward() {
 	if t.hasSelection() {
-		t.deleteSelection()
-		t.fireChange()
+		lo, hi := t.selRange()
+		t.replace(lo, hi, nil, kindOther)
 		return
 	}
 	if t.caret >= len(t.runes) {
 		return
 	}
-	t.runes = append(t.runes[:t.caret], t.runes[t.caret+1:]...)
-	t.fireChange()
+	t.replace(t.caret, t.caret+1, nil, kindDelete)
 }
 
 // insertString inserts s at the caret, replacing any selection.
@@ -249,18 +312,8 @@ func (t *TextField) insertString(s string) {
 	if s == "" {
 		return
 	}
-	if t.hasSelection() {
-		t.deleteSelection()
-	}
-	rs := []rune(s)
-	out := make([]rune, 0, len(t.runes)+len(rs))
-	out = append(out, t.runes[:t.caret]...)
-	out = append(out, rs...)
-	out = append(out, t.runes[t.caret:]...)
-	t.runes = out
-	t.caret += len(rs)
-	t.anchor = t.caret
-	t.fireChange()
+	lo, hi := t.selRange()
+	t.replace(lo, hi, []rune(s), kindOther)
 }
 
 func (t *TextField) selectedText() string {
@@ -287,8 +340,8 @@ func (t *TextField) cutSelection() {
 		return
 	}
 	t.copySelection()
-	t.deleteSelection()
-	t.fireChange()
+	lo, hi := t.selRange()
+	t.replace(lo, hi, nil, kindOther)
 }
 
 func (t *TextField) paste() {
@@ -315,7 +368,8 @@ func (t *TextField) composing() bool { return t.preedit != "" }
 // preedit) replaces any selection, so the eventual commit lands at the caret.
 func (t *TextField) setPreedit(text string, caret int) {
 	if text != "" && t.preedit == "" && t.hasSelection() {
-		t.deleteSelection()
+		lo, hi := t.selRange()
+		t.replace(lo, hi, nil, kindOther)
 	}
 	t.preedit = text
 	n := len([]rune(text))
@@ -364,11 +418,7 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	rad := t.cornerRadius()
 
 	canvas.FillRoundRect(b, rad, t.ColourOf(RoleSurface))
-	border := t.ColourOf(RoleBorder)
-	if t.focused {
-		border = t.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(b, rad, border, 1)
+	strokeFocusable(canvas, b, rad, t.ColourOf(RoleBorder), t.ColourOf(RoleAccent), t.focused)
 
 	inner := b.Inset(textFieldPadding)
 	canvas.PushClip(inner)
@@ -490,6 +540,7 @@ func (t *TextField) HandleEvent(ev *Event) bool {
 	case EventFocusLost:
 		t.focused = false
 		t.dragging = false
+		t.hist.seal()
 		t.preedit = ""
 		t.preeditCaret = 0
 		return true
@@ -522,6 +573,16 @@ func (t *TextField) handleKey(k render.Key, mods render.ModifierSet) bool {
 			return true
 		case render.KeyV:
 			t.paste()
+			return true
+		case render.KeyZ:
+			if extend {
+				t.Redo()
+			} else {
+				t.Undo()
+			}
+			return true
+		case render.KeyY:
+			t.Redo()
 			return true
 		}
 	}
@@ -564,4 +625,15 @@ func (t *TextField) moveRight(extend bool) {
 		return
 	}
 	t.setCaret(t.caret+1, extend)
+}
+
+// ReplaceRange replaces the runes in [start, end) (order independent, clamped to
+// the text) with s, and leaves the caret after s with no selection. Unlike
+// SetText it is recorded as a single undoable step, and it fires OnChange.
+func (t *TextField) ReplaceRange(start, end int, s string) {
+	if start > end {
+		start, end = end, start
+	}
+	clamp := func(i int) int { return max(0, min(i, len(t.runes))) }
+	t.replace(clamp(start), clamp(end), []rune(s), kindOther)
 }

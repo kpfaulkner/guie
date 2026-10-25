@@ -200,11 +200,7 @@ func (p *ColourPicker) drawTrack(canvas render.Canvas, i int) {
 		sw := tr.W/float64(strips) + 1
 		canvas.FillRect(geom.Rect{X: sx, Y: tr.Y, W: sw, H: tr.H}, p.gradientColour(i, t))
 	}
-	border := p.ColourOf(RoleBorder)
-	if p.active == i && (p.dragging || p.focused()) {
-		border = p.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRect(tr, border, 1)
+	strokeFocusable(canvas, tr, 0, p.ColourOf(RoleBorder), p.ColourOf(RoleAccent), p.active == i && (p.dragging || p.focused()))
 
 	// Handle.
 	hx := tr.X + p.channel(i)*tr.W

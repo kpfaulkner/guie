@@ -72,6 +72,7 @@ type treeContext struct {
 	openPopup     func(*Popup)
 	closePopup    func(*Popup)
 	theme         *theme.Theme
+	animate       func(duration float64, ease Easing, apply func(t float64)) *Animation
 	clipboard     render.Clipboard
 }
 

@@ -74,3 +74,26 @@ func (b *BaseWidget) ColourOf(role ColourRole) color.Color {
 	}
 	return paletteColour(b.appTheme().Palette, role)
 }
+
+// Tint strengths for raised/hover surfaces, as the fraction of the way toward
+// white (on a dark surface) or black (on a light one).
+const (
+	tintHeader = 0.05 // table header band
+	tintHover  = 0.06 // hovered row, cell or tab
+	tintStrong = 0.09 // stronger emphasis: hovered header cell, tooltip body
+	tintFlat   = 0.08 // flat button hover
+	tintPress  = 0.14 // flat button pressed
+)
+
+// tint nudges c away from the page: toward white if c is dark, toward black if
+// it is light. Scaling a colour up (lighten) does nothing on a light theme,
+// where surfaces are already near white, so hover/raised shades go through here
+// to stay visible on both.
+func tint(c color.Color, t float64) color.Color {
+	r, g, b, _ := c.RGBA()
+	lum := (299*r + 587*g + 114*b) / 1000
+	if lum < 0x8000 {
+		return mixColour(c, color.White, t)
+	}
+	return mixColour(c, color.Black, t)
+}

@@ -89,7 +89,7 @@ func (a *App) drawTooltip(c render.Canvas) {
 	if a.shadows {
 		drawShadow(c, rect, rad)
 	}
-	c.FillRoundRect(rect, rad, lighten(pal.Surface, 1.3))
+	c.FillRoundRect(rect, rad, tint(pal.Surface, tintStrong))
 	c.StrokeRoundRect(rect, rad, pal.Border, 1)
 	inner := geom.Rect{X: x + tooltipPad, Y: y + tooltipPad, W: size.W, H: size.H}
 	drawText(c, a.tooltipText, inner, geom.AlignStart, f, pal.Text)

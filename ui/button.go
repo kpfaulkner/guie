@@ -28,6 +28,9 @@ type Button struct {
 	focused bool
 	flat    bool // no fill/border until hover/press (toolbar/ghost style)
 
+	hoverFade fade // eases toward 1 while hovered
+	pressFade fade // eases toward 1 while pressed over the button
+
 	font render.FontFace
 }
 
@@ -135,14 +138,24 @@ func (b *Button) fillColour() color.Color {
 		return b.ColourOf(RoleDisabled)
 	}
 	base := b.ColourOf(RolePrimary)
-	switch {
-	case b.pressed && b.hover:
-		return darken(base, 0.8)
-	case b.hover:
-		return lighten(base, 1.15)
-	default:
-		return base
+	// Cross-fade idle -> hover -> pressed rather than switching, so a state
+	// change eases in over transitionDuration.
+	c := mixColour(base, lighten(base, 1.15), b.hoverFade.level)
+	return mixColour(c, darken(base, 0.8), b.pressFade.level)
+}
+
+// syncFades points the hover and press fades at the button's current state.
+// Called after every event, so any path that changes hover/pressed is covered.
+func (b *Button) syncFades() {
+	hv, pr := 0.0, 0.0
+	if b.hover {
+		hv = 1
 	}
+	if b.pressed && b.hover {
+		pr = 1
+	}
+	b.fadeTo(&b.hoverFade, hv)
+	b.fadeTo(&b.pressFade, pr)
 }
 
 func (b *Button) labelColour() color.Color {
@@ -160,9 +173,18 @@ func (b *Button) labelColour() color.Color {
 func (b *Button) flatHighlight() color.Color {
 	base := b.ColourOf(RoleSurface)
 	if b.pressed && b.hover {
-		return lighten(base, 1.8)
+		return tint(base, tintPress)
 	}
-	return lighten(base, 1.45)
+	return tint(base, tintFlat)
+}
+
+// flatFill is the flat button's current highlight: the hover colour faded in by
+// the hover level, shifting to the pressed colour as the press level rises.
+// Fully transparent at rest.
+func (b *Button) flatFill() color.Color {
+	base := b.ColourOf(RoleSurface)
+	c := mixColour(tint(base, tintFlat), tint(base, tintPress), b.pressFade.level)
+	return withAlpha(c, b.hoverFade.level)
 }
 
 // Focusable reports whether the button can take keyboard focus (only when
@@ -175,16 +197,16 @@ func (b *Button) Draw(c render.Canvas) {
 	rect := b.Bounds()
 	rad := b.cornerRadius()
 	if b.flat {
-		if b.Enabled() && (b.hover || b.pressed) {
-			c.FillRoundRect(rect, rad, b.flatHighlight())
+		if b.Enabled() && b.hoverFade.level > 0 {
+			c.FillRoundRect(rect, rad, b.flatFill())
 		}
 	} else {
 		c.FillRoundRect(rect, rad, b.fillColour())
-		c.StrokeRoundRect(rect, rad, b.ColourOf(RoleBorder), 1)
+		strokeFocusable(c, rect, rad, b.ColourOf(RoleBorder), b.ColourOf(RoleAccent), b.focused)
 	}
-	if b.focused {
-		ring := rect.Inset(geom.UniformInsets(2))
-		c.StrokeRoundRect(ring, maxF(0, rad-1), b.ColourOf(RoleAccent), 1)
+	if b.flat && b.focused {
+		// A flat button has no border at rest, only the focus ring.
+		strokeFocusable(c, rect, rad, b.ColourOf(RoleBorder), b.ColourOf(RoleAccent), true)
 	}
 
 	content := b.contentSize()
@@ -221,6 +243,7 @@ func (b *Button) HandleEvent(ev *Event) bool {
 	if !b.Enabled() {
 		return false
 	}
+	defer b.syncFades()
 	switch ev.Type {
 	case EventPointerEnter:
 		b.hover = true

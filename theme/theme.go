@@ -60,3 +60,53 @@ func Default() Theme {
 		CornerRadius: 5,
 	}
 }
+
+// LightPalette returns the built-in light palette: a near-white backdrop with
+// white surfaces, dark text and the same blue family as the dark theme. Border
+// and Disabled are soft greys; Accent matches Primary so focus and selection
+// stay clearly visible on light surfaces.
+func LightPalette() Palette {
+	return Palette{
+		Background: color.RGBA{R: 0xf4, G: 0xf5, B: 0xf8, A: 0xff},
+		Surface:    color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+		Primary:    color.RGBA{R: 0x3b, G: 0x6e, B: 0xa5, A: 0xff},
+		OnPrimary:  color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+		Text:       color.RGBA{R: 0x1b, G: 0x1d, B: 0x22, A: 0xff},
+		TextMuted:  color.RGBA{R: 0x6b, G: 0x6f, B: 0x7a, A: 0xff},
+		Border:     color.RGBA{R: 0xd0, G: 0xd3, B: 0xda, A: 0xff},
+		Accent:     color.RGBA{R: 0x3b, G: 0x6e, B: 0xa5, A: 0xff},
+		Disabled:   color.RGBA{R: 0xc8, G: 0xcc, B: 0xd4, A: 0xff},
+	}
+}
+
+// Dark returns the built-in dark theme. It is the same as Default and exists so
+// Dark and Light read as a pair.
+func Dark() Theme { return Default() }
+
+// Light returns the built-in light theme: the light palette with the same font
+// size and corner radius as the dark theme.
+func Light() Theme {
+	t := Default()
+	t.Palette = LightPalette()
+	return t
+}
+
+// IsDark reports whether the palette is a dark one, judged by the luminance of
+// its Background. Useful for a toggle that flips to the opposite theme.
+func (p Palette) IsDark() bool {
+	r, g, b, _ := p.Background.RGBA()
+	// Rec. 601 luma on 16-bit channels; below mid-grey counts as dark.
+	return (299*r+587*g+114*b)/1000 < 0x8000
+}
+
+// Toggled returns the light theme if t is dark, otherwise the dark theme. The
+// font, font size and corner radius of t are carried over so a toggle does not
+// reset them.
+func (t Theme) Toggled() Theme {
+	n := Dark()
+	if t.Palette.IsDark() {
+		n = Light()
+	}
+	n.Font, n.FontSize, n.CornerRadius = t.Font, t.FontSize, t.CornerRadius
+	return n
+}

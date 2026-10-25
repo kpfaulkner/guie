@@ -44,12 +44,13 @@ func (g *RadioGroup) selectIndex(i int) {
 // Space/Enter while focused) deselects the others in its group.
 type RadioButton struct {
 	BaseWidget
-	label    string
-	group    *RadioGroup
-	index    int
-	selected bool
-	hover    bool
-	focused  bool
+	label     string
+	group     *RadioGroup
+	index     int
+	selected  bool
+	hover     bool
+	hoverFade fade // eases toward 1 while hovered
+	focused   bool
 
 	font render.FontFace
 }
@@ -99,14 +100,10 @@ func (r *RadioButton) Draw(canvas render.Canvas) {
 	radius := side / 2
 	center := geom.Point{X: b.X + radius, Y: b.Y + b.H/2}
 
-	if r.hover {
-		canvas.FillCircle(center, radius, r.ColourOf(RoleSurface))
+	if r.hoverFade.level > 0 {
+		canvas.FillCircle(center, radius, withAlpha(r.ColourOf(RoleSurface), r.hoverFade.level))
 	}
-	border := r.ColourOf(RoleBorder)
-	if r.focused {
-		border = r.ColourOf(RoleAccent)
-	}
-	canvas.StrokeCircle(center, radius, border, 1)
+	strokeFocusableCircle(canvas, center, radius, r.ColourOf(RoleBorder), r.ColourOf(RoleAccent), r.focused)
 	if r.selected {
 		canvas.FillCircle(center, radius*0.5, r.ColourOf(RoleAccent))
 	}
@@ -122,9 +119,11 @@ func (r *RadioButton) HandleEvent(ev *Event) bool {
 	switch ev.Type {
 	case EventPointerEnter:
 		r.hover = true
+		r.fadeTo(&r.hoverFade, 1)
 		return true
 	case EventPointerLeave:
 		r.hover = false
+		r.fadeTo(&r.hoverFade, 0)
 		return true
 	case EventClick:
 		r.Select()

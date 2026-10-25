@@ -137,7 +137,7 @@ func (m *MenuBar) Draw(canvas render.Canvas) {
 		case i == m.openIdx:
 			canvas.FillRect(r, m.ColourOf(RolePrimary))
 		case i == m.hover:
-			canvas.FillRect(r, lighten(m.ColourOf(RoleSurface), 1.25))
+			canvas.FillRect(r, tint(m.ColourOf(RoleSurface), tintHover))
 		}
 		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: vCenterY(f, r.Y, r.H)}, f, m.ColourOf(RoleText))
 	}

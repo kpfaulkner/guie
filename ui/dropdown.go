@@ -100,11 +100,7 @@ func (d *DropdownCombo) Draw(canvas render.Canvas) {
 	b := d.Bounds()
 	rad := d.cornerRadius()
 	canvas.FillRoundRect(b, rad, d.ColourOf(RoleSurface))
-	border := d.ColourOf(RoleBorder)
-	if d.focused || d.open {
-		border = d.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(b, rad, border, 1)
+	strokeFocusable(canvas, b, rad, d.ColourOf(RoleBorder), d.ColourOf(RoleAccent), d.focused || d.open)
 
 	textColour := d.ColourOf(RoleText)
 	if d.selected < 0 {

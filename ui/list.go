@@ -161,7 +161,7 @@ func (l *List) Draw(canvas render.Canvas) {
 		case i == l.selected:
 			canvas.FillRect(row, l.ColourOf(RolePrimary))
 		case i == l.hoverRow:
-			canvas.FillRect(row, lighten(l.ColourOf(RoleSurface), 1.25))
+			canvas.FillRect(row, tint(l.ColourOf(RoleSurface), tintHover))
 		}
 		textColour := l.ColourOf(RoleText)
 		if i == l.selected {

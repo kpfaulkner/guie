@@ -266,8 +266,11 @@ func main() {
 			if from == "" {
 				return
 			}
-			n := strings.Count(area.Text(), from)
-			area.SetText(strings.ReplaceAll(area.Text(), from, to))
+			text := area.Text()
+			n := strings.Count(text, from)
+			if n > 0 { // one undoable step, unlike SetText
+				area.ReplaceRange(0, len([]rune(text)), strings.ReplaceAll(text, from, to))
+			}
 			say(fmt.Sprintf("Replaced %d occurrence(s)", n))
 			area.RequestFocus()
 		})
@@ -282,6 +285,8 @@ func main() {
 	bar.AddMenu("Edit",
 		ui.NewMenuItem("Find", findText),
 		ui.NewMenuItem("Replace", replaceText),
+		ui.NewMenuItem("Undo", func() { area.Undo() }),
+		ui.NewMenuItem("Redo", func() { area.Redo() }),
 	)
 	bar.AddMenu("Help",
 		ui.NewMenuItem("About", func() {

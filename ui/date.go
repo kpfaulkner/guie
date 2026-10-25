@@ -169,11 +169,7 @@ func (d *DatePicker) Draw(canvas render.Canvas) {
 	}
 	b := d.Bounds()
 	canvas.FillRoundRect(b, d.cornerRadius(), d.ColourOf(RoleSurface))
-	border := d.ColourOf(RoleBorder)
-	if d.focused {
-		border = d.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(b, d.cornerRadius(), border, 1)
+	strokeFocusable(canvas, b, d.cornerRadius(), d.ColourOf(RoleBorder), d.ColourOf(RoleAccent), d.focused)
 
 	origin, cellW, rowH := d.grid()
 	textCol := d.ColourOf(RoleText)
@@ -206,7 +202,7 @@ func (d *DatePicker) Draw(canvas render.Canvas) {
 		case sameDay(date, d.selected):
 			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColourOf(RolePrimary))
 		case i == d.hover:
-			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, lighten(d.ColourOf(RoleSurface), 1.25))
+			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, tint(d.ColourOf(RoleSurface), tintHover))
 		}
 		if sameDay(date, d.today) && !sameDay(date, d.selected) {
 			canvas.StrokeRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColourOf(RoleAccent), 1)

@@ -301,7 +301,7 @@ func (t *Tree) Draw(canvas render.Canvas) {
 		case r.node == t.selected:
 			canvas.FillRect(row, t.ColourOf(RolePrimary))
 		case r.node == t.hover:
-			canvas.FillRect(row, lighten(t.ColourOf(RoleSurface), 1.25))
+			canvas.FillRect(row, tint(t.ColourOf(RoleSurface), tintHover))
 		}
 
 		textColour := t.ColourOf(RoleText)

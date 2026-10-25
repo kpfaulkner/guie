@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	tabHPad = 12 // horizontal padding inside a tab title
-	tabVPad = 6  // vertical padding of the tab strip
+	tabHPad       = 12 // horizontal padding inside a tab title
+	tabVPad       = 6  // vertical padding of the tab strip
+	tabIndicatorH = 2  // thickness of the active-tab underline
 )
 
 // tab is one pane: a title shown in the strip and its content widget.
@@ -26,8 +27,17 @@ type TabContainer struct {
 	selected int
 	hover    int
 	focused  bool
-	onChange func(int)
-	font     render.FontFace
+
+	hoverFades []fade // per-tab hover level, parallel to tabs
+
+	// Active-tab underline. It slides between tabs: while indAnim runs it is
+	// drawn at the blend of indFrom and indTo (x relative to the strip's left
+	// edge, so it survives a resize); once settled it snaps to the live rect.
+	indFrom, indTo tabSpan
+	indT           float64
+	indAnim        *Animation
+	onChange       func(int)
+	font           render.FontFace
 }
 
 // NewTabContainer returns an empty TabContainer.
@@ -41,6 +51,7 @@ func (t *TabContainer) OnChange(fn func(int)) { t.onChange = fn }
 // AddTab appends a pane with the given title and content widget.
 func (t *TabContainer) AddTab(title string, content Widget) {
 	t.tabs = append(t.tabs, tab{title: title, content: content})
+	t.hoverFades = append(t.hoverFades, fade{})
 	if t.ctx != nil {
 		content.mount(content, t.self, t.ctx)
 	}
@@ -55,6 +66,7 @@ func (t *TabContainer) Select(i int) {
 	if i < 0 || i >= len(t.tabs) || i == t.selected {
 		return
 	}
+	t.slideIndicator(t.selected, i)
 	t.selected = i
 	if t.onChange != nil {
 		t.onChange(i)
@@ -175,23 +187,28 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	b := t.Bounds()
 	sh := t.stripHeight()
 
-	canvas.FillRect(geom.Rect{X: b.X, Y: b.Y, W: b.W, H: sh}, t.ColourOf(RoleSurface))
+	surface := t.ColourOf(RoleSurface)
+	canvas.FillRect(geom.Rect{X: b.X, Y: b.Y, W: b.W, H: sh}, surface)
 	for i, tb := range t.tabs {
 		r := t.titleRect(i)
-		switch {
-		case i == t.selected:
-			canvas.FillRect(r, t.ColourOf(RolePrimary))
-		case i == t.hover:
-			canvas.FillRect(r, lighten(t.ColourOf(RoleSurface), 1.25))
-		}
-		col := t.ColourOf(RoleText)
+		hv := t.hoverFades[i].level
+		col := mixColour(t.ColourOf(RoleTextMuted), t.ColourOf(RoleText), hv)
 		if i == t.selected {
-			col = t.ColourOf(RoleOnPrimary)
+			// The active tab is raised a shade and its label is full-strength;
+			// the underline below marks it.
+			canvas.FillRect(r, tint(surface, tintHover))
+			col = t.ColourOf(RoleText)
+		} else if hv > 0 {
+			canvas.FillRect(r, withAlpha(tint(surface, tintHover), hv))
 		}
 		canvas.DrawText(tb.title, geom.Point{X: r.X + tabHPad, Y: vCenterY(f, r.Y, r.H)}, f, col)
 	}
-	// Separator line under the strip.
+	// Separator line under the strip, with the active-tab underline over it.
 	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, t.ColourOf(RoleBorder), 1)
+	if len(t.tabs) > 0 {
+		u := t.indicatorSpan()
+		canvas.FillRect(geom.Rect{X: b.X + u.x, Y: b.Y + sh - tabIndicatorH, W: u.w, H: tabIndicatorH}, t.ColourOf(RoleAccent))
+	}
 
 	if a := t.active(); a != nil && a.Visible() {
 		cr := t.contentRect()
@@ -201,7 +218,7 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	}
 
 	if t.focused {
-		canvas.StrokeRect(b, t.ColourOf(RoleAccent), 1)
+		strokeFocusable(canvas, b, 0, t.ColourOf(RoleBorder), t.ColourOf(RoleAccent), true)
 	}
 }
 
@@ -213,9 +230,11 @@ func (t *TabContainer) HandleEvent(ev *Event) bool {
 	switch ev.Type {
 	case EventPointerMove:
 		t.hover = t.titleAt(ev.Pos)
+		t.syncHoverFades()
 		return true
 	case EventPointerLeave:
 		t.hover = -1
+		t.syncHoverFades()
 		return true
 	case EventClick:
 		if i := t.titleAt(ev.Pos); i >= 0 {
@@ -239,4 +258,54 @@ func (t *TabContainer) HandleEvent(ev *Event) bool {
 		}
 	}
 	return false
+}
+
+// tabSpan is a horizontal extent within the strip: x from the strip's left edge.
+type tabSpan struct{ x, w float64 }
+
+// span returns tab i's extent relative to the strip's left edge.
+func (t *TabContainer) span(i int) tabSpan {
+	r := t.titleRect(i)
+	return tabSpan{x: r.X - t.Bounds().X, w: r.W}
+}
+
+// syncHoverFades points each tab's hover fade at whether it is hovered.
+func (t *TabContainer) syncHoverFades() {
+	for i := range t.hoverFades {
+		target := 0.0
+		if i == t.hover {
+			target = 1
+		}
+		t.fadeTo(&t.hoverFades[i], target)
+	}
+}
+
+// slideIndicator starts the underline sliding from tab from to tab to. Before
+// mount there is nothing to animate, so the underline just lands on the new tab.
+func (t *TabContainer) slideIndicator(from, to int) {
+	if t.indAnim != nil {
+		t.indAnim.Stop()
+		t.indAnim = nil
+	}
+	if t.ctx == nil || t.ctx.animate == nil || t.face() == nil ||
+		from < 0 || from >= len(t.tabs) {
+		t.indT = 1
+		return
+	}
+	t.indFrom, t.indTo = t.indicatorSpan(), t.span(to)
+	t.indT = 0
+	t.indAnim = t.ctx.animate(transitionDuration*1.5, EaseOut, func(v float64) { t.indT = v })
+	t.indAnim.OnDone(func() { t.indT = 1; t.indAnim = nil })
+}
+
+// indicatorSpan returns where the underline is drawn right now: the live extent
+// of the selected tab once settled, or the in-flight blend while sliding.
+func (t *TabContainer) indicatorSpan() tabSpan {
+	if t.indAnim == nil || t.indT >= 1 {
+		return t.span(t.selected)
+	}
+	return tabSpan{
+		x: t.indFrom.x + (t.indTo.x-t.indFrom.x)*t.indT,
+		w: t.indFrom.w + (t.indTo.w-t.indFrom.w)*t.indT,
+	}
 }

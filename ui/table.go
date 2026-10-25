@@ -42,6 +42,7 @@ type Table struct {
 	sortable bool // whether header clicks sort (default true)
 	sortCol  int  // column currently sorted by, -1 = none
 	sortAsc  bool // sort direction
+	striped  bool // alternate rows get a subtle tint
 
 	onSelect      func(int)
 	onHeaderClick func(int)
@@ -69,6 +70,13 @@ func (t *Table) OnHeaderClick(fn func(col int)) { t.onHeaderClick = fn }
 // SetSortable enables or disables built-in click-to-sort. Disable it to handle
 // header clicks entirely via OnHeaderClick.
 func (t *Table) SetSortable(v bool) { t.sortable = v }
+
+// SetStriped turns zebra striping on or off: every second body row gets a subtle
+// tint, which helps the eye track across wide rows. Off by default.
+func (t *Table) SetStriped(v bool) {
+	t.striped = v
+	t.Invalidate()
+}
 
 // SortColumn returns the column the table is sorted by (-1 if unsorted) and the
 // direction (true = ascending).
@@ -346,11 +354,11 @@ func (t *Table) Draw(canvas render.Canvas) {
 
 	// Header row.
 	header := geom.Rect{X: b.X, Y: b.Y, W: b.W, H: rh}
-	canvas.FillRect(header, lighten(t.ColourOf(RoleSurface), 1.2))
+	canvas.FillRect(header, tint(t.ColourOf(RoleSurface), tintHeader))
 	for c, col := range t.columns {
 		cell := geom.Rect{X: xs[c], Y: b.Y, W: widths[c], H: rh}
 		if c == t.hoverCol {
-			canvas.FillRect(cell, lighten(t.ColourOf(RoleSurface), 1.3))
+			canvas.FillRect(cell, tint(t.ColourOf(RoleSurface), tintStrong))
 		}
 		canvas.PushClip(cell)
 		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, b.Y, rh)}, f, t.ColourOf(RoleText))
@@ -372,12 +380,15 @@ func (t *Table) Draw(canvas render.Canvas) {
 		}
 		rowRect := geom.Rect{X: b.X, Y: y, W: b.W, H: rh}
 		textColour := t.ColourOf(RoleText)
+		if t.striped && i%2 == 1 && i != t.selected && i != t.hoverRow {
+			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), tintHeader/2))
+		}
 		switch {
 		case i == t.selected:
 			canvas.FillRect(rowRect, t.ColourOf(RolePrimary))
 			textColour = t.ColourOf(RoleOnPrimary)
 		case i == t.hoverRow:
-			canvas.FillRect(rowRect, lighten(t.ColourOf(RoleSurface), 1.25))
+			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), tintHover))
 		}
 		for c := range t.columns {
 			if c >= len(row) {

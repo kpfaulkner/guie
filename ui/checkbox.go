@@ -13,11 +13,12 @@ const indicatorGap = 8
 // value.
 type Checkbox struct {
 	BaseWidget
-	label    string
-	checked  bool
-	hover    bool
-	focused  bool
-	onChange func(bool)
+	label     string
+	checked   bool
+	hover     bool
+	hoverFade fade // eases toward 1 while hovered
+	focused   bool
+	onChange  func(bool)
 
 	font render.FontFace // nil → theme font
 }
@@ -90,14 +91,10 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 
 	if c.checked {
 		canvas.FillRoundRect(box, rad, c.ColourOf(RolePrimary))
-	} else if c.hover {
-		canvas.FillRoundRect(box, rad, c.ColourOf(RoleSurface))
+	} else if c.hoverFade.level > 0 {
+		canvas.FillRoundRect(box, rad, withAlpha(c.ColourOf(RoleSurface), c.hoverFade.level))
 	}
-	border := c.ColourOf(RoleBorder)
-	if c.focused {
-		border = c.ColourOf(RoleAccent)
-	}
-	canvas.StrokeRoundRect(box, rad, border, 1)
+	strokeFocusable(canvas, box, rad, c.ColourOf(RoleBorder), c.ColourOf(RoleAccent), c.focused)
 
 	if c.checked {
 		col := c.ColourOf(RoleOnPrimary)
@@ -124,9 +121,11 @@ func (c *Checkbox) HandleEvent(ev *Event) bool {
 	switch ev.Type {
 	case EventPointerEnter:
 		c.hover = true
+		c.fadeTo(&c.hoverFade, 1)
 		return true
 	case EventPointerLeave:
 		c.hover = false
+		c.fadeTo(&c.hoverFade, 0)
 		return true
 	case EventClick:
 		c.toggle()

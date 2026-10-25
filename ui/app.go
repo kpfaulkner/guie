@@ -134,6 +134,7 @@ func NewApp(opts ...AppOption) *App {
 		openPopup:     a.openPopup,
 		closePopup:    a.closePopup,
 		theme:         &a.theme,
+		animate:       a.Animate,
 		clipboard:     a.clipboard,
 	}
 	return a

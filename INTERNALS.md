@@ -903,6 +903,53 @@ gradient sliders** for hue, saturation, value and alpha.
 
 ---
 
+## 13f. CanvasWidget (`ui/canvaswidget.go`)
+
+A leaf widget whose painting and input are callbacks: the public escape hatch for
+charts, drawing surfaces and HUDs, so an app need not define a widget type for a
+one-off surface. It adds no capability (embedding `BaseWidget` always worked, see
+`examples/canvas`); it fixes the contract and the defaults. Anything with child
+widgets or its own layout should still embed `BaseWidget`.
+
+- **Construction.** `NewCanvasWidget(draw, opts...)`; `draw` is positional (a nil
+  draw is allowed and draws nothing). Options: `CanvasMinSize`, `CanvasOnEvent`,
+  `CanvasFocusable`. `SetDraw`/`SetOnEvent` swap the callbacks later. Tooltip,
+  context menu, drag/drop and file drop come from `BaseWidget`.
+- **Draw.** `Draw` does `PushClip(Bounds())`, calls `draw(c, bounds)`, `PopClip()`.
+  `c` is the shared canvas, so coordinates are **absolute**, the same as every
+  other widget; `ToLocal(p)` subtracts the bounds origin for callers who prefer
+  local. Callbacks should read colours with `ColourOf` (not cache them) so
+  `App.SetTheme` reaches them. After the clip is popped, a focusable, focused
+  canvas draws the shared ring (`strokeFocusable`, `ui/focus.go`) on top.
+- **Redraw.** The callback runs only on presented frames, and presenting is on
+  demand (§8.5). Input already schedules a frame, so state mutated inside
+  `OnEvent` needs nothing more. State changed from elsewhere needs
+  `App.Invalidate`/`App.Do`; a time-varying canvas needs `App.Animate` or
+  `App.OnFrame`. `w.Invalidate()` only requests a **re-layout** (`BaseWidget`),
+  not a frame, so do not rely on it to repaint.
+- **Events.** `HandleEvent` returns false when disabled; otherwise it tracks
+  hover (`PointerEnter`/`Leave` -> `Hovered()`) and focus (`FocusGained`/`Lost`
+  -> `Focused()`), then forwards **every** event to `OnEvent` and returns its
+  result (true consumes; false, or no callback, lets it bubble). One callback
+  keeps `Event` the only vocabulary, so new event types need no API change.
+- **Capture and keys.** Pointer capture is the dispatcher's (§10.3): after
+  `PointerDown` the widget gets `PointerMove`/`PointerUp` until release, even off
+  its bounds, so drag needs no opt-in. `Focusable()` is `CanvasFocusable && Enabled`
+  - without the option the widget is not in Tab order and never sees key or text
+  events, which is deliberate for display-only canvases.
+- **Sizing.** `MinSize` is the `CanvasMinSize` value (default 0x0), so give it a
+  layout `Weight`. There is no resize callback: derive geometry from `bounds`.
+- **Caching.** None built in. Heavy canvases bake slowly-changing content into a
+  `RenderTarget` (§3.3) and blit it from `draw`; `examples/canvaswidget` bakes
+  finished strokes into a transparent layer, rebuilding on resize, undo and
+  clear, and draws only the in-progress stroke live. Targets are logical 1:1 and
+  are not rescaled on HiDPI, so they can look soft there.
+- **Tests.** `guitest/canvaswidget_test.go`: clip bracketing, nil/`SetDraw`,
+  capture + `ToLocal`, focusable vs not, consume vs bubble, disabled, hover,
+  theme switch. The on-demand redraw path is not observable headlessly.
+
+---
+
 ## 14. Text editing internals
 
 ### 14.1 `TextField` (`ui/textfield.go`) — single line
@@ -1017,6 +1064,55 @@ proportional font, so they prove geometry as well as bookkeeping: the caret
 index and the selection highlight are asserted against mask advances, which
 differ from the real text's.
 
+### 14.5 Undo / redo (`ui/undo.go`, `textfield.go`, `textarea.go`)
+
+Both widgets record **edits, not snapshots**: a `textEdit` is a position, the
+runes removed, the runes inserted, and the caret/selection before and after, so
+a step costs what changed. `TextField` addresses edits by rune index
+(`fieldSel{caret, anchor}`); `TextArea` by `textPos{row, col}` (`areaSel`), so a
+keystroke does not walk the document the way `posToOffset` would. The shared
+`editStack[P, S]` holds the undo/redo slices and the coalescing policy.
+
+- **One mutation funnel.** Every change goes through `replace(lo, hi / from, to,
+  with, kind)`: it captures what is removed, `splice`s, leaves the caret after
+  the inserted text, records the edit and fires `OnChange` once. `insert`,
+  `insertRune`, `insertNewline`, `deleteBack`, `deleteForward`, `insertString`
+  and `cutSelection` are thin callers; `deleteSelection` no longer exists. A paste
+  over a selection is therefore one step. `splice` always builds fresh slices,
+  so recorded edits never alias live text. `TextArea.splice` has a fast path
+  for in-line edits that rewrites one line and leaves the line list alone.
+- **Undo/Redo** apply the recorded edit with `splice` directly (they do not
+  record themselves), restore the saved selection, move the edit between the
+  stacks, fire `OnChange` and seal. API: `Undo`, `Redo`, `CanUndo`, `CanRedo`,
+  `ClearHistory`. Keys, in `handleKey` beside copy/paste: `ModPrimary+Z`,
+  `ModPrimary+Shift+Z`, `ModPrimary+Y`.
+- **Coalescing (`mergeEdit`).** Typed runes, backspaces and forward deletes
+  merge into the top step when `e.before == top.after`, i.e. the caret and
+  selection are exactly where the last edit left them. That one comparison
+  covers contiguity and also splits on any caret move, mouse click or
+  select-all, with no hook in those paths. Typing also splits at a word
+  boundary (whitespace after non-whitespace starts a new step). Paste, cut,
+  Enter, IME commits and anything replacing a selection are `kindOther` and
+  never merge. No timer: history does not depend on typing speed.
+- **Sealing.** `seal()` blocks the next edit merging into the top step. Set by
+  undo, redo and focus loss (the caret is unchanged across a blur, so
+  `before == after` alone would not split it).
+- **Limits.** `undoDepth = 500` steps, oldest dropped; any new edit clears the
+  redo stack. `SetText` calls `clear()`: loading content is not an edit, so it is
+  redo stack. `SetText` calls `clear()`: loading content is not an edit, so it is
+  not undoable. Programmatic edits that should be undoable use `ReplaceRange`
+  (rune offsets into `Text()`, one `kindOther` step; `examples/editor` replace-all).
+  IME preedit is never in history, only the commit.
+- **Masked fields** keep the real text in history, as stated in 14.4; undo works
+  while masked and never draws anything the field would not.
+
+**Tests** (`ui/undo_test.go`, `package ui`) run each behaviour against both
+widgets: typing, redo, keys, word-boundary split, backspace/delete coalescing,
+caret-move split, selection replace and cut restoring the selection, redo
+clearing, `SetText`, focus loss, depth cap, disabled, masked, multi-line
+joins/pastes/selection delete, and that in-line typing in a 5000-line document
+leaves the line list and other lines untouched.
+
 ---
 
 ## 15. Widget catalogue (quick reference)
@@ -1046,6 +1142,7 @@ differ from the real text's.
 | `TabContainer` | tabs.go | tab strip; all panes mounted (keep state), only active shown |
 | `SplitPane` | splitter.go | draggable divider, ratio + min sizes, nests |
 | `Image` | image.go | displays `render.Image` with `FitContain/Stretch/None` |
+| `CanvasWidget` | canvaswidget.go | callback-drawn custom surface; one `OnEvent` for all input; opt-in focus (§13f) |
 
 Self-drawing multi-row widgets (`List`, `Tree`, `Table`, `MenuBar`,
 `TabContainer`, `SplitPane`) draw their "rows/cells/divider" themselves and return only their
