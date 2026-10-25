@@ -153,6 +153,13 @@ type driver struct {
 	// closeHandled records the last render.CloseInterceptor toggle: true while the
 	// app has a close handler installed and expects to veto closes.
 	closeHandled bool
+
+	// window is the geometry the fake window currently reports, and windowOK says
+	// whether it is readable (false models a minimized window). applied is what
+	// the app asked for at startup via render.Config.Geometry.
+	window   render.WindowGeometry
+	windowOK bool
+	applied  render.WindowGeometry
 }
 
 func newDriver() *driver { return &driver{} }
@@ -166,6 +173,11 @@ func (d *driver) SetIMERect(r geom.Rect) { d.imeRect = r }
 func (d *driver) Run(cfg render.Config, hooks render.Hooks) error {
 	d.hooks = hooks
 	d.width, d.height = cfg.Width, cfg.Height
+	d.applied = cfg.Geometry
+	if g := cfg.Geometry; g.Width > 0 && g.Height > 0 {
+		d.width, d.height = g.Width, g.Height
+	}
+	d.window, d.windowOK = cfg.Geometry, true
 	if hooks.Resize != nil {
 		hooks.Resize(d.width, d.height)
 	}
@@ -212,3 +224,7 @@ func (d *driver) step(in render.InputState) (*Recording, error) {
 	}
 	return rec, nil
 }
+
+// WindowGeometry satisfies render.WindowController so the harness exercises the
+// App's geometry tracking. It reports whatever the test last set.
+func (d *driver) WindowGeometry() (render.WindowGeometry, bool) { return d.window, d.windowOK }

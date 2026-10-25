@@ -30,6 +30,9 @@ type Config struct {
 	// standard image.Image values, so applications set the icon without importing
 	// any graphics backend.
 	Icon []image.Image
+	// Geometry, when set, overrides Width/Height and places the window: the way an
+	// application restores where it was last time. See WindowGeometry.
+	Geometry WindowGeometry
 }
 
 // Hooks are the per-frame callbacks a Driver invokes while running the loop.
@@ -120,4 +123,34 @@ type IMEController interface {
 	// SetIMERect reports the focused widget's caret rectangle in absolute logical
 	// pixels, so the OS can place the candidate window beside it.
 	SetIMERect(r geom.Rect)
+}
+
+// WindowGeometry describes where a host window is and how big, in logical
+// pixels, so an application can put it back where the user left it. The zero
+// value means "not set": the driver uses Config.Width and Height and lets the OS
+// choose the position.
+type WindowGeometry struct {
+	// X and Y are the window's top-left corner, meaningful only if HasPosition.
+	// They are relative to the monitor the window is on (the origin is that
+	// monitor's top-left), which is all a backend can report portably.
+	X int `json:"x"`
+	Y int `json:"y"`
+	// Width and Height are the window size; both zero means unset.
+	Width  int `json:"width"`
+	Height int `json:"height"`
+	// HasPosition reports that X and Y are valid.
+	HasPosition bool `json:"hasPosition"`
+	// Maximized reports that the window is (or should start) maximized. The size
+	// is then the restored, not the maximized, size.
+	Maximized bool `json:"maximized"`
+}
+
+// WindowController is an optional capability a Driver may implement to report
+// the live window geometry. The framework type-asserts a Driver for it; without
+// it, geometry cannot be saved (restoring still works if the Driver honours
+// Config.Geometry). It is only called from the UI goroutine while the loop runs.
+type WindowController interface {
+	// WindowGeometry returns the current geometry, with ok false when it cannot
+	// be read sensibly - minimized, fullscreen, or not a desktop window.
+	WindowGeometry() (g WindowGeometry, ok bool)
 }

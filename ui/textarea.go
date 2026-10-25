@@ -23,8 +23,9 @@ const defaultTextAreaRows = 4
 // caret, to select a range across lines; Ctrl+A selects all. Typing,
 // Backspace/Delete and inserting replace the selection.
 //
-// Lines are split on '\n'; there is no soft word-wrap or horizontal scrolling
-// yet, so text past the right edge of a long line is clipped.
+// Lines are split on newlines. With soft wrap off (the default) a long line scrolls
+// sideways: a horizontal scrollbar appears when the longest line is wider than the
+// view, and the view follows the caret. With wrap on, lines break at the edge.
 type TextArea struct {
 	BaseWidget
 	lines     [][]rune
@@ -36,6 +37,17 @@ type TextArea struct {
 	hover     bool
 	dragging  bool
 	scrollY   float64
+	bar       barDrag // scrollbar thumb-drag state
+	scrollX   float64
+	barH      barDrag // horizontal scrollbar thumb-drag state
+
+	// rev counts text changes. It keys the cached longest-line width and the
+	// "already scrolled to the caret" check.
+	rev        int
+	widthCache float64
+	widthRev   int
+	widthOK    bool
+	followed   caretFollow
 
 	preedit      string // IME composition (uncommitted) shown inline at the caret
 	preeditCaret int    // caret position within preedit, in runes
@@ -162,6 +174,7 @@ func (t *TextArea) Text() string {
 // SetText replaces the contents and moves the caret to the end.
 func (t *TextArea) SetText(s string) {
 	raw := strings.Split(s, "\n")
+	t.rev++
 	t.lines = make([][]rune, len(raw))
 	for i, ln := range raw {
 		t.lines[i] = []rune(ln)
@@ -275,6 +288,7 @@ func (t *TextArea) face() render.FontFace {
 // SetFont overrides the area's font face (nil falls back to the theme font).
 func (t *TextArea) SetFont(f render.FontFace) {
 	t.font = f
+	t.widthOK = false
 	t.Invalidate()
 }
 
@@ -399,6 +413,7 @@ func (t *TextArea) textBetween(from, to textPos) []rune {
 // splice replaces the text from..to with with ('\n' separates lines). It builds
 // fresh line slices so recorded edits never alias the live text.
 func (t *TextArea) splice(from, to textPos, with []rune) {
+	t.rev++
 	head, tail := t.lines[from.row][:from.col], t.lines[to.row][to.col:]
 	parts := [][]rune{{}}
 	for _, r := range with {
@@ -605,7 +620,7 @@ func (t *TextArea) caretAt(p geom.Point) (int, int) {
 		vi = len(rows) - 1
 	}
 	r := rows[vi]
-	col := r.start + caretIndexForX(t.lines[r.lr][r.start:r.end], p.X-inner.X, t.face())
+	col := r.start + caretIndexForX(t.lines[r.lr][r.start:r.end], p.X-inner.X+t.scrollX, t.face())
 	return r.lr, col
 }
 
@@ -656,7 +671,7 @@ func (t *TextArea) imeCaretRect() (geom.Rect, bool) {
 	rows := t.rows()
 	ci := t.caretVisualIndex(rows)
 	r := rows[ci]
-	x := inner.X + t.caretXWithPreedit(f, r)
+	x := inner.X - t.scrollX + t.caretXWithPreedit(f, r)
 	y := inner.Y + float64(ci)*lh - t.scrollY
 	return geom.Rect{X: x, Y: y, W: 1, H: lh}, true
 }
@@ -686,13 +701,16 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 	if t.wrap {
 		t.wrapWidth = inner.W
 	}
-	t.scrollCaretIntoView(inner.H)
+	t.scrollCaretIntoView()
 
+	g := t.geomInfo()
 	rows := t.rows()
 	ci := t.caretVisualIndex(rows)
 	textColour := t.ColourOf(RoleText)
-	canvas.PushClip(inner)
-	t.drawSelectionRows(canvas, inner, lh, rows, t.ColourOf(RolePrimary))
+	// Text is positioned from ox, which slides left as the view scrolls across.
+	ox := inner.X - t.scrollX
+	canvas.PushClip(g.view)
+	t.drawSelectionRows(canvas, geom.Rect{X: ox, Y: inner.Y, W: inner.W, H: inner.H}, lh, rows, t.ColourOf(RolePrimary))
 	for vi, r := range rows {
 		y := inner.Y + float64(vi)*lh - t.scrollY
 		if y+lh < inner.Y || y > inner.Y+inner.H {
@@ -709,17 +727,17 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 				rel = len(seg)
 			}
 			pre, post := string(seg[:rel]), string(seg[rel:])
-			canvas.DrawText(pre+t.preedit+post, geom.Point{X: inner.X, Y: y}, f, textColour)
-			ux0 := inner.X + f.Measure(pre).W
-			ux1 := inner.X + f.Measure(pre+t.preedit).W
+			canvas.DrawText(pre+t.preedit+post, geom.Point{X: ox, Y: y}, f, textColour)
+			ux0 := ox + f.Measure(pre).W
+			ux1 := ox + f.Measure(pre+t.preedit).W
 			canvas.DrawLine(geom.Point{X: ux0, Y: y + lh - 1}, geom.Point{X: ux1, Y: y + lh - 1}, textColour, 1)
 		} else {
-			canvas.DrawText(string(seg), geom.Point{X: inner.X, Y: y}, f, textColour)
+			canvas.DrawText(string(seg), geom.Point{X: ox, Y: y}, f, textColour)
 		}
 	}
 	if t.focused {
 		r := rows[ci]
-		caretX := inner.X + t.caretXWithPreedit(f, r)
+		caretX := ox + t.caretXWithPreedit(f, r)
 		caretY := inner.Y + float64(ci)*lh - t.scrollY
 		canvas.DrawLine(
 			geom.Point{X: caretX, Y: caretY + 1},
@@ -729,8 +747,14 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 	}
 	canvas.PopClip()
 
-	if t.contentHeight() > inner.H {
-		t.drawScrollbar(canvas, b, inner.H)
+	if g.vOver {
+		t.drawScrollbar(canvas, b, g.view.H)
+	}
+	if g.hOver {
+		drawBar(canvas, t.scrollTrackH(), false, t.scrollMetricsH(), t.ColourOf(RoleBackground), t.ColourOf(RoleAccent))
+		if g.vOver { // the corner where the two gutters meet
+			canvas.FillRect(geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y + b.H - scrollbarWidth, W: scrollbarWidth, H: scrollbarWidth}, t.ColourOf(RoleBackground))
+		}
 	}
 }
 
@@ -780,20 +804,6 @@ func (t *TextArea) maxScroll(viewH float64) float64 {
 	return maxF(0, t.contentHeight()-viewH)
 }
 
-// scrollCaretIntoView adjusts scrollY so the caret's visual row is visible.
-func (t *TextArea) scrollCaretIntoView(viewH float64) {
-	lh := t.lineHeight()
-	ci := t.caretVisualIndex(t.rows())
-	top := float64(ci) * lh
-	bottom := top + lh
-	if top < t.scrollY {
-		t.scrollY = top
-	} else if bottom > t.scrollY+viewH {
-		t.scrollY = bottom - viewH
-	}
-	t.clampScroll(viewH)
-}
-
 func maxI(a, b int) int {
 	if a > b {
 		return a
@@ -808,25 +818,8 @@ func minI(a, b int) int {
 	return b
 }
 
-func (t *TextArea) clampScroll(viewH float64) {
-	if t.scrollY < 0 {
-		t.scrollY = 0
-	}
-	if m := t.maxScroll(viewH); t.scrollY > m {
-		t.scrollY = m
-	}
-}
-
 func (t *TextArea) drawScrollbar(canvas render.Canvas, b geom.Rect, viewH float64) {
-	ch := t.contentHeight()
-	thumbH := maxF(minThumb, viewH*viewH/ch)
-	var off float64
-	if m := t.maxScroll(viewH); m > 0 {
-		off = (t.scrollY / m) * (b.H - thumbH)
-	}
-	x := b.X + b.W - scrollbarWidth
-	canvas.FillRect(geom.Rect{X: x, Y: b.Y, W: scrollbarWidth, H: b.H}, t.ColourOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: x, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColourOf(RoleAccent))
+	drawBar(canvas, t.scrollTrack(), true, t.scrollMetrics(), t.ColourOf(RoleBackground), t.ColourOf(RoleAccent))
 }
 
 // HandleEvent edits the text, manages the selection and scrolls in response to
@@ -834,6 +827,21 @@ func (t *TextArea) drawScrollbar(canvas render.Canvas, b geom.Rect, viewH float6
 func (t *TextArea) HandleEvent(ev *Event) bool {
 	if !t.Enabled() {
 		return false
+	}
+	g := t.geomInfo()
+	if off, changed, ok := t.bar.handle(ev, t.scrollTrack(), g.vOver, true, t.scrollMetrics()); ok {
+		if changed {
+			t.scrollY = off
+			t.clampScroll()
+		}
+		return true
+	}
+	if off, changed, ok := t.barH.handle(ev, t.scrollTrackH(), g.hOver, false, t.scrollMetricsH()); ok {
+		if changed {
+			t.scrollX = off
+			t.clampScroll()
+		}
+		return true
 	}
 	switch ev.Type {
 	case EventPointerEnter:
@@ -870,9 +878,22 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 	case EventComposition:
 		t.setPreedit(ev.Comp.Text, ev.Comp.Caret)
 		return true
+	case EventDoubleClick:
+		if ev.Button == render.MouseLeft {
+			r, c := t.caretAt(ev.Pos)
+			t.selectWordAt(r, c)
+			return true
+		}
 	case EventWheel:
+		// A sideways wheel, or Shift with the ordinary one, scrolls across when there
+		// is somewhere to go.
+		if dx := wheelAcross(ev); dx != 0 && t.maxScrollX() > 0 {
+			t.scrollX -= dx * wheelStep
+			t.clampScroll()
+			return true
+		}
 		t.scrollY -= ev.Wheel.Y * wheelStep
-		t.clampScroll(t.Bounds().Inset(textAreaPadding).H)
+		t.clampScroll()
 		return true
 	case EventText:
 		if ev.Rune >= 0x20 && ev.Rune != 0x7f {
@@ -993,4 +1014,12 @@ func (t *TextArea) ReplaceRange(start, end int, s string) {
 	sr, sc := t.offsetToPos(start)
 	er, ec := t.offsetToPos(end)
 	t.replace(textPos{sr, sc}, textPos{er, ec}, []rune(s), kindOther)
+}
+
+// selectWordAt selects the word (or whitespace/punctuation run) around (row, col)
+// within that line; words do not span lines.
+func (t *TextArea) selectWordAt(row, col int) {
+	lo, hi := wordBounds(t.lines[row], col)
+	t.anchorRow, t.anchorCol = row, lo
+	t.caretRow, t.caretCol = row, hi
 }

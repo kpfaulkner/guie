@@ -453,6 +453,51 @@ the top of the next frame on the loop goroutine. This is documented on `App`.
 
 ---
 
+### 8.7 Window geometry (`ui/window.go`, `render/driver.go`, `internal/ebiten/window.go`)
+
+Remembering where the window was between runs. The seam is `render.WindowGeometry`
+(`X, Y, Width, Height, HasPosition, Maximized`, logical px, position relative to
+the window's monitor) plus two pieces: `Config.Geometry` (what to open at) and the
+optional `render.WindowController` capability (`WindowGeometry() (g, ok)`, read
+the live window). `ui.WindowGeometry` is an alias, so apps import only `ui`.
+
+- **API.** `WithWindowGeometry(g)` opens at `g`; `WithWindowStateFile(path)` loads
+  `path` at construction and saves on exit; `App.WindowGeometry()` is the last
+  *restorable* geometry; `LoadWindowGeometry`/`SaveWindowGeometry` are the file
+  helpers (JSON). Saved state beats `WithSize`. The framework stores no other
+  preferences and does not pick the path (`os.UserConfigDir` is the usual home).
+- **Tracking.** `App.trackGeometry` polls the driver at the end of every `update`
+  and once more in `closeRequested` (the window is still up there, and a pure move
+  may have produced no frame). It is a no-op until `Run` is called (`running`):
+  EBiten panics on `WindowPosition` before the loop, and tests drive `update`
+  directly. Minimized, fullscreen or unreadable windows (`ok` false, or zero size)
+  keep the last normal geometry. A **maximized** window keeps the pre-maximize
+  size/position and just sets `Maximized`, because EBiten exposes no restored
+  bounds; the app seeds `geom` from the configured geometry so a window that
+  *starts* maximized still has a size to restore to.
+- **Saving.** `App.Run` calls `saveWindowState` after the driver returns, using the
+  remembered geometry, so it never reads a dead window. It writes a temp file and
+  renames it, creates the directory, and ignores failure (remembering must never
+  block exit). Nothing is written if no geometry was ever known.
+- **Loading is defensive.** Missing/corrupt/empty files load as "none".
+  `sanitizeGeometry` clears a size outside (0, 16384] (both axes together) and a
+  position beyond +/-32768, so a bad file cannot yield an absurd window.
+- **Backend.** EBiten sets size and position *before* `RunGame` (`applyGeometry`),
+  but the monitor the window lands on is unknown until the loop runs, so
+  `place` does the on-screen check on the first `Update`: it shrinks a window
+  larger than the monitor, pulls the position back with `clampToMonitor` (keeps
+  >= 96px of width and the title bar reachable), then `MaximizeWindow`s if asked
+  (needs a resizable window). Verified against a real window: position and size
+  restore, a maximized flag round-trips with its restored size, and a position far
+  off-screen comes back on screen.
+- **Limits.** Position is per-monitor and EBiten gives no monitor identity or way
+  to choose the starting monitor, so a window saved on a second screen reopens at
+  the same offset on whichever monitor the OS picks. WASM has no window position;
+  only the size applies there. `guitest` models all of this with
+  `Harness.SetWindowGeometry`/`AppliedWindowGeometry`.
+
+---
+
 ## 9. Layout engine
 
 ### 9.1 Two-phase, top-down
@@ -520,7 +565,7 @@ nothing to scroll. This bit `ScrollView` once and is now a deliberate invariant.
 
 `Event{Type, Pos, Button, Wheel, Key, Rune, Modifiers}`. `EventType`:
 `PointerEnter/Leave/Move/Down/Up`, `Click`, `Wheel`, `KeyDown/Up`, `Text`,
-`FocusGained/Lost`. Which fields matter depends on `Type`.
+`FocusGained/Lost`, `DoubleClick`. Which fields matter depends on `Type`.
 
 ### 10.2 Dispatch & bubbling (`ui/app.go`)
 
@@ -554,6 +599,19 @@ nothing to scroll. This bit `ScrollView` once and is now a deliberate invariant.
    also dispatch a derived `Click`. (So *click derivation* lives in the
    dispatcher, not the widget: press+release on the same target = click;
    release-outside = no click.)
+
+**Double-click** (`ui/doubleclick.go`). After a derived `Click`, `noteClick`
+compares it with `App.lastClick`: same widget, same button, within
+`doubleClickInterval` (400ms) and `doubleClickSlop` (5 logical px per axis) makes
+the second click a double-click, dispatched as `EventDoubleClick` (bubbling, bus
+published). Both clicks still deliver their own `EventClick`, so the sequence is
+click, click, double-click. A third quick click starts a fresh pair rather than
+a second double. Drag-ending releases derive no click, so a drag never counts.
+Time comes from `App.now` (`time.Now`; tests replace it) rather than frame
+ticks, because an idle window runs no updates (8.5). `BaseWidget.OnDoubleClick`
+is consulted at each bubble level, like `OnFileDrop`, so widgets overriding
+`HandleEvent` do not shadow it. `TextField` and `TextArea` select the word under the
+pointer on a left double-click (`wordBounds`, `ui/textword.go`: a run of letters, digits and `_`, or a whitespace or punctuation run; `TextArea` stays on its line; a masked `TextField` selects everything so word edges do not reveal spaces). `List`, `Table` and `Tree` treat it as activation: `List.OnActivate(i)` and `Table.OnActivate(i)` fire on a row double-click or Enter (the row is selected by the first click; `Table` ignores the header band; the index is the displayed, possibly sorted, row), and `Tree` runs the same `activate` as Enter - a leaf fires `OnActivate`, a parent toggles - except a double-click on a chevron, which its two clicks already toggled.
 
 ### 10.4 Focus
 
@@ -623,7 +681,13 @@ stack drawn above the root.
   `MenuBar` opens a `Container` of `menuRow`s; `App.ShowContextMenu` opens the
   same kind of menu at the cursor on right-click (§10.8); `App.ShowModal`/
   `ShowMessage` center a panel as a modal dialog. `DialogButton` wraps an action
-  + auto-close.
+  + auto-close. `App.ShowConfirm` (`ui/confirm.go`) is `ShowMessage` with Cancel and
+  confirm buttons that reports once to `onResult(bool)`: a button resolves it, and
+  Escape or any other close (`Popup.onClose`) counts as Cancel; a `resolved` guard
+  makes a button click followed by its close fire only once. The confirm button
+  takes focus (Enter confirms; `ConfirmDefaultCancel` focuses Cancel instead) and
+  the previous focus is restored on close. Options: `ConfirmLabels`,
+  `ConfirmDefaultCancel`.
 
 (There is no in-surface "window" layer yet; multi-window is parked because
 EBiten is single-window — see §16.)
@@ -950,6 +1014,106 @@ widgets or its own layout should still embed `BaseWidget`.
 
 ---
 
+## 13g. ScrollBar (`ui/scrollbar.go`)
+
+One scrollbar implementation, shared by everything that scrolls. It has two
+layers because the self-drawing widgets (`List`, `Tree`, `Table`, `TextArea`,
+`ScrollView`) return no child widgets (§15), so there is nowhere to mount a bar
+widget in them:
+
+- **Core (no widget).** `scrollMetrics{content, view, offset}` describes what is
+  scrolled; `thumbRect(track, vertical, m)` and `drawBar` give the geometry and
+  the paint (gutter `RoleBackground`, thumb `RoleAccent`, as before); `barDrag` is
+  the pointer state. The thumb is `track * view/content` long, at least `minThumb`
+  (or the track, if shorter), and fills the track when nothing scrolls; its
+  position is proportional to `offset / (content - view)`. Both axes are
+  supported (`vertical` picks the axis).
+- **`barDrag.handle(ev, track, show, vertical, m)`** is the whole behaviour and
+  returns `(offset, changed, consumed)`: a left press on the thumb starts a drag
+  (moves then scroll proportionally and keep working when the pointer leaves the
+  bar, via pointer capture, §10.3); a left press on the gutter pages one view
+  towards the click; release ends the drag; and the `Click` that ends any press on
+  the bar is swallowed, so a row or caret under the bar is never selected through
+  it. With `show` false (content fits, so no bar is drawn) it takes nothing.
+- **Owners** each hold a `bar barDrag` and call `handle` first in `HandleEvent`,
+  applying a changed offset through their own `clamp`. They supply `scrollTrack()`
+  (the gutter: right edge; for `Table`, below the header) and `scrollMetrics()`;
+  `drawScrollbar` is now one `drawBar` call. Wheel and keyboard scrolling are
+  unchanged and stay with each widget. `TextArea` measures the view as its inner
+  (padded) height, so its thumb ratio is now the track share like the others.
+- **`ScrollBar` widget** wraps the same core for custom surfaces:
+  `NewScrollBar(geom.Vertical|Horizontal)`, `SetRange(content, view)`,
+  `Offset`/`SetOffset` (no callback, clamped), `OnScroll(func(offset float64))`
+  fired when the *user* scrolls (thumb, gutter, wheel; the horizontal bar also
+  takes a sideways wheel). It does not move anything itself: the owner applies the
+  offset, e.g. a `CanvasWidget` shifting what it draws. `MinSize` is a
+  `scrollbarWidth` strip. It fills its `Bounds`, so place it like any widget.
+- **`ScrollView` horizontal scrolling** is opt-in (`SetHorizontalScroll(true)`),
+  because turning it on changes layout: the content keeps its `MinSize` width
+  instead of being stretched to the view, and `MinSize` stops asking the parent for
+  the content width (like its height, the width is the parent's to give). A second
+  bar (`barH`, `trackH`) appears along the bottom only while the content is wider
+  than the view; that shrinks the viewport height (`hbarShown` depends only on
+  widths, so there is no circularity) and the vertical gutter stops above the
+  corner, which is filled. A sideways wheel, or Shift with the ordinary wheel,
+  scrolls across (Shift falls back to vertical when there is no horizontal range).
+  Because scrolled content can extend under the bars, `hitTest` now honours an
+  optional `childClip()`: `ScrollView` confines its content to the viewport so the
+  bars keep their own events.
+- **`Table` horizontal scrolling** is opt-in too (`SetHorizontalScroll(true)`).
+  Columns then get a floor, `Column.MinWidth` (default `defaultColMinWidth`, 80),
+  and share any spare width by weight (`flexWithMins`: a column whose share falls
+  short is pinned at its minimum and the rest share what is left, repeating). When
+  the minimums no longer fit, a bar (`barH`, `scrollTrackH`) appears along the
+  bottom and the header and rows shift left together (`colX` subtracts `offsetX`),
+  the header staying put vertically. The two bars depend on each other (the
+  vertical gutter narrows the columns, the horizontal bar shortens the body, which
+  can make the rows overflow), so `geomInfo` works the layout out once in two
+  passes and `bodyHeight`, `overflow`, `colWidths` and the bars all read it. Header
+  cells, rows and column separators are clipped to the view so scrolled cells stay
+  off the gutter; the strip under the body is not a row (`rowAt` returns -1 there).
+  A sideways wheel or Shift+wheel scrolls across (falling back to vertical when
+  there is no range) and Left/Right arrows step by `wheelStep`; `MinSize` width
+  drops to one minimum column.
+- **`TextArea` horizontal scrolling** is automatic without soft wrap (wrapped
+  lines never overflow sideways), in `ui/textarea_scroll.go`. `scrollX` and a
+  second bar appear when the longest line is wider than the view; `contentWidth`
+  measures every line, so it is cached against `rev`, a counter bumped by every
+  `splice` and `SetText` (and cleared by `SetFont`). `geomInfo` lays the box out
+  in two passes like `Table`, and, without wrap, the text view now stops at the
+  vertical bar instead of running under it. Text, selection, caret, preedit and
+  the IME rect are positioned from `inner.X - scrollX`, and `caretAt` adds
+  `scrollX` back. A sideways wheel or Shift+wheel scrolls across (vertical when
+  there is no range).
+- **The view follows the caret only when the caret moves.** `scrollCaretIntoView`
+  used to run every frame, which made any scrolling away from the caret snap back
+  - invisible while only the wheel could scroll, but it undid every scrollbar
+  drag once the bars could move the view. It now remembers the caret position and
+  text revision it last followed (`caretFollow`) and does nothing until they
+  change; it scrolls by the least needed on both axes.
+- **`List` and `Tree` horizontal scrolling** is opt-in (`SetHorizontalScroll(true)`),
+  because it changes `MinSize` (the width stops asking for the widest row, like the
+  height). The bar layout is the shared `carveBars(w, h, contentW, contentH,
+  hscroll)`, which settles the two bars' effect on each other in two passes
+  (`List.geomInfo`, `Tree.geomInfo`); `Table`, `TextArea` and `ScrollView` still do
+  the same sum by hand. Content width is the widest row, cached so asking is
+  cheap: `List` keeps a width per item and re-measures only items whose string
+  changed (the caller owns the slice and may edit it in place), `Tree` caches
+  each node's label width on the node (`w`, `wLabel`, `wFP`). Both are
+  invalidated by `measureFingerprint`, one `Measure` of a probe string that
+  changes when the font does. Rows, highlights and (for `Tree`) chevrons and
+  `chevronHit` are positioned from `x - offsetX`; the clip stops them at the
+  gutter, and the strip under the rows is not a row (`rowAt` returns -1). A
+  sideways wheel or Shift+wheel scrolls across; `List` also steps with Left/Right,
+  while `Tree` keeps those keys for expand/collapse. Keyboard selection keeps the
+  row above the bar (`scrollTo` uses the reduced view height) but does not scroll
+  sideways to show it.
+- **Not done:** arrow buttons and hold-to-repeat paging on the bars, a hover or
+  pressed thumb colour, and sideways scrolling to follow keyboard selection in
+  `List`/`Tree`.
+
+---
+
 ## 14. Text editing internals
 
 ### 14.1 `TextField` (`ui/textfield.go`) — single line
@@ -964,7 +1128,7 @@ Ctrl+C/X/V via the context clipboard; paste flattens newlines (single-line).
 ### 14.2 `TextArea` (`ui/textarea.go`) — multi line
 
 State: `lines [][]rune`, `caretRow`/`caretCol`, `anchorRow`/`anchorCol`,
-`scrollY`, `wrap`, `wrapWidth`. Editing handles newline insertion, line joining
+`scrollX`/`scrollY`, `wrap`, `wrapWidth`. Editing handles newline insertion, line joining
 on backspace/delete at edges, and selection across lines.
 
 **Soft word-wrap** uses a unified **visual-rows** model: `rows()` maps logical
@@ -1126,10 +1290,11 @@ leaves the line list and other lines untouched.
 | `RadioButton`/`RadioGroup` | radio.go | circular indicators, group exclusivity |
 | `TextField` | textfield.go | single-line edit + selection + clipboard; optional masking (§14.4) |
 | `TextArea` | textarea.go | multi-line, soft-wrap, selection, clipboard |
-| `ScrollView` | scrollview.go | viewport + wheel + draggable thumb |
-| `List` | list.go | selectable rows, wheel, keyboard, per-row hover |
-| `Tree` | tree.go | hierarchical `TreeNode`s, expand/collapse chevrons, keyboard nav, scroll |
-| `Table` | table.go | header + weighted columns, selectable scrollable body, click-header sort |
+| `ScrollView` | scrollview.go | viewport + wheel + draggable thumb (shared bar, §13g); opt-in horizontal scroll |
+| `ScrollBar` | scrollbar.go | standalone vertical/horizontal bar: thumb drag, gutter paging, wheel; owner applies `OnScroll(offset)` |
+| `List` | list.go | selectable rows, wheel, keyboard, per-row hover, activate on double-click/Enter; opt-in horizontal scroll (§13g) |
+| `Tree` | tree.go | hierarchical `TreeNode`s, expand/collapse chevrons, keyboard nav, scroll; opt-in horizontal scroll (§13g) |
+| `Table` | table.go | header + weighted columns, selectable scrollable body, click-header sort; opt-in horizontal scroll with `Column.MinWidth` (§13g) |
 | `DropdownCombo` | dropdown.go | opens a popup `List` |
 | `MenuBar`/`Menu`/`MenuItem` | menu.go | popup menus, hover-switch between titles |
 | `Slider` | slider.go | drag + arrow keys, `[0,1]` |

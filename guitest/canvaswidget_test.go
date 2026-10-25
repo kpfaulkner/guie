@@ -224,3 +224,16 @@ func (s *bubbleSpy) HandleEvent(ev *ui.Event) bool {
 	}
 	return false
 }
+
+func TestDoubleClickThroughHarness(t *testing.T) {
+	n := 0
+	cw := ui.NewCanvasWidget(nil)
+	cw.OnDoubleClick(func(p geom.Point) bool { n++; return true })
+	h := canvasHarness(cw)
+	x, y := cw.Bounds().X+5, cw.Bounds().Y+5
+	h.Click(x, y)
+	h.Click(x, y)
+	if n != 1 {
+		t.Errorf("double-clicks = %d, want 1", n)
+	}
+}

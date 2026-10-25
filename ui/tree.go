@@ -24,6 +24,13 @@ type TreeNode struct {
 	children []*TreeNode
 	parent   *TreeNode
 	expanded bool
+
+	// A cached label width for horizontal scrolling, valid while wOK and the label and
+	// font fingerprint still match.
+	w      float64
+	wLabel string
+	wFP    float64
+	wOK    bool
 }
 
 // NewTreeNode returns a node with the given label and optional children.
@@ -69,6 +76,10 @@ type Tree struct {
 	selected   *TreeNode
 	hover      *TreeNode
 	offset     float64
+	bar        barDrag // scrollbar thumb-drag state
+	offsetX    float64
+	barH       barDrag // horizontal scrollbar thumb-drag state
+	hscroll    bool    // rows may be wider than the tree, scrolling across
 	focused    bool
 	font       render.FontFace
 	onSelect   func(*TreeNode)
@@ -93,8 +104,20 @@ func (t *Tree) SetRoots(roots ...*TreeNode) {
 func (t *Tree) OnSelect(fn func(*TreeNode)) { t.onSelect = fn }
 
 // OnActivate registers the handler invoked when a leaf node is activated
-// (Enter while focused). Activating a parent node toggles its expansion instead.
+// (Enter while focused, or a double-click on its row). Activating a parent node
+// toggles its expansion instead.
 func (t *Tree) OnActivate(fn func(*TreeNode)) { t.onActivate = fn }
+
+// activate opens n: a leaf fires OnActivate, a parent toggles its expansion. It is
+// what Enter and a double-click on a row both do.
+func (t *Tree) activate(n *TreeNode) {
+	t.SetSelected(n)
+	if !n.Leaf() {
+		t.Toggle(n)
+	} else if t.onActivate != nil {
+		t.onActivate(n)
+	}
+}
 
 // Selected returns the selected node, or nil.
 func (t *Tree) Selected() *TreeNode { return t.selected }
@@ -217,6 +240,10 @@ func (t *Tree) MinSize() geom.Size {
 	if f == nil {
 		return geom.Size{}
 	}
+	if t.hscroll {
+		// Like its height, the width is the parent's to give: wide rows scroll.
+		return geom.Size{W: minViewport + scrollbarWidth, H: t.RowHeight()}
+	}
 	var w float64
 	for _, r := range t.rows() {
 		rw := float64(r.depth)*treeIndent + treeChevron + treeGap + f.Measure(r.node.Label).W
@@ -225,7 +252,7 @@ func (t *Tree) MinSize() geom.Size {
 	return geom.Size{W: w + 2*treeRowPad + scrollbarWidth, H: t.RowHeight()}
 }
 
-func (t *Tree) maxOffset() float64 { return maxF(0, t.ContentHeight()-t.Bounds().H) }
+func (t *Tree) maxOffset() float64 { return maxF(0, t.ContentHeight()-t.geomInfo().viewH) }
 
 func (t *Tree) clamp() {
 	if t.offset < 0 {
@@ -234,6 +261,7 @@ func (t *Tree) clamp() {
 	if m := t.maxOffset(); t.offset > m {
 		t.offset = m
 	}
+	t.offsetX = minF(maxF(t.offsetX, 0), t.maxOffsetX())
 }
 
 // rowAt returns the visible-row index at absolute y, or -1.
@@ -241,6 +269,9 @@ func (t *Tree) rowAt(rows []treeRow, y float64) int {
 	rh := t.RowHeight()
 	if rh <= 0 {
 		return -1
+	}
+	if y >= t.Bounds().Y+t.geomInfo().viewH {
+		return -1 // the horizontal bar, if any
 	}
 	idx := int((y - t.Bounds().Y + t.offset) / rh)
 	if idx < 0 || idx >= len(rows) {
@@ -256,8 +287,8 @@ func (t *Tree) scrollTo(i int) {
 	bottom := top + rh
 	if top < t.offset {
 		t.offset = top
-	} else if bottom > t.offset+t.Bounds().H {
-		t.offset = bottom - t.Bounds().H
+	} else if viewH := t.geomInfo().viewH; bottom > t.offset+viewH {
+		t.offset = bottom - viewH
 	}
 	t.clamp()
 }
@@ -284,19 +315,22 @@ func (t *Tree) Draw(canvas render.Canvas) {
 
 	rows := t.rows()
 	rh := t.RowHeight()
-	overflow := rh*float64(len(rows)) > b.H
-	rowW := b.W
-	if overflow {
-		rowW -= scrollbarWidth
+	g := t.geomInfo()
+	// Rows are as wide as the widest when scrolling across, so a highlight spans the
+	// whole scrolled row; the clip keeps them off the gutter.
+	rowW := g.viewW
+	if t.hscroll {
+		rowW = maxF(t.widest(), g.viewW)
 	}
+	ox := b.X - t.offsetX
 
-	canvas.PushClip(geom.Rect{X: b.X, Y: b.Y, W: rowW, H: b.H})
+	canvas.PushClip(geom.Rect{X: b.X, Y: b.Y, W: g.viewW, H: g.viewH})
 	for i, r := range rows {
 		y := b.Y - t.offset + float64(i)*rh
-		if y+rh < b.Y || y > b.Y+b.H {
+		if y+rh < b.Y || y > b.Y+g.viewH {
 			continue // not visible
 		}
-		row := geom.Rect{X: b.X, Y: y, W: rowW, H: rh}
+		row := geom.Rect{X: ox, Y: y, W: rowW, H: rh}
 		switch {
 		case r.node == t.selected:
 			canvas.FillRect(row, t.ColourOf(RolePrimary))
@@ -309,7 +343,7 @@ func (t *Tree) Draw(canvas render.Canvas) {
 			textColour = t.ColourOf(RoleOnPrimary)
 		}
 
-		indent := b.X + treeRowPad + float64(r.depth)*treeIndent
+		indent := ox + treeRowPad + float64(r.depth)*treeIndent
 		if !r.node.Leaf() {
 			t.drawChevron(canvas, indent, y, rh, r.node.expanded, textColour)
 		}
@@ -320,8 +354,14 @@ func (t *Tree) Draw(canvas render.Canvas) {
 
 	canvas.StrokeRect(b, t.ColourOf(RoleBorder), 1)
 
-	if overflow {
+	if g.vOver {
 		t.drawScrollbar(canvas, b, rh*float64(len(rows)))
+	}
+	if g.hOver {
+		drawBar(canvas, t.scrollTrackH(), false, t.scrollMetricsH(), t.ColourOf(RoleBackground), t.ColourOf(RoleAccent))
+		if g.vOver { // the corner where the two gutters meet
+			canvas.FillRect(geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y + b.H - scrollbarWidth, W: scrollbarWidth, H: scrollbarWidth}, t.ColourOf(RoleBackground))
+		}
 	}
 }
 
@@ -342,21 +382,24 @@ func (t *Tree) drawChevron(canvas render.Canvas, x, y, rh float64, expanded bool
 	}
 }
 
+// scrollTrack is the scrollbar gutter along the right edge.
+func (t *Tree) scrollTrack() geom.Rect {
+	b := t.Bounds()
+	return geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y, W: scrollbarWidth, H: t.geomInfo().viewH}
+}
+
+func (t *Tree) scrollMetrics() scrollMetrics {
+	return scrollMetrics{content: t.ContentHeight(), view: t.geomInfo().viewH, offset: t.offset}
+}
+
 func (t *Tree) drawScrollbar(canvas render.Canvas, b geom.Rect, contentH float64) {
-	thumbH := maxF(minThumb, b.H*b.H/contentH)
-	var off float64
-	if m := t.maxOffset(); m > 0 {
-		off = (t.offset / m) * (b.H - thumbH)
-	}
-	gutter := geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y, W: scrollbarWidth, H: b.H}
-	canvas.FillRect(gutter, t.ColourOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: gutter.X, Y: b.Y + off, W: scrollbarWidth, H: thumbH}, t.ColourOf(RoleAccent))
+	drawBar(canvas, t.scrollTrack(), true, t.scrollMetrics(), t.ColourOf(RoleBackground), t.ColourOf(RoleAccent))
 }
 
 // chevronHit reports whether absolute x falls within the chevron column for a
 // node at the given depth.
 func (t *Tree) chevronHit(x float64, depth int) bool {
-	start := t.Bounds().X + treeRowPad + float64(depth)*treeIndent
+	start := t.Bounds().X - t.offsetX + treeRowPad + float64(depth)*treeIndent
 	return x >= start && x < start+treeChevron
 }
 
@@ -365,6 +408,21 @@ func (t *Tree) chevronHit(x float64, depth int) bool {
 func (t *Tree) HandleEvent(ev *Event) bool {
 	if !t.Enabled() {
 		return false
+	}
+	g := t.geomInfo()
+	if off, changed, ok := t.bar.handle(ev, t.scrollTrack(), g.vOver, true, t.scrollMetrics()); ok {
+		if changed {
+			t.offset = off
+			t.clamp()
+		}
+		return true
+	}
+	if off, changed, ok := t.barH.handle(ev, t.scrollTrackH(), g.hOver, false, t.scrollMetricsH()); ok {
+		if changed {
+			t.offsetX = off
+			t.clamp()
+		}
+		return true
 	}
 	switch ev.Type {
 	case EventPointerMove:
@@ -391,7 +449,25 @@ func (t *Tree) HandleEvent(ev *Event) bool {
 			t.SetSelected(r.node)
 		}
 		return true
+	case EventDoubleClick:
+		rows := t.rows()
+		if i := t.rowAt(rows, ev.Pos.Y); i >= 0 && ev.Button == render.MouseLeft {
+			r := rows[i]
+			// A double-click on the chevron is two toggles already; leave it.
+			if !r.node.Leaf() && t.chevronHit(ev.Pos.X, r.depth) {
+				return true
+			}
+			t.activate(r.node)
+		}
+		return true
 	case EventWheel:
+		// A sideways wheel, or Shift with the ordinary one, scrolls across when there
+		// is somewhere to go.
+		if dx := wheelAcross(ev); dx != 0 && t.maxOffsetX() > 0 {
+			t.offsetX -= dx * wheelStep
+			t.clamp()
+			return true
+		}
 		t.offset -= ev.Wheel.Y * wheelStep
 		t.clamp()
 		return true
@@ -427,13 +503,7 @@ func (t *Tree) handleKey(k render.Key) bool {
 		if t.selected == nil {
 			return true
 		}
-		if t.selected.Leaf() {
-			if t.onActivate != nil {
-				t.onActivate(t.selected)
-			}
-		} else {
-			t.Toggle(t.selected)
-		}
+		t.activate(t.selected)
 	default:
 		return false
 	}

@@ -53,8 +53,12 @@ func main() {
 	content.SetLayout(ui.HBox(16))
 	content.SetPadding(geom.UniformInsets(16))
 
-	fruits := []string{"Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Kiwi", "Lemon", "Mango"}
+	fruits := []string{"Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Kiwi", "Lemon", "Mango",
+		"Dragonfruit (a deliberately long row, to show the list scrolling across)"}
 	list := ui.NewList(fruits)
+	list.SetHorizontalScroll(true) // the long row scrolls instead of being clipped
+	// Double-click a row (or press Enter on it) to activate it.
+	list.OnActivate(func(i int) { say(fmt.Sprintf("List: opened %s", fruits[i])) })
 	list.OnSelect(func(i int) { say(fmt.Sprintf("List: %s", fruits[i])) })
 	// Right-click the list for a context menu acting on the current selection.
 	list.SetContextMenu(
@@ -71,7 +75,7 @@ func main() {
 	dd := ui.NewDropdown(colours, ui.DropdownPlaceholder("choose a colour"))
 	dd.OnSelect(func(i int) { say("Dropdown: " + colours[i]) })
 	right.Add(dd, ui.Align(geom.AlignStart))
-	right.Add(ui.NewLabel("(right-click the list · try Ctrl/Cmd+N, +S, +Shift+S)"), ui.Weight(1))
+	right.Add(ui.NewLabel("right-click the list for a menu\ndouble-click a row to open it\nShift+wheel or Left/Right scrolls the long row\ntry Ctrl/Cmd+N, +S, +Shift+S"), ui.Weight(1))
 	content.Add(right, ui.Weight(1))
 
 	root.Add(content, ui.Weight(1))

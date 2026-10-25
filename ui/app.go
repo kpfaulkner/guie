@@ -11,6 +11,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/kpfaulkner/guie/geom"
 	ebitenbackend "github.com/kpfaulkner/guie/internal/ebiten"
@@ -31,7 +32,12 @@ type App struct {
 	driver    render.Driver
 	ime       render.IMEController    // non-nil if the driver supports IME
 	closer    render.CloseInterceptor // non-nil if the driver can defer window closing
-	frames    render.FrameScheduler   // non-nil if the driver can gate frames
+	windower  render.WindowController // non-nil if the driver can report window geometry
+	running   bool                    // Run has been called: the backend window exists (or is about to)
+	statePath string                  // window state file, "" for none
+	geom      WindowGeometry          // last restorable window geometry
+	haveGeom  bool
+	frames    render.FrameScheduler // non-nil if the driver can gate frames
 	cfg       render.Config
 	theme     theme.Theme
 	clipboard render.Clipboard
@@ -68,11 +74,13 @@ type App struct {
 	accels []accelerator // global keyboard shortcuts
 
 	// pointer/focus dispatch state
-	hovered     Widget     // widget currently under the cursor
-	pressTarget Widget     // widget that received the active pointer-down (capture)
-	focused     Widget     // widget with keyboard focus
-	prevPointer geom.Point // cursor pos at the previous frame
-	havePrev    bool       // whether prevPointer has been set
+	hovered     Widget           // widget currently under the cursor
+	pressTarget Widget           // widget that received the active pointer-down (capture)
+	focused     Widget           // widget with keyboard focus
+	lastClick   clickRecord      // previous derived click, for double-click detection
+	now         func() time.Time // clock for double-click timing; tests replace it
+	prevPointer geom.Point       // cursor pos at the previous frame
+	havePrev    bool             // whether prevPointer has been set
 
 	drag      *dragSession // in-flight drag-and-drop, nil when none
 	composing bool         // an IME composition (preedit) is active
@@ -120,6 +128,9 @@ func NewApp(opts ...AppOption) *App {
 	if c, ok := a.driver.(render.CloseInterceptor); ok {
 		a.closer = c
 	}
+	if c, ok := a.driver.(render.WindowController); ok {
+		a.windower = c
+	}
 	// Detect optional frame gating. A driver that has it starts continuous, so
 	// the window is up and painted before frames are allowed to stop.
 	if f, ok := a.driver.(render.FrameScheduler); ok {
@@ -128,6 +139,7 @@ func NewApp(opts ...AppOption) *App {
 	}
 
 	a.bus = newEventBus()
+	a.now = time.Now
 	a.ctx = &treeContext{
 		requestLayout: func() { a.needsLayout = true },
 		requestFocus:  a.setFocus,
@@ -219,12 +231,15 @@ func (a *App) OnCloseRequest(fn func() bool) {
 // Run starts the main loop. It blocks until the window is closed or an error
 // occurs.
 func (a *App) Run() error {
-	return a.driver.Run(a.cfg, render.Hooks{
+	a.running = true
+	err := a.driver.Run(a.cfg, render.Hooks{
 		Update:         a.update,
 		Draw:           a.draw,
 		Resize:         a.resize,
 		CloseRequested: a.closeRequested,
 	})
+	a.saveWindowState()
+	return err
 }
 
 // closeRequested asks the app's close handler whether the window may close,
@@ -232,6 +247,7 @@ func (a *App) Run() error {
 // already produced (e.g. a save that completed during this frame). With no
 // handler installed the close proceeds.
 func (a *App) closeRequested() bool {
+	a.trackGeometry() // the window is still up here; a move may have produced no frame
 	if a.closeReq == nil {
 		return true
 	}
@@ -320,6 +336,7 @@ func (a *App) update(in render.InputState) error {
 	a.dispatchKeyboard(in)
 	a.dispatchFileDrop(in)
 	a.reportIMERect()
+	a.trackGeometry()
 	a.syncFrames()
 	return nil
 }
@@ -618,6 +635,7 @@ func (a *App) dispatchPointer(in render.InputState) {
 			// A release that ends a drag does not also derive a click.
 			if !dragEnding && a.pressTarget.Bounds().Contains(pos) {
 				a.dispatch(a.pressTarget, Event{Type: EventClick, Pos: pos, Button: btn, Modifiers: in.Modifiers})
+				a.noteClick(a.pressTarget, pos, btn, in.Modifiers)
 			}
 		}
 		if in.MouseDown == 0 {

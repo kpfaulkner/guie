@@ -1,6 +1,7 @@
 // Command editor is a small general-purpose text editor built with guie.
 // It has a menu bar (File / Edit / Help) and a flat icon toolbar. File ▸
-// Open/Save/Quit, Edit ▸ Find/Replace, Help ▸ About. Open and the editing
+// Open/Save/Quit, Edit ▸ Find/Replace/Undo/Redo/Toggle word wrap, Help ▸ About.
+// Replace-all is one undoable step (TextArea.ReplaceRange). Open and the editing
 // dialogs are custom modal panels (a label + text field(s) + OK/Cancel) shown
 // via App.ShowModal; Find uses TextArea's selection API to highlight and scroll
 // to a match. Toolbar icons are generated in memory and loaded via
@@ -211,6 +212,7 @@ func main() {
 		ui.TextAreaPlaceholder("Open a file (File ▸ Open) or start typing..."),
 	)
 	status := ui.NewLabel("Ready.")
+	wrap := true // matches TextAreaWrap above
 	say := func(s string) { status.SetText(s) }
 
 	currentPath := ""
@@ -287,6 +289,11 @@ func main() {
 		ui.NewMenuItem("Replace", replaceText),
 		ui.NewMenuItem("Undo", func() { area.Undo() }),
 		ui.NewMenuItem("Redo", func() { area.Redo() }),
+		ui.NewMenuItem("Toggle word wrap", func() {
+			wrap = !wrap
+			area.SetWrap(wrap) // unwrapped, long lines scroll across with a bar and Shift+wheel
+			say(fmt.Sprintf("Word wrap: %v", wrap))
+		}),
 	)
 	bar.AddMenu("Help",
 		ui.NewMenuItem("About", func() {

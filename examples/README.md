@@ -9,6 +9,8 @@ go run ./examples/layouts    # VBox / HBox / Grid / Stack, weights, alignment, p
 go run ./examples/widgets    # Label + Button, click counter, runtime enable/disable
 go run ./examples/events     # focus (Tab/Shift+Tab), keyboard activation, event bus
 go run ./examples/canvas     # a custom widget drawn with the Canvas primitives
+go run ./examples/canvaswidget # ui.CanvasWidget: a paint surface from callbacks, strokes baked into a RenderTarget
+go run ./examples/scrollbar # standalone ScrollBar pair scrolling a CanvasWidget map
 go run ./examples/controls   # TextField, Checkbox, RadioGroup, Slider, ProgressBar
 go run ./examples/scroll     # ScrollView over a tall list (wheel + draggable thumb)
 go run ./examples/showcase   # MenuBar + List + DropdownCombo with popups
@@ -28,6 +30,7 @@ go run ./examples/dragdrop   # drag-and-drop: move items between panels, ghost +
 go run ./examples/tree       # Tree (expand/collapse/keyboard) + Toast notifications
 go run ./examples/ime        # inline IME preedit rendering (simulated composition)
 go run ./examples/widgets2   # numeric Stepper + busy Spinner
+go run ./examples/windowstate # remembers window size, position and maximised state across runs
 go run ./examples/datepicker # inline month calendar (DatePicker)
 go run ./examples/colourpicker # HSV colour picker (swatch + H/S/V sliders)
 go run ./examples/framepacing # on-demand frame presenting (-stats, -continuous to compare)
@@ -42,23 +45,26 @@ What each one exercises:
 | `widgets` | `Label.SetText`, `Button` + `OnClick`, `SetEnabled` toggling at runtime, pointer hover/press |
 | `events`  | Focus traversal, Space/Enter activation, `app.Events().Subscribe` global listener |
 | `canvas`  | Custom widget via `BaseWidget`, `Canvas` primitives (`FillRect`, `StrokeRect`, `DrawLine`, `DrawText`, `MeasureText`) |
+| `canvaswidget`| `CanvasWidget`: draw + `CanvasOnEvent` callbacks, `CanvasFocusable` (keys 1-4, Z, C), `ToLocal`, pointer capture, theme colours via `ColourOf`, finished strokes cached in a `RenderTarget` |
+| `scrollbar`| Standalone `ScrollBar` (vertical + horizontal): `SetRange`, `OnScroll`, `SetOffset`, driving a `CanvasWidget` map; wheel, Shift+wheel and drag-to-pan |
+| `windowstate`| `WithWindowStateFile`: restores window size, position and maximised state, saved on exit; `App.WindowGeometry` |
 | `controls`| `TextField` (typing, caret), `Checkbox`, `RadioButton`/`RadioGroup`, `Slider` → `ProgressBar` |
-| `scroll`  | `ScrollView`: wheel + draggable thumb, interactive widgets inside the viewport |
-| `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection + scroll), `DropdownCombo`, overlay popups |
-| `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal |
-| `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap, selection, cut/copy/paste, scrolling |
+| `scroll`  | `ScrollView`: wheel + draggable thumb + gutter paging, interactive widgets inside the viewport, `SetHorizontalScroll` with a very wide row (bar along the bottom, Shift+wheel) |
+| `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection, scroll, `OnActivate` on double-click/Enter, `SetHorizontalScroll` with a long row), `DropdownCombo`, overlay popups |
+| `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal; `App.ShowConfirm` (reports once to a callback, `ConfirmLabels`, `ConfirmDefaultCancel`) |
+| `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap (toggle with `SetWrap` to see sideways scrolling), selection, double-click selects a word, cut/copy/paste, undo/redo (Ctrl+Z), scrolling |
 | `tabs`    | `TabContainer`: tab strip, click/Left-Right to switch, panes keep their state |
-| `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows, click-header sort (numeric "Years" column) |
+| `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows, click-header sort (numeric "Years" column); `SetHorizontalScroll` with `Column.MinWidth` (scrolls across when narrow); `OnActivate` on double-click/Enter |
 | `fonts`   | Runtime font sizing via `App.SetFont` + `ui.DefaultFont`, plus per-widget `SetFont` |
 | `tooltips`| Hover tooltips via `SetTooltip`, with a rest delay and on-screen clamping |
 | `splitter`| `SplitPane`/`HSplit`/`VSplit`: draggable dividers, ratio + min sizes, nested |
 | `colours`  | Per-widget colour overrides via `SetColour`/`ColourOf` and `ColourRole`s |
 | `images`  | `Image` widget (fit modes) + image buttons via `ui.LoadImage`/`ButtonImage` |
-| `editor`  | A text editor: `MenuBar`, file open/save, find/replace, custom modal dialogs, `TextArea` selection API |
+| `editor`  | A text editor: `MenuBar`, file open/save, find/replace (replace-all is one undo step via `ReplaceRange`), Undo/Redo, word-wrap toggle, custom modal dialogs, `TextArea` selection API |
 | `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, colour/brush controls |
 | `clipboard`| OS clipboard: copy/paste with other apps. Works by default now — this example wires it explicitly to report initialisation failure |
 | `dragdrop`| Drag-and-drop: `SetDragSource`/`SetDropTarget`, `OnDrop`/`OnDragEnter`/`OnDragLeave`, ghost + drop highlight, `Container.Remove` to re-parent |
-| `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate`; `App.ShowToast` with info/success/warning/error kinds |
+| `tree`    | `Tree`/`TreeNode`: expand/collapse, click + keyboard nav, `OnSelect`/`OnActivate` (Enter or double-click), `SetHorizontalScroll` with a very long name; `App.ShowToast` with info/success/warning/error kinds |
 | `ime`     | Inline IME preedit drawn underlined at the caret via `EventComposition`; uses a simulated composition since EBiten exposes no real IME |
 | `widgets2`| `Stepper` (min/max/step/decimals, buttons + arrows + wheel, `OnChange`) and the indeterminate busy `Spinner` (`Start`/`Stop`) |
 | `datepicker`| `DatePicker` inline calendar + `DateField` popup variant: month nav, click + keyboard day selection, `OnChange(time.Time)` |

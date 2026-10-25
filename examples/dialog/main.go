@@ -37,17 +37,18 @@ func main() {
 	})
 	row.Add(showMsg)
 
-	// A confirm dialog with Cancel / Delete choices.
+	// A confirm dialog. ShowConfirm reports the choice once: true for Delete,
+	// false for Cancel, Escape or any other close. ConfirmDefaultCancel gives
+	// Cancel the initial focus so a stray Enter is safe for a destructive action.
 	del := ui.NewButton("Delete...")
 	del.OnClick(func() {
-		app.ShowMessage("Delete item?", "This cannot be undone.",
-			ui.DialogButton{Label: "Cancel", OnClick: func() {
-				status.SetText("Last action: cancelled")
-			}},
-			ui.DialogButton{Label: "Delete", OnClick: func() {
+		app.ShowConfirm("Delete item?", "This cannot be undone.", func(ok bool) {
+			if ok {
 				status.SetText("Last action: deleted")
-			}},
-		)
+			} else {
+				status.SetText("Last action: cancelled")
+			}
+		}, ui.ConfirmLabels("Delete", "Cancel"), ui.ConfirmDefaultCancel())
 	})
 	row.Add(del)
 

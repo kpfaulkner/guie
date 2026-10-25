@@ -5,6 +5,11 @@
 // cut/copy/paste with Ctrl+X / Ctrl+C / Ctrl+V (Ctrl+A selects all). A status
 // line reports the line and character counts as you edit.
 //
+// Ctrl+Z undoes and Ctrl+Shift+Z (or Ctrl+Y) redoes, and a double-click selects a
+// word. Untick "Word wrap" and the long lines scroll sideways instead: a bar
+// appears along the bottom, Shift+wheel scrolls across, and the view follows the
+// caret as you type or move along a line.
+//
 // Run with: go run ./examples/textarea
 package main
 
@@ -40,9 +45,13 @@ func main() {
 		ui.TextAreaPlaceholder("Start typing your notes here..."),
 	)
 	area.OnChange(update)
-	area.SetText("The quick brown fox jumps over the lazy dog, and keeps on running well past the right edge so you can see soft word-wrap in action.\nSecond paragraph.")
+	area.SetText("The quick brown fox jumps over the lazy dog, and keeps on running well past the right edge so you can see soft word-wrap in action.\nSecond paragraph.\nA line with no break points: " + strings.Repeat("0123456789", 14))
 	update(area.Text())
 
+	wrap := ui.NewCheckbox("Word wrap")
+	wrap.SetChecked(true)
+	wrap.OnChange(func(on bool) { area.SetWrap(on) })
+	root.Add(wrap)
 	root.Add(area, ui.Weight(1))
 	root.Add(stats)
 

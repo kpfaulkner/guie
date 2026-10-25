@@ -66,6 +66,7 @@ func (d *Driver) Run(cfg render.Config, hooks render.Hooks) error {
 		cfg.Height = 600
 	}
 	ebiten.SetWindowSize(cfg.Width, cfg.Height)
+	applyGeometry(cfg.Geometry)
 	ebiten.SetWindowTitle(cfg.Title)
 	if len(cfg.Icon) > 0 {
 		ebiten.SetWindowIcon(cfg.Icon)
@@ -81,6 +82,7 @@ func (d *Driver) Run(cfg render.Config, hooks render.Hooks) error {
 		width:  cfg.Width,
 		height: cfg.Height,
 		scale:  1,
+		want:   cfg.Geometry,
 	}
 	return ebiten.RunGame(g)
 }
@@ -99,6 +101,8 @@ type game struct {
 	width, height int
 	scale         float64
 	sized         bool
+	placed        bool                  // the first-Update window placement has run
+	want          render.WindowGeometry // the geometry the app asked for
 }
 
 // Update polls input and forwards it to the framework's Update hook. A
@@ -112,6 +116,10 @@ type game struct {
 // is already going away, so the hook's answer cannot hold it back; terminating
 // either way keeps the shutdown clean.
 func (g *game) Update() error {
+	if !g.placed {
+		g.placed = true
+		place(g.want)
+	}
 	if ebiten.IsWindowBeingClosed() {
 		if g.hooks.CloseRequested == nil || g.hooks.CloseRequested() || !ebiten.IsWindowClosingHandled() {
 			return ebiten.Termination

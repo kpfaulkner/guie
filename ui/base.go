@@ -12,16 +12,17 @@ import (
 // implementations shared by all widgets. Embed it in a concrete widget and
 // override Draw, Layout and MinSize (and, later, event handling) as needed.
 type BaseWidget struct {
-	bounds      geom.Rect
-	visible     bool
-	enabled     bool
-	tooltip     string
-	contextMenu []MenuItem                 // shown on right-click, empty for none
-	drag        *dragConfig                // drag-source / drop-target config, nil until opted in
-	colours     map[ColourRole]color.Color // per-widget colour overrides
-	self        Widget                     // this widget's interface identity
-	parent      Widget
-	ctx         *treeContext
+	bounds        geom.Rect
+	visible       bool
+	enabled       bool
+	tooltip       string
+	contextMenu   []MenuItem                 // shown on right-click, empty for none
+	drag          *dragConfig                // drag-source / drop-target config, nil until opted in
+	onDoubleClick func(geom.Point) bool      // see OnDoubleClick
+	colours       map[ColourRole]color.Color // per-widget colour overrides
+	self          Widget                     // this widget's interface identity
+	parent        Widget
+	ctx           *treeContext
 }
 
 // NewBase returns a BaseWidget that is visible and enabled. Concrete widgets

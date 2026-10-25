@@ -299,3 +299,15 @@ func removeKey(ks []render.Key, k render.Key) []render.Key {
 	}
 	return out
 }
+
+// SetWindowGeometry sets what the fake window reports to the app, as if the user
+// had moved or resized it. ok false models a window with no readable geometry
+// (minimized, fullscreen). The app notices on the next Step.
+func (h *Harness) SetWindowGeometry(g render.WindowGeometry, ok bool) *Harness {
+	h.driver.window, h.driver.windowOK = g, ok
+	return h
+}
+
+// AppliedWindowGeometry returns the geometry the app asked the backend to open
+// the window at (the zero value if it asked for none).
+func (h *Harness) AppliedWindowGeometry() render.WindowGeometry { return h.driver.applied }

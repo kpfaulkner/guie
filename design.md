@@ -345,7 +345,7 @@ Grouped by build priority.
 - **TextField** — single-line text entry (uses `TextInput`/focus/caret). Optionally
   **masked** for credential entry — see *MASKED TEXT INPUT*. *(Masking done —
   `INTERNALS.md` §14.4.)*
-- **ScrollBar** + **ScrollView** — clip + offset content; vertical & horizontal.
+- **ScrollBar** + **ScrollView** - clip + offset content. *(Done: a shared `ScrollBar` drives every scrolling widget and is also a standalone widget, INTERNALS 13g. Horizontal scrolling: opt-in (`SetHorizontalScroll`) on `ScrollView`, `Table`, `List` and `Tree`; automatic on `TextArea` without wrap.)*
 
 ### Third wave
 
@@ -388,7 +388,7 @@ Grouped by build priority.
 - Animation/transition primitives (timeline vs per-frame). *(Done — per-frame
   hook `App.OnFrame` plus `App.Animate`/`App.Tween` with easings; see
   `internals.md` §11a and `examples/animation`.)*
-- Persistence of window size/position.
+- Persistence of window size/position. *(Done - `ui.WithWindowStateFile`, `WithWindowGeometry`, `App.WindowGeometry`; see INTERNALS 8.7 and `examples/windowstate`. Which-monitor restore is still open: EBiten reports position relative to the current monitor only.)*
 - Testing approach (headless backend implementing `Canvas`/`Input` for unit
   tests of layout and event dispatch without a real window). *(Done — the
   `guitest` package provides a GPU-free `render.Driver`/`Canvas`/`FontFace`
@@ -1373,7 +1373,7 @@ These reshape public API and are hard/churny to retrofit after freeze.
 | Multi-window | **Lock the `App`/`Window` API shape** so it doesn't bake in a single-window assumption (e.g. `App.MainWindow()` singleton); **implement lazily** when a real app needs it. Inherently desktop-only (no WASM). |
 | Rich text | Reserve an attributed-text / **`[]TextSpan`** type and ship a basic **`RichText`** widget (multi-style spans + clickable links). Keep plain `Label` simple/fast. **Markdown deferred** (layer on top / userland). |
 | Text undo | Built-in **undo/redo inside `TextField`/`TextArea`** (a correctness expectation of the widget). App-level command history stays userland. |
-| Window geometry | Small helper to persist/restore window **size + position** (mostly non-OS-specific; "which monitor" restore needs backend help later). |
+| Window geometry | *(Done - INTERNALS 8.7.)* Small helper to persist/restore window **size + position** (mostly non-OS-specific; "which monitor" restore needs backend help later). |
 | Masked text input | `Masked()` option + `SetMasked` on `TextField`, so a credential can be entered without being displayed. Public API, so pre-freeze. Spec in *MASKED TEXT INPUT*. *(Done — `INTERNALS.md` §14.4.)* |
 | OS file drops | `InputState.DroppedFiles` (`fs.FS`) + `EventFileDrop` + `OnFileDrop` — public API on the seam, the widget and the event set, so the shape must land pre-freeze. Small: EBiten already surfaces the drop. Spec in *DRAG-AND-DROP → OS file drops*. |
 
@@ -1382,7 +1382,7 @@ These reshape public API and are hard/churny to retrofit after freeze.
 | Feature | Decision / scope |
 |---|---|
 | WASM target | **Supported + advertised.** Whole repo builds clean for `GOOS=js GOARCH=wasm` today (verified), the `clipboard` package included — a runtime failure there degrades to the in-process fallback. Guard remaining OS opt-in packages (dialogs) behind build tags. Browser runtime smoke-test + docs-site playground to follow. |
-| In-app dialogs | `MessageBox` / `Confirm` + an **in-surface file chooser** built from existing List/Tree/TextField. Pure `ui`, cross-platform incl. WASM. |
+| In-app dialogs | `ShowMessage` and `ShowConfirm` (done) + an **in-surface file chooser** (not built) built from existing List/Tree/TextField. Pure `ui`, cross-platform incl. WASM. |
 | Translations / locale | App-level translation strings + locale-aware date/number formatting. Additive display layer; no widget rewrite. |
 | Redraw-when-dirty | Skip the whole frame draw when the tree isn't dirty, using the existing `Invalidate` signal (needs `ebiten.SetScreenClearedEveryFrame(false)`). Kills idle CPU/battery cheaply. |
 | Launch collateral | `CONTRIBUTING`, CI workflow, README polish, GitHub. |

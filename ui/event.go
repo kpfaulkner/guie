@@ -47,6 +47,12 @@ const (
 	// The files are carried in Event.Files. Unlike in-process drag-and-drop there
 	// is no enter/over/leave phase: the OS reports only the completed drop.
 	EventFileDrop
+	// EventDoubleClick is sent after the second of two clicks on the same widget,
+	// same button, within a short time and distance of each other, and bubbles
+	// like a click. Each of the two clicks also sent its own EventClick first, so
+	// a widget that acts on single clicks acts on both; use it for the extra
+	// meaning (open, select word). A third quick click starts a new sequence.
+	EventDoubleClick
 )
 
 // Event describes a single input event. Which fields are meaningful depends on
@@ -94,6 +100,12 @@ func (d FileDrop) ReadFile(name string) ([]byte, error) {
 func hitTest(w Widget, pos geom.Point) Widget {
 	if w == nil || !w.Visible() || !w.Bounds().Contains(pos) {
 		return nil
+	}
+	// A widget whose children can extend past what is visible (a scrolled view)
+	// confines them to its clip, so the parts of it drawn on top of them still
+	// get their own events.
+	if cc, ok := w.(interface{ childClip() geom.Rect }); ok && !cc.childClip().Contains(pos) {
+		return w
 	}
 	children := w.Children()
 	for i := len(children) - 1; i >= 0; i-- {

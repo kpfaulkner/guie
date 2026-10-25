@@ -547,6 +547,11 @@ func (t *TextField) HandleEvent(ev *Event) bool {
 	case EventComposition:
 		t.setPreedit(ev.Comp.Text, ev.Comp.Caret)
 		return true
+	case EventDoubleClick:
+		if ev.Button == render.MouseLeft {
+			t.selectWordAt(t.caretIndexAt(ev.Pos.X))
+			return true
+		}
 	case EventText:
 		if ev.Rune >= 0x20 && ev.Rune != 0x7f {
 			t.insert(ev.Rune)
@@ -636,4 +641,15 @@ func (t *TextField) ReplaceRange(start, end int, s string) {
 	}
 	clamp := func(i int) int { return max(0, min(i, len(t.runes))) }
 	t.replace(clamp(start), clamp(end), []rune(s), kindOther)
+}
+
+// selectWordAt selects the word (or whitespace/punctuation run) around caret
+// index idx. A masked field selects everything instead: word boundaries would
+// show where the spaces in a secret are.
+func (t *TextField) selectWordAt(idx int) {
+	if t.masked {
+		t.selectAll()
+		return
+	}
+	t.anchor, t.caret = wordBounds(t.runes, idx)
 }

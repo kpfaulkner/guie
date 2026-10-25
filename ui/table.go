@@ -9,6 +9,10 @@ import (
 
 const tableCellPad = 6
 
+// defaultColMinWidth is the narrowest a column gets under horizontal scrolling when
+// it sets no MinWidth of its own.
+const defaultColMinWidth = 80
+
 // Column describes a table column.
 type Column struct {
 	// Title is the header text.
@@ -23,6 +27,10 @@ type Column struct {
 	// NoSort disables click-to-sort for this column (its header still reports
 	// OnHeaderClick).
 	NoSort bool
+	// MinWidth is the narrowest the column may get while horizontal scrolling is on
+	// (see Table.SetHorizontalScroll); 0 means defaultColMinWidth. It is ignored
+	// otherwise, when columns simply share the width by weight.
+	MinWidth float64
 }
 
 // Table is a grid of string cells with a fixed header row and a scrollable,
@@ -37,6 +45,10 @@ type Table struct {
 	hoverRow int // -1 = none
 	hoverCol int // header column under the cursor, -1 = none
 	offset   float64
+	bar      barDrag // scrollbar thumb-drag state
+	offsetX  float64 // horizontal scroll, only with hscroll
+	barH     barDrag // horizontal scrollbar thumb-drag state
+	hscroll  bool    // columns may be wider than the table, scrolling across
 	focused  bool
 
 	sortable bool // whether header clicks sort (default true)
@@ -45,6 +57,7 @@ type Table struct {
 	striped  bool // alternate rows get a subtle tint
 
 	onSelect      func(int)
+	onActivate    func(int)
 	onHeaderClick func(int)
 	font          render.FontFace
 }
@@ -183,6 +196,12 @@ func sameRow(a, b []string) bool {
 // OnSelect registers the handler invoked with the newly selected row index.
 func (t *Table) OnSelect(fn func(int)) { t.onSelect = fn }
 
+// OnActivate registers the handler invoked with a row index when that row is
+// activated: double-clicked, or Enter pressed while it is selected. The index is
+// the displayed (possibly sorted) row, as for OnSelect. Double-clicking the
+// header does nothing extra.
+func (t *Table) OnActivate(fn func(int)) { t.onActivate = fn }
+
 // SetRows replaces all rows and clears the selection.
 func (t *Table) SetRows(rows [][]string) {
 	t.rows = rows
@@ -251,12 +270,71 @@ func (t *Table) rowHeight() float64 {
 
 func (t *Table) contentHeight() float64 { return t.rowHeight() * float64(len(t.rows)) }
 
-// bodyHeight is the height available to rows, below the header.
-func (t *Table) bodyHeight() float64 { return t.Bounds().H - t.rowHeight() }
+// tableGeom is how the table's width and height are carved up, worked out
+// together because the two scrollbars depend on each other: a vertical bar takes
+// width, which can make the columns overflow and need a horizontal bar, which
+// takes height, which can make the rows overflow.
+type tableGeom struct {
+	vOver  bool    // rows overflow, so the vertical bar shows
+	hOver  bool    // columns overflow, so the horizontal bar shows (hscroll only)
+	viewW  float64 // width of the column area, left of the vertical bar
+	bodyH  float64 // height of the row area, below the header and above the horizontal bar
+	totalW float64 // laid-out width of all the columns
+}
 
-func (t *Table) overflow() bool { return t.contentHeight() > t.bodyHeight() }
+// minColWidth is column c's narrowest width under horizontal scrolling.
+func (t *Table) minColWidth(c int) float64 {
+	if w := t.columns[c].MinWidth; w > 0 {
+		return w
+	}
+	return defaultColMinWidth
+}
+
+func (t *Table) geomInfo() tableGeom {
+	b := t.Bounds()
+	body := b.H - t.rowHeight()
+	g := tableGeom{bodyH: body, viewW: b.W}
+	g.vOver = t.contentHeight() > g.bodyH
+	if g.vOver {
+		g.viewW -= scrollbarWidth
+	}
+	g.totalW = g.viewW
+	if !t.hscroll {
+		return g
+	}
+	var minTotal float64
+	for c := range t.columns {
+		minTotal += t.minColWidth(c)
+	}
+	if minTotal <= g.viewW {
+		return g
+	}
+	// The columns overflow: the horizontal bar takes a strip off the body, which
+	// may in turn make the rows overflow. The bar only ever narrows the view, so
+	// the columns still overflow after that and one more pass settles it.
+	g.hOver = true
+	g.bodyH = body - scrollbarWidth
+	g.vOver = t.contentHeight() > g.bodyH
+	g.viewW = b.W
+	if g.vOver {
+		g.viewW -= scrollbarWidth
+	}
+	g.totalW = maxF(minTotal, g.viewW)
+	return g
+}
+
+// bodyHeight is the height available to rows, below the header (and above the
+// horizontal bar, when there is one).
+func (t *Table) bodyHeight() float64 { return t.geomInfo().bodyH }
+
+func (t *Table) overflow() bool { return t.geomInfo().vOver }
 
 func (t *Table) maxOffset() float64 { return maxF(0, t.contentHeight()-t.bodyHeight()) }
+
+func (t *Table) maxOffsetX() float64 {
+	g := t.geomInfo()
+	return maxF(0, g.totalW-g.viewW)
+}
 
 func (t *Table) clamp() {
 	if t.offset < 0 {
@@ -265,14 +343,25 @@ func (t *Table) clamp() {
 	if m := t.maxOffset(); t.offset > m {
 		t.offset = m
 	}
+	t.offsetX = minF(maxF(t.offsetX, 0), t.maxOffsetX())
+}
+
+// SetHorizontalScroll lets the columns be wider than the table. Each column then
+// keeps at least its MinWidth (80 if unset); when they no longer fit, a bar
+// appears along the bottom and the header and rows scroll across together, the
+// header staying put vertically. Columns still share any spare width by weight.
+// Off by default, when columns are squeezed to fit as before.
+func (t *Table) SetHorizontalScroll(on bool) {
+	t.hscroll = on
+	if !on {
+		t.offsetX = 0
+	}
+	t.Invalidate()
 }
 
 // colWidths returns the resolved pixel width of each column.
 func (t *Table) colWidths() []float64 {
-	w := t.Bounds().W
-	if t.overflow() {
-		w -= scrollbarWidth
-	}
+	g := t.geomInfo()
 	weights := make([]int, len(t.columns))
 	for i, c := range t.columns {
 		if c.Weight <= 0 {
@@ -281,13 +370,58 @@ func (t *Table) colWidths() []float64 {
 			weights[i] = c.Weight
 		}
 	}
-	return distributeTracks(len(t.columns), w, 0, weights)
+	if !t.hscroll {
+		return distributeTracks(len(t.columns), g.viewW, 0, weights)
+	}
+	mins := make([]float64, len(t.columns))
+	for i := range mins {
+		mins[i] = t.minColWidth(i)
+	}
+	return flexWithMins(g.totalW, weights, mins)
 }
 
-// colX returns the left edge x of each column.
+// flexWithMins splits total across columns by weight, but never gives a column
+// less than its minimum: a column whose share would fall short is pinned at its
+// minimum and the rest share what is left, repeating until none fall short. total
+// is assumed to be at least the sum of the minimums.
+func flexWithMins(total float64, weights []int, mins []float64) []float64 {
+	n := len(weights)
+	out := make([]float64, n)
+	pinned := make([]bool, n)
+	for {
+		left, wsum := total, 0
+		for i := range out {
+			if pinned[i] {
+				left -= out[i]
+			} else {
+				wsum += weights[i]
+			}
+		}
+		again := false
+		for i := range out {
+			if pinned[i] {
+				continue
+			}
+			share := 0.0
+			if wsum > 0 {
+				share = left * float64(weights[i]) / float64(wsum)
+			}
+			if share < mins[i] {
+				out[i], pinned[i], again = mins[i], true, true
+			} else {
+				out[i] = share
+			}
+		}
+		if !again {
+			return out
+		}
+	}
+}
+
+// colX returns the left edge x of each column, shifted by the horizontal scroll.
 func (t *Table) colX(widths []float64) []float64 {
 	xs := make([]float64, len(widths))
-	x := t.Bounds().X
+	x := t.Bounds().X - t.offsetX
 	for i, cw := range widths {
 		xs[i] = x
 		x += cw
@@ -304,6 +438,9 @@ func (t *Table) rowAt(y float64) int {
 	bodyTop := t.Bounds().Y + rh
 	if y < bodyTop {
 		return -1
+	}
+	if y >= bodyTop+t.bodyHeight() {
+		return -1 // the horizontal bar, if any
 	}
 	idx := int((y - bodyTop + t.offset) / rh)
 	if idx < 0 || idx >= len(t.rows) {
@@ -331,6 +468,10 @@ func (t *Table) MinSize() geom.Size {
 	if f == nil {
 		return geom.Size{}
 	}
+	if t.hscroll {
+		// Like a scroll view, the width is the parent's to give: the columns scroll.
+		return geom.Size{W: defaultColMinWidth, H: t.rowHeight() * 2}
+	}
 	var w float64
 	for _, c := range t.columns {
 		w += f.Measure(c.Title).W + 2*tableCellPad
@@ -355,6 +496,8 @@ func (t *Table) Draw(canvas render.Canvas) {
 	// Header row.
 	header := geom.Rect{X: b.X, Y: b.Y, W: b.W, H: rh}
 	canvas.FillRect(header, tint(t.ColourOf(RoleSurface), tintHeader))
+	g := t.geomInfo()
+	canvas.PushClip(geom.Rect{X: b.X, Y: b.Y, W: g.viewW, H: rh}) // scrolled cells stay off the gutter
 	for c, col := range t.columns {
 		cell := geom.Rect{X: xs[c], Y: b.Y, W: widths[c], H: rh}
 		if c == t.hoverCol {
@@ -367,18 +510,19 @@ func (t *Table) Draw(canvas render.Canvas) {
 		}
 		canvas.PopClip()
 	}
+	canvas.PopClip()
 	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + rh}, geom.Point{X: b.X + b.W, Y: b.Y + rh}, t.ColourOf(RoleBorder), 1)
 
 	// Body rows.
 	bodyTop := b.Y + rh
-	body := geom.Rect{X: b.X, Y: bodyTop, W: b.W, H: b.H - rh}
+	body := geom.Rect{X: b.X, Y: bodyTop, W: g.viewW, H: g.bodyH}
 	canvas.PushClip(body)
 	for i, row := range t.rows {
 		y := bodyTop - t.offset + float64(i)*rh
-		if y+rh < bodyTop || y > b.Y+b.H {
+		if y+rh < bodyTop || y > bodyTop+g.bodyH {
 			continue
 		}
-		rowRect := geom.Rect{X: b.X, Y: y, W: b.W, H: rh}
+		rowRect := geom.Rect{X: b.X - t.offsetX, Y: y, W: g.totalW, H: rh}
 		textColour := t.ColourOf(RoleText)
 		if t.striped && i%2 == 1 && i != t.selected && i != t.hoverRow {
 			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), tintHeader/2))
@@ -402,15 +546,23 @@ func (t *Table) Draw(canvas render.Canvas) {
 	}
 	canvas.PopClip()
 
-	// Column separators (skip the left edge).
+	// Column separators (skip the left edge), kept off the gutters.
+	canvas.PushClip(geom.Rect{X: b.X, Y: b.Y, W: g.viewW, H: rh + g.bodyH})
 	for c := 1; c < len(xs); c++ {
-		canvas.DrawLine(geom.Point{X: xs[c], Y: b.Y}, geom.Point{X: xs[c], Y: b.Y + b.H}, t.ColourOf(RoleBorder), 1)
+		canvas.DrawLine(geom.Point{X: xs[c], Y: b.Y}, geom.Point{X: xs[c], Y: bodyTop + g.bodyH}, t.ColourOf(RoleBorder), 1)
 	}
+	canvas.PopClip()
 
 	canvas.StrokeRect(b, t.ColourOf(RoleBorder), 1)
 
-	if t.overflow() {
+	if g.vOver {
 		t.drawScrollbar(canvas, b, bodyTop)
+	}
+	if g.hOver {
+		drawBar(canvas, t.scrollTrackH(), false, t.scrollMetricsH(), t.ColourOf(RoleBackground), t.ColourOf(RoleAccent))
+		if g.vOver { // the corner where the two gutters meet
+			canvas.FillRect(geom.Rect{X: b.X + b.W - scrollbarWidth, Y: b.Y + b.H - scrollbarWidth, W: scrollbarWidth, H: scrollbarWidth}, t.ColourOf(RoleBackground))
+		}
 	}
 }
 
@@ -430,17 +582,32 @@ func (t *Table) drawSortIndicator(canvas render.Canvas, cell geom.Rect, asc bool
 	}
 }
 
+// scrollTrack is the scrollbar gutter along the right edge of the body, below the
+// header.
+func (t *Table) scrollTrack() geom.Rect {
+	b := t.Bounds()
+	top := b.Y + t.rowHeight()
+	return geom.Rect{X: b.X + b.W - scrollbarWidth, Y: top, W: scrollbarWidth, H: t.bodyHeight()}
+}
+
+func (t *Table) scrollMetrics() scrollMetrics {
+	return scrollMetrics{content: t.contentHeight(), view: t.bodyHeight(), offset: t.offset}
+}
+
+// scrollTrackH is the horizontal scrollbar gutter along the bottom edge (only
+// meaningful while the columns overflow).
+func (t *Table) scrollTrackH() geom.Rect {
+	b := t.Bounds()
+	return geom.Rect{X: b.X, Y: b.Y + b.H - scrollbarWidth, W: t.geomInfo().viewW, H: scrollbarWidth}
+}
+
+func (t *Table) scrollMetricsH() scrollMetrics {
+	g := t.geomInfo()
+	return scrollMetrics{content: g.totalW, view: g.viewW, offset: t.offsetX}
+}
+
 func (t *Table) drawScrollbar(canvas render.Canvas, b geom.Rect, bodyTop float64) {
-	bh := t.bodyHeight()
-	ch := t.contentHeight()
-	thumbH := maxF(minThumb, bh*bh/ch)
-	var off float64
-	if m := t.maxOffset(); m > 0 {
-		off = (t.offset / m) * (bh - thumbH)
-	}
-	x := b.X + b.W - scrollbarWidth
-	canvas.FillRect(geom.Rect{X: x, Y: bodyTop, W: scrollbarWidth, H: bh}, t.ColourOf(RoleBackground))
-	canvas.FillRect(geom.Rect{X: x, Y: bodyTop + off, W: scrollbarWidth, H: thumbH}, t.ColourOf(RoleAccent))
+	drawBar(canvas, t.scrollTrack(), true, t.scrollMetrics(), t.ColourOf(RoleBackground), t.ColourOf(RoleAccent))
 }
 
 // HandleEvent handles hover, row selection, wheel scrolling and keyboard
@@ -448,6 +615,20 @@ func (t *Table) drawScrollbar(canvas render.Canvas, b geom.Rect, bodyTop float64
 func (t *Table) HandleEvent(ev *Event) bool {
 	if !t.Enabled() {
 		return false
+	}
+	if off, changed, ok := t.bar.handle(ev, t.scrollTrack(), t.overflow(), true, t.scrollMetrics()); ok {
+		if changed {
+			t.offset = off
+			t.clamp()
+		}
+		return true
+	}
+	if off, changed, ok := t.barH.handle(ev, t.scrollTrackH(), t.geomInfo().hOver, false, t.scrollMetricsH()); ok {
+		if changed {
+			t.offsetX = off
+			t.clamp()
+		}
+		return true
 	}
 	switch ev.Type {
 	case EventPointerMove:
@@ -472,7 +653,22 @@ func (t *Table) HandleEvent(ev *Event) bool {
 			t.SetSelected(i)
 		}
 		return true
+	case EventDoubleClick:
+		if i := t.rowAt(ev.Pos.Y); i >= 0 && ev.Button == render.MouseLeft {
+			t.SetSelected(i)
+			if t.onActivate != nil {
+				t.onActivate(i)
+			}
+		}
+		return true
 	case EventWheel:
+		// A sideways wheel, or Shift with the ordinary one, scrolls across when there
+		// is somewhere to go.
+		if dx := wheelAcross(ev); t.hscroll && dx != 0 && t.maxOffsetX() > 0 {
+			t.offsetX -= dx * wheelStep
+			t.clamp()
+			return true
+		}
 		t.offset -= ev.Wheel.Y * wheelStep
 		t.clamp()
 		return true
@@ -499,9 +695,22 @@ func (t *Table) handleKey(k render.Key) bool {
 		t.selectAndShow(0)
 	case render.KeyEnd:
 		t.selectAndShow(len(t.rows) - 1)
+	case render.KeyLeft, render.KeyRight:
+		if !t.hscroll {
+			return false
+		}
+		if k == render.KeyLeft {
+			t.offsetX -= wheelStep
+		} else {
+			t.offsetX += wheelStep
+		}
+		t.clamp()
 	case render.KeyEnter:
 		if t.selected >= 0 && t.onSelect != nil {
 			t.onSelect(t.selected)
+		}
+		if t.selected >= 0 && t.onActivate != nil {
+			t.onActivate(t.selected)
 		}
 	default:
 		return false
