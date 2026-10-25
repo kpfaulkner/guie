@@ -1,14 +1,54 @@
 # guie
 
 A cross-platform GUI framework for Go: windows, layouts and a catalogue of
-widgets (buttons, lists, trees, tables, text fields, menus, dialogs, drag-and-
-drop, toasts, …) with theming, events and animations. It renders on
+widgets with theming, events and animations. It renders on
 [Ebiten](https://github.com/hajimehoshi/ebiten), but that is an internal
-detail — application code imports only `ui`, `geom`, `render` and `theme`, never
+detail - application code imports only `ui`, `geom`, `render` and `theme`, never
 Ebiten.
 
-See [`design.md`](design.md) for the architecture and decisions, and
-[`internals.md`](internals.md) for the implementation guide.
+> **Status: v0.x.** The API is still settling and may change between releases;
+> expect to pin a version. Development is on Windows; macOS and Linux should work
+> (Ebiten is cross-platform and guie has almost no OS-specific code) but have not
+> been run yet, so treat them as untested. See [Platforms](#platforms).
+
+## What is in it
+
+- **Layout:** `Container` with `VBox` / `HBox` / `Grid` / `Stack`, weights,
+  alignment, padding, `SplitPane`.
+- **Widgets:** `Label`, `Button` (text or image), `Checkbox`, `RadioButton`,
+  `TextField` (optionally masked), `TextArea` (soft wrap, selection, undo/redo),
+  `Slider`, `Stepper`, `ProgressBar`, `Spinner`, `List`, `Tree`, `Table`
+  (sortable), `DropdownCombo`, `MenuBar` and context menus, `TabContainer`,
+  `ScrollView` and a standalone `ScrollBar`, `DatePicker` / `DateField`,
+  `ColourPicker`, `Image`, tooltips and toasts.
+- **Custom drawing:** `CanvasWidget` for charts, paint surfaces and HUDs, drawn
+  with the same `render.Canvas` primitives the built-in widgets use.
+- **Dialogs:** modal dialogs, `App.ShowMessage` and `App.ShowConfirm`.
+- **Input:** callbacks as the main API plus an optional event bus, focus and Tab
+  order, keyboard accelerators, double-click, in-process drag-and-drop, OS file
+  drops, clipboard (the OS clipboard by default), and IME for committed text.
+- **Scrolling:** wheel, draggable scroll bars and gutter paging everywhere
+  content overflows; horizontal scrolling is opt-in on `ScrollView`, `Table`,
+  `List` and `Tree` and automatic in an unwrapped `TextArea`.
+- **Look:** a dark theme and a light theme you can switch at runtime, per-widget
+  colour overrides, fonts, HiDPI scaling, animated hover and focus.
+- **App plumbing:** frames are drawn on demand so an idle window is nearly free,
+  `App.Do` for updates from other goroutines, window size and position saved
+  across runs (`ui.WithWindowStateFile`).
+- **Testing:** a headless backend, `guitest`, to test a UI with no window or GPU
+  (see [Testing](#testing)).
+
+Not done yet: accessibility (screen readers), rich text, data binding, multiple
+OS windows, native file dialogs and a native macOS menu bar. They are tracked in
+[`design.md`](design.md).
+
+## Documentation
+
+- [`docs/`](docs/tutorial-basics.md) - tutorials: windows and widgets,
+  containers and placement, events and overlays.
+- [`examples/`](examples/README.md) - small runnable programs for each feature.
+- [`design.md`](design.md) - the architecture, decisions and roadmap.
+- [`INTERNALS.md`](INTERNALS.md) - how it is built, for contributors.
 
 ## Quick start
 
@@ -48,6 +88,26 @@ go run ./examples/hello       # smallest program
 go run ./examples/tree        # Tree widget + Toast notifications
 go run ./examples/dragdrop    # drag-and-drop between panels
 ```
+
+
+## Requirements
+
+- Go 1.25 or newer. `go get github.com/kpfaulkner/guie`.
+- Windows builds without cgo or any extra tools. macOS and Linux build with cgo, so they need a C toolchain (on macOS, the Xcode command-line tools).
+
+### Platforms
+
+| Platform | State |
+|---|---|
+| Windows | Developed and tested here. |
+| macOS | Expected to work, **untested**. HiDPI and the Cmd-based shortcuts are implemented but have not been seen on real hardware. |
+| Linux | Expected to work, **untested**. Ebiten needs cgo here, so a C compiler and the X11/GL development packages are required (on Debian/Ubuntu: `libgl1-mesa-dev xorg-dev libasound2-dev`). |
+| Raspberry Pi | Builds natively on a Pi (arm64); a Pi 4 or 5 with the desktop Mesa driver is the realistic target. Untested. |
+| Web (WASM) | The library packages build for `GOOS=js GOARCH=wasm`; running it in a browser has not been tried. |
+
+`guitest` needs no display or GPU, so UI tests run on a headless CI machine. The
+packages still link Ebiten, though, so on Linux and macOS `go test` needs the cgo
+toolchain above (it does not on Windows).
 
 ## Testing
 
@@ -145,3 +205,7 @@ go test ./guitest/ -v    # the headless harness self-tests
 
 GUI examples can't run headlessly (they open a window); they all compile and are
 the manual "does it actually render" check via `go run ./examples/<name>`.
+
+## License
+
+Apache License 2.0. See [`LICENSE`](LICENSE).
