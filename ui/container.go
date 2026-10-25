@@ -116,12 +116,22 @@ func (c *Container) ContentRect() geom.Rect {
 	return c.Bounds().Inset(c.padding)
 }
 
+// resolveGap tells a layout whose spacing follows the theme (ThemeGap) what that
+// is now. It is cheap and runs before every measure and arrange, so a SetTheme is
+// picked up by the next layout pass without anything having to be rebuilt.
+func (c *Container) resolveGap() {
+	if s, ok := c.layout.(spacingSetter); ok {
+		s.setThemeGap(c.px(c.appTheme().Spacing))
+	}
+}
+
 // MinSize returns the size needed to enclose the children plus padding. With a
 // layout manager it defers to the layout's measurement; otherwise it takes the
 // largest child extents on each axis.
 func (c *Container) MinSize() geom.Size {
 	var content geom.Size
 	if c.layout != nil {
+		c.resolveGap()
 		content = c.layout.Measure(c.items())
 	} else {
 		for _, ch := range c.children {
@@ -141,6 +151,7 @@ func (c *Container) MinSize() geom.Size {
 // children keep their assigned bounds.
 func (c *Container) Layout() {
 	if c.layout != nil {
+		c.resolveGap()
 		c.layout.Arrange(c.items(), c.ContentRect())
 	}
 	for _, ch := range c.children {

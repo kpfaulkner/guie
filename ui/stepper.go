@@ -132,8 +132,8 @@ func (s *Stepper) MinSize() geom.Size {
 		w = maxF(f.Measure(lo).W, f.Measure(hi).W)
 	}
 	return geom.Size{
-		W: w + stepperPadding.Left + stepperPadding.Right + stepperButtonW,
-		H: h + stepperPadding.Top + stepperPadding.Bottom,
+		W: w + s.insets(stepperPadding).Left + s.insets(stepperPadding).Right + stepperButtonW,
+		H: h + s.insets(stepperPadding).Top + s.insets(stepperPadding).Bottom,
 	}
 }
 
@@ -154,13 +154,12 @@ func (s *Stepper) Draw(canvas render.Canvas) {
 	rad := s.cornerRadius()
 
 	canvas.FillRoundRect(b, rad, s.ColourOf(RoleSurface))
-	strokeFocusable(canvas, b, rad, s.ColourOf(RoleBorder), s.ColourOf(RoleAccent), s.focused)
-
+	s.strokeFocusable(canvas, b, rad, s.focused)
 	textColour := s.ColourOf(RoleText)
 	if !s.Enabled() {
 		textColour = s.ColourOf(RoleDisabled)
 	}
-	inner := b.Inset(stepperPadding)
+	inner := b.Inset(s.insets(stepperPadding))
 	canvas.DrawText(s.text(), geom.Point{X: inner.X, Y: vCenterY(f, inner.Y, inner.H)}, f, textColour)
 
 	// Button column: up on the top half, down on the bottom half.
@@ -170,10 +169,10 @@ func (s *Stepper) Draw(canvas render.Canvas) {
 	upRect := geom.Rect{X: col.X, Y: col.Y, W: col.W, H: col.H / 2}
 	downRect := geom.Rect{X: col.X, Y: midY, W: col.W, H: col.H / 2}
 	if s.hoverUp {
-		canvas.FillRect(upRect, tint(s.ColourOf(RoleSurface), tintHover))
+		canvas.FillRect(upRect, tint(s.ColourOf(RoleSurface), s.tintOf(tintHover)))
 	}
 	if s.hoverDown {
-		canvas.FillRect(downRect, tint(s.ColourOf(RoleSurface), tintHover))
+		canvas.FillRect(downRect, tint(s.ColourOf(RoleSurface), s.tintOf(tintHover)))
 	}
 	arrow := s.ColourOf(RoleText)
 	if !s.Enabled() {

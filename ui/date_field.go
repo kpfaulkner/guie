@@ -135,8 +135,8 @@ func (f *DateField) MinSize() geom.Size {
 	w := maxF(face.Measure(f.placeholder).W, face.Measure(dateFieldSample.Format(f.format)).W)
 	h := face.Measure("Ag").H
 	return geom.Size{
-		W: w + dateFieldIcon + 2*dateFieldHPadding,
-		H: h + 2*dateFieldVPadding,
+		W: w + dateFieldIcon + 2*f.px(dateFieldHPadding),
+		H: h + 2*f.px(dateFieldVPadding),
 	}
 }
 
@@ -150,13 +150,12 @@ func (f *DateField) Draw(canvas render.Canvas) {
 	b := f.Bounds()
 	rad := f.cornerRadius()
 	canvas.FillRoundRect(b, rad, f.ColourOf(RoleSurface))
-	strokeFocusable(canvas, b, rad, f.ColourOf(RoleBorder), f.ColourOf(RoleAccent), f.focused || f.open)
-
+	f.strokeFocusable(canvas, b, rad, f.focused || f.open)
 	textColour := f.ColourOf(RoleText)
 	if !f.hasValue {
 		textColour = f.ColourOf(RoleTextMuted)
 	}
-	canvas.DrawText(f.label(), geom.Point{X: b.X + dateFieldHPadding, Y: vCenterY(face, b.Y, b.H)}, face, textColour)
+	canvas.DrawText(f.label(), geom.Point{X: b.X + f.px(dateFieldHPadding), Y: vCenterY(face, b.Y, b.H)}, face, textColour)
 
 	f.drawCalendarGlyph(canvas, b)
 }
@@ -165,7 +164,7 @@ func (f *DateField) Draw(canvas render.Canvas) {
 func (f *DateField) drawCalendarGlyph(canvas render.Canvas, b geom.Rect) {
 	col := f.ColourOf(RoleText)
 	s := float64(dateFieldIcon)
-	x := b.X + b.W - dateFieldHPadding - s
+	x := b.X + b.W - f.px(dateFieldHPadding) - s
 	y := b.Y + (b.H-s)/2
 	canvas.StrokeRoundRect(geom.Rect{X: x, Y: y, W: s, H: s}, 2, col, 1)
 	// Header bar across the top of the calendar.

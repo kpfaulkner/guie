@@ -86,7 +86,7 @@ func (r *RadioButton) MinSize() geom.Size {
 	}
 	side := f.Measure("Ag").H
 	text := f.Measure(r.label)
-	return geom.Size{W: side + indicatorGap + text.W, H: maxF(side, text.H)}
+	return geom.Size{W: side + r.px(indicatorGap) + text.W, H: maxF(side, text.H)}
 }
 
 // Draw renders the circular indicator (filled when selected) and the label.
@@ -103,12 +103,12 @@ func (r *RadioButton) Draw(canvas render.Canvas) {
 	if r.hoverFade.level > 0 {
 		canvas.FillCircle(center, radius, withAlpha(r.ColourOf(RoleSurface), r.hoverFade.level))
 	}
-	strokeFocusableCircle(canvas, center, radius, r.ColourOf(RoleBorder), r.ColourOf(RoleAccent), r.focused)
+	r.strokeFocusableCircle(canvas, center, radius, r.focused)
 	if r.selected {
 		canvas.FillCircle(center, radius*0.5, r.ColourOf(RoleAccent))
 	}
 
-	canvas.DrawText(r.label, geom.Point{X: b.X + side + indicatorGap, Y: vCenterY(f, b.Y, b.H)}, f, r.ColourOf(RoleText))
+	canvas.DrawText(r.label, geom.Point{X: b.X + side + r.px(indicatorGap), Y: vCenterY(f, b.Y, b.H)}, f, r.ColourOf(RoleText))
 }
 
 // HandleEvent selects the button on click or Space/Enter and tracks hover/focus.

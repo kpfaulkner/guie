@@ -42,5 +42,5 @@ func (p *ProgressBar) Draw(canvas render.Canvas) {
 		canvas.FillRoundRect(fill, rad, p.ColourOf(RolePrimary))
 		canvas.PopClip()
 	}
-	canvas.StrokeRoundRect(b, rad, p.ColourOf(RoleBorder), 1)
+	canvas.StrokeRoundRect(b, rad, p.ColourOf(RoleBorder), p.borderW())
 }

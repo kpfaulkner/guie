@@ -1466,21 +1466,477 @@ Font, FontSize and CornerRadius, with per-widget colour overrides
 | Item | Scope |
 |---|---|
 | Light theme | `theme.LightPalette()` / `theme.Light()` alongside `DefaultPalette()`. |
-| High-contrast theme | Accessibility-oriented palette; verify focus and selection stay visible. |
-| Brand/custom themes | Document building a `theme.Palette` by hand; example in `examples/theming`. |
-| Theme switcher | Runtime light/dark/high-contrast toggle via `App.SetTheme`. Doubles as a correctness check that no widget caches colours at construction. |
+| High-contrast theme | *(Done: `theme.HighContrast()`, contrast-tested in `theme`; see 2.2.)* Accessibility-oriented palette; verify focus and selection stay visible. |
+| Brand/custom themes | *(Done: `examples/theming` builds Ocean and Forest by hand.)* Document building a `theme.Palette` by hand. |
+| Theme switcher | *(Done: `examples/theming`; the palette audit is the correctness check.)* Runtime light/dark/high-contrast toggle via `App.SetTheme`. Doubles as a correctness check that no widget caches colours at construction. |
 | OS light/dark detect | Opt-in bridge to follow the system theme (already deferred in roadmap). |
 
 ### 2.2 Richer Theme model
 
-`design.md` (THEMING) planned `Spacing` and `Padding` on `Theme` but
-`theme/theme.go` does not have them yet. Add, then have widgets read them:
+*(Designed. Supersedes the short list that stood here.)*
+*(Steps 1 to 5 and 7 built; 6 (the audit) is running and grows with the widgets. Notes on each follow.)*
 
-- `Spacing` (default gap between widgets) and `Padding` (`geom.Insets`).
-- Border width.
-- Elevation / shadow strength (builds on `ui/shadow.go`).
-- Per-state colours: hover, pressed, focus, selected, disabled.
-- Keep additive: zero values fall back to current behaviour.
+*(Step 7 built: the theming example. Of the build order, only step 6 needs more work, and it is a test that grows with the widgets.)*
+
+**Step 7, as built:** `examples/theming` is rewritten around the new model, in a 980 x 700
+window with the controls on the left and a live preview card on the right.
+
+- **Theme picker:** Dark, Light, **High contrast** (a full preset: its borders, focus
+  ring, state tints, no shadows and no fades come with it) and the two custom
+  palettes, Ocean and Forest, on the default look. Corner radius and accent pickers
+  are kept.
+- **Density and Spacing sliders** (0.7 to 1.5, and 2 to 20) drive `Theme.Density`
+  and `Theme.Spacing`; every row and column in the example is built with
+  `ui.ThemeGap`, so dragging Spacing visibly moves them and Density scales both the
+  padding inside widgets and the gaps.
+- **Reduce motion** checkbox sets `Motion.Reduced` (High contrast has it on already).
+- **Try it:** a toast of each kind (fills from the status colours), and a confirm
+  dialog (the backdrop is the theme's scrim).
+- The preview card shows a button, a flat button, text field, checkbox, slider,
+  stepper, dropdown, a list and a table with a selected row, striping and a caption,
+  so the hover, pressed, selection and focus states can all be seen. Tab walks it.
+- The status line reports what is applied (theme, border and focus widths, motion).
+- Both columns sit in a `ScrollView` (horizontal scrolling on), because at density 1.5 and
+  spacing 20 the controls are wider and taller than the window. This was found by
+  laying the example out headlessly at the extremes: before the scroll views the
+  card ran 34 px past the bottom of the window and the controls pushed the preview
+  off the right edge. At the defaults nothing scrolls, and at every setting the
+  root fits the window.
+- A Container's own background and border are explicit values, so `applyTheme`
+  re-applies them from the app's completed theme (including `BorderWidth`).
+
+It compiles and runs, but **has not been looked at**: whether the focus halo reads
+well, how the filled-button hover compares with the old one, and how High contrast
+looks all need eyes on a real window (`go run ./examples/theming`).
+
+*(Step 5 built: motion from the theme. Steps 6-7 are not; 6 is already running.)*
+
+**Step 5, as built:**
+
+- The widgets' own state fades (hover, press and the like, through `fadeTo`) and the
+  tab underline's slide read `Theme.Motion`. The length is `Motion.Duration` (0.12 s
+  by default; the tab slide is 1.5 x that), through `BaseWidget.motionSeconds()`;
+  the old `transitionDuration` constant is gone.
+- **`Motion.Reduced` makes those transitions jump to their end state in the frame
+  they are triggered**, by the same path a widget takes before it is mounted. Nothing
+  is left animating, so an app that is idle stays idle (`needsFrames` is false after
+  a reduced-motion hover; true after a normal one, which the tests check as a pair).
+- **What reduced motion does not touch**, on purpose: motion the application starts
+  with `App.Animate` / `App.Tween` / `App.OnFrame`, toasts fading, and the spinner.
+  Those are application behaviour or content (a spinner is the "busy" signal), and
+  an app that wants them off can read `Theme.Motion.Reduced` itself. A fade already
+  in flight when the theme changes simply finishes (it is a tenth of a second).
+- A theme or widget with no motion settings falls back to 0.12 s and "not reduced".
+- Guarded by mutation, each caught by a test: ignoring `Reduced` in `fadeTo`, ignoring
+  it in the tab slide, and hard-wiring the duration. The tests cover the fade length
+  ordering (0.03 < 0.12 < 0.6 s), the default being about 7 frames, snap-on-enter,
+  snap-on-leave and snap-on-press, following `SetTheme` in both directions, the tab
+  slide length, and `App.Animate` still running under a reduced theme.
+- Nothing reads the operating system's reduced-motion setting; that is the opt-in
+  bridge listed under "not in the model".
+
+*(Step 4 built: `ThemeGap`. Steps 5-7 are not.)*
+
+**Step 4, as built:**
+
+- `const ui.ThemeGap = -1`, accepted anywhere a spacing is: `ui.VBox(ui.ThemeGap)`,
+  `ui.HBox(ui.ThemeGap)`, `ui.NewGrid(cols, ui.ThemeGap)`. **Any negative spacing
+  means the same**; a negative gap used to mean overlapping children, which nobody
+  wanted. An explicit number, `0` included, is exactly that number: `VBox(10)` is 10
+  at every density and under every theme, because the caller asked for 10.
+- `Box` and `Grid` read their spacing through `gap()`, which returns `Spacing`, or
+  the theme's gap when `Spacing` is negative. The theme's gap is **`Theme.Spacing x
+  Density`** (default 8 x 1). The `Container` that owns the layout sets it through
+  the unexported `spacingSetter` interface, in `resolveGap`, immediately before
+  every `Measure` and `Arrange`. Nothing is resolved at construction, so a
+  `SetTheme` (new spacing or new density) takes effect on the next layout pass
+  with no rebuilding, and a theme written before `Spacing` existed gives 8.
+- It reaches `MinSize` as well as layout, so a container's size includes its
+  themed gaps (tested for both axes and at density 2).
+- Grid track sizes use the same resolved gap: the last column and row end exactly at
+  the container edge. A first version of the test only measured the gaps and did not
+  notice a grid whose track sums used the raw `-1`; it now also checks the edges, and
+  fails on that mutation.
+- **What does not follow the theme:** the built-in dialogs and popups still use
+  their own explicit gaps (`VBox(12)`, `HBox(10)`, padding 16), and a Container's
+  `SetPadding` is the caller's number. Only `Box`/`Grid` spacing has a theme mode.
+- Unmounted containers (before `SetContent`) measure with the default theme, as
+  every other widget does.
+
+*(Step 3 built: Density reaches every widget's padding and gaps. Steps 4-7 are not.)*
+
+**Step 3, as built:**
+
+- `BaseWidget.px(v)` and `insets(in)` multiply by `Theme.Density`; `App.px(v)` does it
+  for the things that are not widgets (toasts, tooltips); `densityOf(theme)` is the
+  shared rule (a missing or non-positive density counts as 1). `density()` reads
+  the theme through the tree context instead of copying it, because it is asked on
+  every layout and hit test. At density 1, `v * 1.0 == v` exactly, so the default
+  look is unchanged to the bit (tested, and an old-style theme still draws
+  identically to `Default()`).
+- **Scaled:** the padding and gaps of `Button` (and its icon gap), `Checkbox` and
+  `Radio` (indicator gap), `TextField`, `TextArea`, `Stepper`, `DropdownCombo`,
+  `DateField`, `DatePicker`, `ColourPicker`, `List`, `Tree` (row padding, indent,
+  gap), `Table` (cell padding), `TabContainer`, `MenuBar` and its popup rows, toasts
+  and tooltips. The same accessor is used by `MinSize`, `Draw` and every hit test
+  (`rowAt`, `caretAt`, `chevronHit`, `headerColAt`...), so they cannot drift apart.
+- **Not scaled, on purpose:** text and font size; control glyphs and fixed pieces
+  (the tree's chevron column, the stepper's button column, the dropdown arrow, the
+  date field's icon, slider and progress-bar heights, the scroll bar thickness);
+  any number an application passes itself (`VBox(10)`, `SetPadding`, a Container's
+  border); and the built-in dialogs' own panel padding. Row and field **heights
+  still follow the font**, so a row is `text height + 2 x scaled padding`.
+- The popup menu panel and the dialog panel now use `BorderWidth` for their outline
+  too (a step-2 loose end).
+- **How it is guarded.** `TestDensityScalesPaddingAndOnlyPadding` holds, per widget,
+  the padding it adds at density 1, worked out by hand from the constants, and
+  checks the size changes by exactly that much per unit of density on each axis.
+  A merely "linear in density" check was tried first and **missed** a deliberately
+  unscaled `tabVPad` (a constant is linear too), so the exact-slope table replaced
+  it; it now fails on that mutation. The hit-testing tests (`chevronHit` at 0.5 and
+  2, caret placement after a click, row selection by scaled row height) fail if a
+  hit test is left on the unscaled value. Also checked: text sits one scaled
+  padding in from the edge when drawn, toast padding scales, and a dialog stays on
+  a small surface at 1.25.
+- No `Compact()` / `Spacious()` presets: `WithDensity(0.8)` is the whole API.
+
+*(Step 2 built: roles, tints, widths, the focus-ring halo, and toasts, scrim and
+shadows reading the theme. Steps 3-7 are not.)*
+
+**Step 2, as built:**
+
+- `ColourRole` gains `RoleSuccess/Warning/Error/Info/Scrim`, appended. `RoleInfo`
+  resolves to `Primary` when `Palette.Info` is nil.
+- **Tints are `tintKind`s resolved against `Theme.States`** (`tintOf`), replacing the
+  five float constants. The flat button's hover is `States.Hover x 4/3`, which is
+  exactly the old 0.08 at the default 0.06. Every call site changed; at the default
+  theme the numbers are identical.
+- **`NoShadows`** was not in the model above but `HighContrast` needs it (the design
+  says "no soft shadow"): a `Theme.NoShadows` bool, off by default, ANDed with
+  `App.SetShadows`. It is checked in one place, `App.shadowsOn`.
+- **Widths.** The outlines of `List`, `Tree`, `Table`, `ProgressBar`, the colour
+  picker, tooltips and toasts use `BorderWidth`; the slider's handle ring and every
+  focus ring use `FocusWidth`. Still literal (deliberately): explicit `Container`
+  borders (the caller chose them), the date picker's 1 px "selected day" ring, the
+  date field's calendar glyph, the colour picker's handle marker.
+- **Focus ring.** `strokeFocusable` is now a `BaseWidget` method, so it reads the
+  theme itself, and draws the ring plus a **halo** of the page colour (`Background`)
+  just inside it, `max(1, BorderWidth)` thick. The ring's own contrast against a
+  filled control is unchanged (the light theme's `Accent` still equals its
+  `Primary`); the halo is what keeps it visible, because the ring is now bounded on
+  both sides by something that contrasts with it. **This changes how every focused
+  control looks by one thin line** just inside the ring - worth eyeballing in the
+  `showcase` and `theming` examples, since it cannot be checked headlessly.
+- **Toasts** take their fill from `Success/Warning/Error` (or `Info`/`Primary`), text
+  from `OnPrimary`, and a border that is the fill shaded 30% toward black. The old
+  borders were hand-picked darker greens, ambers and reds; the derived ones are
+  within a few units per channel, so a toast looks the same at a glance but is not
+  bit-identical. The warning fill is the darker `#946300` noted in step 1.
+- **Scrim** comes from `Palette.Scrim` (default unchanged: black at 0xA0).
+- **Filled-button states** went through the tint mechanism without needing the
+  fallback: hover is `tint(Primary, Hover x 1.5)` and pressed is `Primary` shaded
+  toward black by `Pressed x 1.43`. Pressed is **numerically identical** to the old
+  `darken(0.8)` at the default tints (checked). Hover is a little less blue-bright
+  than the old `lighten(1.15)` (per channel roughly +5, -4, -17 on the dark
+  `Primary`), because a tint toward white is uniform where scaling is not.
+- **The palette audit** (`guitest/theme_audit_test.go`) is in and covers 27 widget
+  states (every widget, plus hover, press, focus, selection, open popups, tooltips,
+  toasts of each kind and a modal). It was checked by sabotage: hard-coding the
+  success toast colour, or the halo colour, makes it fail naming the colours. Not
+  covered: the colour picker (its hue strips are content, not chrome) and anything
+  an application draws itself in a `CanvasWidget`.
+- Also tested: halo and ring widths and halo-inside-ring for Default and
+  HighContrast; border width; toast and scrim colours from the theme; shadows off
+  for `HighContrast` and still off by `SetShadows(false)`; hover strength following
+  `States.Hover`; and **an old-style `Theme` literal drawing bit-identically to
+  `Default()`** for a button, list, text area and table.
+
+**Step 1, as built, and where it differs from the design above:**
+
+- `Theme.WithDefaults()` is exported (`ui` has to call it) and is what makes "zero
+  means default" true: `NewApp`/`WithTheme` and `App.SetTheme` run every theme
+  through it, so `app.Theme()` is always complete. A theme written before the new
+  fields existed resolves to exactly `theme.Default()` (tested). `SetTheme` keeps
+  the current font and size when the new theme has none, but every other zero field
+  takes the *default*, not the previous value.
+- The built-in palettes carry the new colours themselves (so `Palette ==
+  DefaultPalette()` still holds); `WithDefaults` fills them for a palette that
+  predates them. **`Palette.Info` stays nil by default and means "use Primary"**,
+  because info toasts follow the palette today; only Success, Warning, Error and
+  Scrim have defaults.
+- **One default colour changed:** the warning fill, from `#B77A00` to `#946300`.
+  The old amber gave white text about 3.6:1, and the dark theme's off-white
+  `OnPrimary` needs a darker fill again to reach 4.5:1. This is a visible but small
+  change to warning toasts. It takes effect when toasts read the palette (step 2).
+- `Toggled()` keeps the user's `Density`, `Spacing` and `Motion` but takes borders,
+  focus width and state tints from the preset it switches to, so leaving high
+  contrast does not drag its 3 px ring along. Tested.
+- `HighContrast()` clears 7:1 for text and 3:1 for the focus ring on both the page
+  and a filled button.
+
+**Findings from the contrast tests that the design did not anticipate:**
+
+- **The focus ring is invisible on a filled button in the light theme** (its
+  `Accent` is its `Primary`, 1.0:1) and weak in the dark theme (1.8:1). The ring is
+  drawn in `Accent` over the button's own fill, so this is a real bug in the
+  shipped themes, not a test artefact. It is **not** fixed by repainting the
+  presets (that would change every app's look); it is fixed in step 2, by drawing
+  the ring with a thin contrasting halo (`Background` against `Accent`) so it reads
+  on any fill. `TestFocusRingStandsApartFromAFilledButton` holds high contrast to
+  3:1 now and records the two known gaps; when the halo lands the test should turn
+  into a drawn-pixels check for all three.
+- The dark and light presets otherwise already meet the targets: text 4.5:1, muted
+  text 3:1, accent on the page 3:1, status fills with white text 4.5:1.
+
+
+Today a `Theme` is a 9-colour `Palette`, a font and size, and one `CornerRadius`.
+Everything else a widget needs to decide how it looks is a constant in its own
+file, so a theme can recolour the UI but cannot change how it feels, and a few
+things cannot be themed at all. This section says what the model gains, what stays
+as it is, and how it is built without breaking anyone.
+
+#### What is wrong today (found by reading the code)
+
+- **State shading is scattered.** Hover and pressed shades are five tint constants
+  in `ui/colour.go` (`tintHover` 0.06, `tintPress` 0.14, `tintHeader` 0.05,
+  `tintStrong` 0.09, `tintFlat` 0.08) plus a separate `lighten(1.15)` /
+  `darken(0.8)` pair in `Button`. A theme cannot change any of them, so a
+  high-contrast theme cannot make hover more obvious.
+- **Hard-coded colours.** Toast fills are three literal colours per kind
+  (`ui/toast.go`), the modal scrim is a literal (`ui/popup.go`), the shadow is a
+  literal alpha (`ui/shadow.go`). None follow `SetTheme`, so a toast looks the same
+  in light and dark and cannot be branded.
+- **Metrics are per-widget constants.** `buttonPadding`, `textFieldPadding`,
+  `listRowPad`, `tableCellPad`, `tabHPad`, `menuRowPad`, the row heights and gaps
+  are about twenty `var`/`const` values. There is no way to ask for a compact or a
+  spacious UI, and `Theme.Spacing` / `Theme.Padding`, planned in the original
+  design, were never added.
+- **Border and focus width are literals** (`1` in every `StrokeRoundRect`, `2` in
+  `focusRingWidth`).
+- **Motion is a constant** (`transitionDuration` 0.12 s). There is no way to turn
+  animation down for someone who asks the OS for reduced motion.
+- **No high-contrast theme**, so focus and selection visibility on the existing two
+  themes has never been checked against a number.
+
+What already works and stays: widgets draw through `ColourOf(role)` and read the
+theme in `Draw`, never at construction, so `SetTheme` restyles everything on the
+next frame; per-widget `SetColour(role, c)` overrides; `Theme.Toggled()`; the
+light and dark presets.
+
+#### Principles
+
+1. **Additive, zero value = today.** A `Theme` literal written for the current
+   struct must keep working and look the same. Every new field's zero value means
+   "use the default", which is what the code does now. (Same rule as `MaskRune`
+   and the other pre-freeze additions: nothing a caller already writes changes.)
+2. **A knob must reach every widget or not exist.** No field is added that only
+   some widgets honour. The audit test (below) is how that is enforced.
+3. **States are amounts, not colours.** One hover colour cannot serve a filled
+   button, a list row and a table header, because each starts from a different base.
+   A theme says *how much* to shift a base colour, and the widget shifts its own.
+4. **Few knobs.** One scalar for density, not per-widget padding tables. Per-widget
+   detail stays in the widget; the theme sets the overall character.
+5. **Checked by numbers.** Presets are tested for text and focus contrast, not
+   eyeballed.
+
+#### The model
+
+```go
+// theme package
+type Palette struct {
+    // existing nine, unchanged
+    Background, Surface, Primary, OnPrimary, Text, TextMuted, Border, Accent, Disabled color.Color
+
+    // new; nil means "use the built-in default for this role"
+    Success, Warning, Error, Info color.Color // status fills (toasts, validation); text on them is OnPrimary
+    Scrim                         color.Color // modal backdrop; default black at ~63% alpha
+}
+
+// How far a state shifts a widget's own base colour, as the fraction of the way
+// toward white (on a dark base) or black (on a light one). Zero fields use the
+// defaults shown, which are today's constants.
+type StateTints struct {
+    Hover    float64 // 0.06  hovered row, cell, tab, menu item
+    Pressed  float64 // 0.14  pressed flat button
+    Header   float64 // 0.05  table header band, striping (half)
+    Emphasis float64 // 0.09  hovered header cell, tooltip body
+}
+
+type Theme struct {
+    Palette      Palette
+    Font         render.FontFace
+    FontSize     float64
+    CornerRadius float64 // unchanged: zero is genuinely square
+
+    // new
+    States       StateTints
+    Density      float64 // multiplies every widget's internal padding and gaps; 1 default
+    Spacing      float64 // the gap ui.ThemeGap resolves to, before Density; 8 default
+    BorderWidth  float64 // control outlines; 1 default
+    FocusWidth   float64 // the focus ring; 2 default
+    Motion       Motion
+}
+
+type Motion struct {
+    Duration float64 // hover/press/focus fades, seconds; 0.12 default
+    Reduced  bool    // snap straight to the end state, no fades
+}
+```
+
+`Density` is the one metrics knob. `theme.Compact()` is 0.8, the default 1,
+`theme.Spacious()` 1.25 (helpers on `Theme`, below). It scales paddings and gaps,
+**not** the font: text size is already `FontSize`, and scaling both would make the
+two interact.
+
+Where "zero means default" would be wrong, the field is left out rather than
+overloaded: a theme that wants no outline sets `Palette.Border` to a transparent
+colour, and square corners remain `CornerRadius: 0` because that field predates the
+rule and already means what it says.
+
+#### Presets
+
+```go
+func Default() Theme        // dark, as now
+func Dark() Theme
+func Light() Theme
+func HighContrast() Theme   // new
+func (t Theme) WithDensity(d float64) Theme
+func (t Theme) WithReducedMotion() Theme
+```
+
+`HighContrast()` is a near-black background, white text, a bright accent (yellow
+family, so focus and selection stay visible against both), **2 px borders and a 3 px
+focus ring**, larger state tints (hover 0.18, pressed 0.30), reduced motion on,
+and no soft shadow. Its job is to be unmistakable, not pretty. `Toggled()` keeps its
+dark/light meaning; cycling three themes is the application's list.
+
+`WithDensity` and `WithReducedMotion` return a copy, so presets compose:
+`theme.Light().WithDensity(0.8)`.
+
+#### How widgets read it
+
+The new values reach widgets through two accessors beside `ColourOf`, so a widget
+never touches `theme.Theme` directly:
+
+```go
+func (b *BaseWidget) ColourOf(role ColourRole) color.Color // + RoleSuccess/Warning/Error/Info/Scrim
+func (b *BaseWidget) tintOf(s tintKind) float64            // hover, pressed, header, emphasis
+func (b *BaseWidget) px(v float64) float64                 // v * Density, for paddings and gaps
+func (b *BaseWidget) borderW() float64
+func (b *BaseWidget) focusW() float64
+```
+
+- **New roles** (`RoleSuccess`, `RoleWarning`, `RoleError`, `RoleInfo`, `RoleScrim`)
+  are appended to `ColourRole`, not inserted, so existing values do not move.
+  `SetColour` works on them like any other, so a single toast can be recoloured.
+- **Palette fallbacks** for the nil new colours live in one function in `ui`
+  (`paletteColour`): Success/Warning/Error/Info are the colours the toast code uses
+  now, Scrim is the current literal. So a palette that never heard of them is
+  unchanged.
+- **Padding.** The package-level `var buttonPadding = geom.Insets{...}` style values
+  stay as the *base*; every use in `MinSize` and `Draw` goes through
+  `b.px(...)`/`b.insets(base)`. This touches most widget files (about twenty padding values) but is mechanical,
+  and `px` returns its argument at Density 1, so the default look is bit-identical.
+- **Border and focus** replace the literal `1` in outline strokes and
+  `focusRingWidth` in `strokeFocusable`.
+- **Motion.** `fadeTo` reads `Motion.Duration`; with `Motion.Reduced` it snaps
+  (the path it already takes before a widget is mounted). Running `App.Animate`
+  animations (toast slide, spinner) are application motion and are left alone.
+- **Filled-button states** (`lighten 1.15` / `darken 0.8`) become the same tint
+  mechanism as every other state, using `States.Hover` and `States.Pressed` with a
+  fixed multiplier so a filled button reads slightly stronger than a flat row. This
+  is the one place the *default* look can shift (the tint direction follows the
+  base colour's luminance, where `lighten` always went up). It is checked against
+  both presets before it is accepted; if it is visibly different, the old factors
+  stay as defaults of two extra `StateTints` fields.
+
+#### Spacing between widgets
+
+`Theme.Spacing` is what the original design promised and never delivered. Layouts
+are built before any theme exists (`ui.VBox(10)` runs at construction), so the gap
+cannot be read then. The design is a sentinel resolved at layout time:
+
+```go
+const ThemeGap = -1                          // ui.VBox(ui.ThemeGap), ui.HBox(ui.ThemeGap)
+```
+
+`Container` already holds the tree context, so when it lays out a `Box` or `Grid`
+whose spacing is negative it passes `Spacing * Density` in (through a small
+unexported `spacingSetter` interface the layout may implement). Explicit numbers
+keep working and are **not** scaled by Density: a caller who wrote `VBox(10)` asked
+for 10. Only `ThemeGap` follows the theme. This is opt-in, so nothing changes for
+existing layouts.
+
+#### Things deliberately not in the model
+
+- **Per-widget padding tables**, **a type scale / second font**, **radii per
+  control kind**: more knobs than a v0.x needs. `CornerRadius` stays one value.
+- **Colour for hover or pressed as an explicit palette entry.** States are amounts
+  (principle 3). If an application needs an exact colour for one widget it already
+  has `SetColour`.
+- **OS light/dark and reduced-motion detection.** Both are opt-in bridges that
+  would *set* a theme or `Motion.Reduced`; they are separate work (see ROADMAP).
+- **`Container` background/border overrides following `SetTheme`.** Those are
+  explicit values a caller set (called out in `App.SetTheme`'s doc). Making them
+  role-based (`SetBackground(RoleSurface)`) is a possible follow-up, not part of
+  this.
+
+#### Build order (each step ships on its own)
+
+1. `theme`: the new fields, `Default()` values, `HighContrast()`, `WithDensity`,
+   `WithReducedMotion`, and a `withDefaults` applied by `App.SetTheme`/`NewApp` (the
+   same place the font fallback already lives). Contrast tests for the three presets.
+2. `ui`: new roles and fallbacks; `tintOf`, `borderW`, `focusW`; replace the tint
+   constants and the literal widths; toast, scrim and shadow through roles.
+3. `ui`: `px`/`insets` through every padding use (Density).
+4. `ui`: `ThemeGap` and `spacingSetter`.
+5. `ui`: motion duration and reduced motion in `fadeTo`.
+6. The audit test (below) runs from step 2 and gains cases as widgets are converted.
+7. `examples/theming`: a picker for Dark / Light / High contrast, a density slider,
+   a reduced-motion checkbox, and a toast of each kind.
+
+#### Tests
+
+- **Contrast (`theme`).** A WCAG contrast function in the test, and for Dark, Light
+  and HighContrast: Text on Background and on Surface >= 4.5 (HighContrast >= 7),
+  OnPrimary on Primary >= 4.5, Accent against Surface >= 3 (the focus ring is a
+  graphical object), TextMuted on Surface >= 3 for the presets that claim it, and
+  each status colour against OnPrimary >= 4.5. A preset that fails is fixed, not
+  excused.
+- **Zero-value compatibility.** `Theme{Palette: DefaultPalette(), FontSize: 14,
+  CornerRadius: 5}` (the shape callers have today) resolves to exactly
+  `Default()`'s metrics, and a recorded frame of every widget is identical to a
+  frame drawn with the explicit defaults.
+- **Palette audit (`guitest`).** The mechanical check for "no hard-coded colours and
+  nothing cached at construction". Build every widget once; draw it under theme A
+  and under theme B, whose palettes share **no** colour; collect every colour used
+  in each recording; the intersection must be empty (apart from fully transparent
+  colours). Anything in the intersection is a literal baked into a widget, or a
+  colour cached before `SetTheme`. This replaces eyeballing 30 widgets and is what
+  would have caught the toast colours.
+- **State audit.** For each widget with hover/pressed/focus states, draw rest and
+  state under a theme with large `States` and assert the state differs from rest by
+  at least the configured amount, and equals rest when the tints are zero-width.
+- **Density.** At 0.8 and 1.25, `MinSize()` of Button, TextField, List, Table,
+  Tabs and Menu scales their padding portion and leaves the text portion alone; at
+  1 it is bit-identical to today. `ThemeGap` follows `Spacing * Density`, and an
+  explicit spacing does not.
+- **Reduced motion.** With `Reduced`, a hover reaches its end state in the same
+  frame and no animation is left running (so the app can go idle).
+- **Presets are distinguishable.** HighContrast's border and focus widths are larger
+  than Default's, and a focused widget's ring is drawn at `FocusWidth`.
+
+#### Decisions this design asks for
+
+1. **Density as one scalar** (recommended) vs per-widget padding in the theme.
+2. **`ThemeGap` sentinel** (recommended; opt-in) vs dropping `Theme.Spacing` from
+   the model altogether.
+3. **Filled-button states through the shared tint** (recommended, with the
+   fallback above) vs keeping `lighten/darken` as two more theme fields.
+4. **HighContrast in this round** (recommended: it is the proof the knobs work)
+   vs later.
+5. **Zero means default for the new metrics**, with no way to ask for a 0-width
+   border except a transparent border colour.
 
 ### 2.3 Canvas capabilities (`render.Canvas`)
 

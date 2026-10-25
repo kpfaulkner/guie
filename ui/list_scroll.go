@@ -39,7 +39,7 @@ func (l *List) widest() float64 {
 		}
 		w = maxF(w, l.wW[i])
 	}
-	return w + 2*listRowPad
+	return w + 2*l.px(listRowPad)
 }
 
 // geomInfo carves the list's box up between rows and bars.

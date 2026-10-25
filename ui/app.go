@@ -110,6 +110,9 @@ func NewApp(opts ...AppOption) *App {
 		o(a)
 	}
 
+	// A theme from WithTheme may predate the optional fields; fill them in.
+	a.theme = a.theme.WithDefaults()
+
 	// Default the theme font and the clear colour from the theme if unset.
 	if a.theme.Font == nil {
 		a.theme.Font = ebitenbackend.DefaultFont(a.theme.FontSize)
@@ -168,7 +171,9 @@ func (a *App) SetFont(f render.FontFace) {
 // the whole UI restyles on the next frame — except per-widget overrides (e.g.
 // LabelColour) and a Container's own SetBackground/SetBorder/SetCornerRadius,
 // which are explicit values you must re-apply yourself. If the new theme leaves
-// Font or FontSize unset, the current values are kept.
+// Font or FontSize unset, the current values are kept. Any other field left zero
+// takes its default (theme.WithDefaults), not the current value, so the theme you
+// pass is the theme you get.
 func (a *App) SetTheme(t theme.Theme) {
 	if t.Font == nil {
 		t.Font = a.theme.Font
@@ -176,7 +181,7 @@ func (a *App) SetTheme(t theme.Theme) {
 	if t.FontSize == 0 {
 		t.FontSize = a.theme.FontSize
 	}
-	a.theme = t
+	a.theme = t.WithDefaults()
 	a.needsLayout = true
 }
 
@@ -186,6 +191,10 @@ func (a *App) Events() *EventBus { return a.bus }
 
 // SetShadows enables or disables overlay/tooltip drop shadows at runtime.
 func (a *App) SetShadows(v bool) { a.shadows = v }
+
+// shadowsOn reports whether soft drop shadows are drawn: the app flag and the theme
+// both have to allow them.
+func (a *App) shadowsOn() bool { return a.shadows && !a.theme.NoShadows }
 
 // SetDebugBounds enables or disables the debug overlay that strokes an outline
 // around every widget's bounds, making layout boundaries visible. It can also

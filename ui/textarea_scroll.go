@@ -20,7 +20,7 @@ type areaGeom struct {
 // and the view is the padded box as it always was.
 func (t *TextArea) geomInfo() areaGeom {
 	b := t.Bounds()
-	inner := b.Inset(textAreaPadding)
+	inner := b.Inset(t.insets(textAreaPadding))
 	g := areaGeom{inner: inner, view: inner}
 	g.vOver = t.contentHeight() > inner.H
 	if t.wrap {

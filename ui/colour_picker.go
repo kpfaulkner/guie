@@ -109,11 +109,11 @@ func (p *ColourPicker) Focusable() bool { return p.Enabled() }
 func (p *ColourPicker) MinSize() geom.Size {
 	return geom.Size{
 		W: 220,
-		H: cpSwatchH + cpGap + cpChannels*cpTrackH + (cpChannels-1)*cpGap + 2*cpPad,
+		H: cpSwatchH + p.px(cpGap) + cpChannels*cpTrackH + (cpChannels-1)*p.px(cpGap) + 2*p.px(cpPad),
 	}
 }
 
-func (p *ColourPicker) inner() geom.Rect { return p.Bounds().Inset(geom.UniformInsets(cpPad)) }
+func (p *ColourPicker) inner() geom.Rect { return p.Bounds().Inset(geom.UniformInsets(p.px(cpPad))) }
 
 func (p *ColourPicker) swatchRect() geom.Rect {
 	in := p.inner()
@@ -123,7 +123,7 @@ func (p *ColourPicker) swatchRect() geom.Rect {
 // trackRect returns the rectangle of channel i's slider track.
 func (p *ColourPicker) trackRect(i int) geom.Rect {
 	in := p.inner()
-	y := in.Y + cpSwatchH + cpGap + float64(i)*(cpTrackH+cpGap)
+	y := in.Y + cpSwatchH + p.px(cpGap) + float64(i)*(cpTrackH+p.px(cpGap))
 	return geom.Rect{X: in.X, Y: y, W: in.W, H: cpTrackH}
 }
 
@@ -161,7 +161,7 @@ func (p *ColourPicker) Draw(canvas render.Canvas) {
 	b := p.Bounds()
 	rad := p.cornerRadius()
 	canvas.FillRoundRect(b, rad, p.ColourOf(RoleSurface))
-	canvas.StrokeRoundRect(b, rad, p.ColourOf(RoleBorder), 1)
+	canvas.StrokeRoundRect(b, rad, p.ColourOf(RoleBorder), p.borderW())
 
 	// Preview swatch with the hex value in a contrasting colour. A checkerboard
 	// behind it makes any transparency visible.
@@ -169,7 +169,7 @@ func (p *ColourPicker) Draw(canvas render.Canvas) {
 	cur := p.Colour()
 	p.drawCheckerboard(canvas, sw, 8)
 	canvas.FillRoundRect(sw, 4, cur)
-	canvas.StrokeRoundRect(sw, 4, p.ColourOf(RoleBorder), 1)
+	canvas.StrokeRoundRect(sw, 4, p.ColourOf(RoleBorder), p.borderW())
 	if f := p.face(); f != nil {
 		hex := hexOf(cur)
 		tw := f.Measure(hex).W
@@ -200,8 +200,7 @@ func (p *ColourPicker) drawTrack(canvas render.Canvas, i int) {
 		sw := tr.W/float64(strips) + 1
 		canvas.FillRect(geom.Rect{X: sx, Y: tr.Y, W: sw, H: tr.H}, p.gradientColour(i, t))
 	}
-	strokeFocusable(canvas, tr, 0, p.ColourOf(RoleBorder), p.ColourOf(RoleAccent), p.active == i && (p.dragging || p.focused()))
-
+	p.strokeFocusable(canvas, tr, 0, p.active == i && (p.dragging || p.focused()))
 	// Handle.
 	hx := tr.X + p.channel(i)*tr.W
 	hr := geom.Rect{X: hx - 2, Y: tr.Y - 2, W: 4, H: tr.H + 4}

@@ -223,7 +223,7 @@ func (t *Tree) RowHeight() float64 {
 	if f == nil {
 		return 0
 	}
-	return f.Measure("Ag").H + 2*treeRowPad
+	return f.Measure("Ag").H + 2*t.px(treeRowPad)
 }
 
 // ContentHeight returns the total height of all visible rows.
@@ -246,10 +246,10 @@ func (t *Tree) MinSize() geom.Size {
 	}
 	var w float64
 	for _, r := range t.rows() {
-		rw := float64(r.depth)*treeIndent + treeChevron + treeGap + f.Measure(r.node.Label).W
+		rw := float64(r.depth)*t.px(treeIndent) + treeChevron + t.px(treeGap) + f.Measure(r.node.Label).W
 		w = maxF(w, rw)
 	}
-	return geom.Size{W: w + 2*treeRowPad + scrollbarWidth, H: t.RowHeight()}
+	return geom.Size{W: w + 2*t.px(treeRowPad) + scrollbarWidth, H: t.RowHeight()}
 }
 
 func (t *Tree) maxOffset() float64 { return maxF(0, t.ContentHeight()-t.geomInfo().viewH) }
@@ -335,7 +335,7 @@ func (t *Tree) Draw(canvas render.Canvas) {
 		case r.node == t.selected:
 			canvas.FillRect(row, t.ColourOf(RolePrimary))
 		case r.node == t.hover:
-			canvas.FillRect(row, tint(t.ColourOf(RoleSurface), tintHover))
+			canvas.FillRect(row, tint(t.ColourOf(RoleSurface), t.tintOf(tintHover)))
 		}
 
 		textColour := t.ColourOf(RoleText)
@@ -343,16 +343,16 @@ func (t *Tree) Draw(canvas render.Canvas) {
 			textColour = t.ColourOf(RoleOnPrimary)
 		}
 
-		indent := ox + treeRowPad + float64(r.depth)*treeIndent
+		indent := ox + t.px(treeRowPad) + float64(r.depth)*t.px(treeIndent)
 		if !r.node.Leaf() {
 			t.drawChevron(canvas, indent, y, rh, r.node.expanded, textColour)
 		}
-		labelX := indent + treeChevron + treeGap
+		labelX := indent + treeChevron + t.px(treeGap)
 		canvas.DrawText(r.node.Label, geom.Point{X: labelX, Y: vCenterY(f, y, rh)}, f, textColour)
 	}
 	canvas.PopClip()
 
-	canvas.StrokeRect(b, t.ColourOf(RoleBorder), 1)
+	canvas.StrokeRect(b, t.ColourOf(RoleBorder), t.borderW())
 
 	if g.vOver {
 		t.drawScrollbar(canvas, b, rh*float64(len(rows)))
@@ -399,7 +399,7 @@ func (t *Tree) drawScrollbar(canvas render.Canvas, b geom.Rect, contentH float64
 // chevronHit reports whether absolute x falls within the chevron column for a
 // node at the given depth.
 func (t *Tree) chevronHit(x float64, depth int) bool {
-	start := t.Bounds().X - t.offsetX + treeRowPad + float64(depth)*treeIndent
+	start := t.Bounds().X - t.offsetX + t.px(treeRowPad) + float64(depth)*t.px(treeIndent)
 	return x >= start && x < start+treeChevron
 }
 

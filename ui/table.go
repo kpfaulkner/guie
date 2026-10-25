@@ -265,7 +265,7 @@ func (t *Table) rowHeight() float64 {
 	if f == nil {
 		return 0
 	}
-	return f.Measure("Ag").H + 2*tableCellPad
+	return f.Measure("Ag").H + 2*t.px(tableCellPad)
 }
 
 func (t *Table) contentHeight() float64 { return t.rowHeight() * float64(len(t.rows)) }
@@ -474,7 +474,7 @@ func (t *Table) MinSize() geom.Size {
 	}
 	var w float64
 	for _, c := range t.columns {
-		w += f.Measure(c.Title).W + 2*tableCellPad
+		w += f.Measure(c.Title).W + 2*t.px(tableCellPad)
 	}
 	return geom.Size{W: w, H: t.rowHeight() * 2}
 }
@@ -495,16 +495,16 @@ func (t *Table) Draw(canvas render.Canvas) {
 
 	// Header row.
 	header := geom.Rect{X: b.X, Y: b.Y, W: b.W, H: rh}
-	canvas.FillRect(header, tint(t.ColourOf(RoleSurface), tintHeader))
+	canvas.FillRect(header, tint(t.ColourOf(RoleSurface), t.tintOf(tintHeader)))
 	g := t.geomInfo()
 	canvas.PushClip(geom.Rect{X: b.X, Y: b.Y, W: g.viewW, H: rh}) // scrolled cells stay off the gutter
 	for c, col := range t.columns {
 		cell := geom.Rect{X: xs[c], Y: b.Y, W: widths[c], H: rh}
 		if c == t.hoverCol {
-			canvas.FillRect(cell, tint(t.ColourOf(RoleSurface), tintStrong))
+			canvas.FillRect(cell, tint(t.ColourOf(RoleSurface), t.tintOf(tintStrong)))
 		}
 		canvas.PushClip(cell)
-		canvas.DrawText(col.Title, geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, b.Y, rh)}, f, t.ColourOf(RoleText))
+		canvas.DrawText(col.Title, geom.Point{X: xs[c] + t.px(tableCellPad), Y: vCenterY(f, b.Y, rh)}, f, t.ColourOf(RoleText))
 		if c == t.sortCol {
 			t.drawSortIndicator(canvas, cell, t.sortAsc)
 		}
@@ -525,14 +525,14 @@ func (t *Table) Draw(canvas render.Canvas) {
 		rowRect := geom.Rect{X: b.X - t.offsetX, Y: y, W: g.totalW, H: rh}
 		textColour := t.ColourOf(RoleText)
 		if t.striped && i%2 == 1 && i != t.selected && i != t.hoverRow {
-			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), tintHeader/2))
+			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), t.tintOf(tintHeader)/2))
 		}
 		switch {
 		case i == t.selected:
 			canvas.FillRect(rowRect, t.ColourOf(RolePrimary))
 			textColour = t.ColourOf(RoleOnPrimary)
 		case i == t.hoverRow:
-			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), tintHover))
+			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), t.tintOf(tintHover)))
 		}
 		for c := range t.columns {
 			if c >= len(row) {
@@ -540,7 +540,7 @@ func (t *Table) Draw(canvas render.Canvas) {
 			}
 			cell := geom.Rect{X: xs[c], Y: y, W: widths[c], H: rh}
 			canvas.PushClip(cell)
-			canvas.DrawText(row[c], geom.Point{X: xs[c] + tableCellPad, Y: vCenterY(f, y, rh)}, f, textColour)
+			canvas.DrawText(row[c], geom.Point{X: xs[c] + t.px(tableCellPad), Y: vCenterY(f, y, rh)}, f, textColour)
 			canvas.PopClip()
 		}
 	}
@@ -553,7 +553,7 @@ func (t *Table) Draw(canvas render.Canvas) {
 	}
 	canvas.PopClip()
 
-	canvas.StrokeRect(b, t.ColourOf(RoleBorder), 1)
+	canvas.StrokeRect(b, t.ColourOf(RoleBorder), t.borderW())
 
 	if g.vOver {
 		t.drawScrollbar(canvas, b, bodyTop)
@@ -569,7 +569,7 @@ func (t *Table) Draw(canvas render.Canvas) {
 // drawSortIndicator draws a small up (ascending) or down (descending) chevron at
 // the right edge of a header cell.
 func (t *Table) drawSortIndicator(canvas render.Canvas, cell geom.Rect, asc bool) {
-	cx := cell.X + cell.W - tableCellPad - 4
+	cx := cell.X + cell.W - t.px(tableCellPad) - 4
 	cy := cell.Y + cell.H/2
 	const s = 3.0
 	col := t.ColourOf(RoleAccent)

@@ -20,7 +20,19 @@ type Grid struct {
 	Spacing    float64
 	ColWeights []int
 	RowWeights []int
+
+	themeGap float64 // what a negative Spacing (ThemeGap) resolves to; set by the Container
 }
+
+// gap is the spacing in force: Spacing, or the theme's when Spacing is negative.
+func (g *Grid) gap() float64 {
+	if g.Spacing < 0 {
+		return g.themeGap
+	}
+	return g.Spacing
+}
+
+func (g *Grid) setThemeGap(v float64) { g.themeGap = v }
 
 // NewGrid returns a Grid with the given column count and spacing.
 func NewGrid(columns int, spacing float64) *Grid {
@@ -142,8 +154,8 @@ func (g *Grid) Measure(items []Item) geom.Size {
 	for _, rh := range rowMin {
 		h += rh
 	}
-	w += g.Spacing * float64(cols-1)
-	h += g.Spacing * float64(rows-1)
+	w += g.gap() * float64(cols-1)
+	h += g.gap() * float64(rows-1)
 	return geom.Size{W: w, H: h}
 }
 
@@ -156,18 +168,18 @@ func (g *Grid) Arrange(items []Item, content geom.Rect) {
 	cols := g.cols()
 	placements, rows := g.place(items)
 
-	colW := distributeTracks(cols, content.W, g.Spacing, g.ColWeights)
-	rowH := distributeTracks(rows, content.H, g.Spacing, g.RowWeights)
-	colX := trackOrigins(colW, content.X, g.Spacing)
-	rowY := trackOrigins(rowH, content.Y, g.Spacing)
+	colW := distributeTracks(cols, content.W, g.gap(), g.ColWeights)
+	rowH := distributeTracks(rows, content.H, g.gap(), g.RowWeights)
+	colX := trackOrigins(colW, content.X, g.gap())
+	rowY := trackOrigins(rowH, content.Y, g.gap())
 
 	for i, it := range items {
 		p := placements[i]
 		cell := geom.Rect{
 			X: colX[p.col],
 			Y: rowY[p.row],
-			W: spanExtent(colW, p.col, p.colSpan, g.Spacing),
-			H: spanExtent(rowH, p.row, p.rowSpan, g.Spacing),
+			W: spanExtent(colW, p.col, p.colSpan, g.gap()),
+			H: spanExtent(rowH, p.row, p.rowSpan, g.gap()),
 		}
 		it.Widget.SetBounds(alignInCell(it.Data.Align, cell, it.Widget.MinSize()))
 	}

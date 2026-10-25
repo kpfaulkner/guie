@@ -73,7 +73,7 @@ func (c *Checkbox) MinSize() geom.Size {
 	}
 	side := f.Measure("Ag").H
 	text := f.Measure(c.label)
-	return geom.Size{W: side + indicatorGap + text.W, H: maxF(side, text.H)}
+	return geom.Size{W: side + c.px(indicatorGap) + text.W, H: maxF(side, text.H)}
 }
 
 func (c *Checkbox) toggle() { c.SetChecked(!c.checked) }
@@ -94,8 +94,7 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 	} else if c.hoverFade.level > 0 {
 		canvas.FillRoundRect(box, rad, withAlpha(c.ColourOf(RoleSurface), c.hoverFade.level))
 	}
-	strokeFocusable(canvas, box, rad, c.ColourOf(RoleBorder), c.ColourOf(RoleAccent), c.focused)
-
+	c.strokeFocusable(canvas, box, rad, c.focused)
 	if c.checked {
 		col := c.ColourOf(RoleOnPrimary)
 		canvas.DrawLine(
@@ -110,7 +109,7 @@ func (c *Checkbox) Draw(canvas render.Canvas) {
 		)
 	}
 
-	canvas.DrawText(c.label, geom.Point{X: box.X + side + indicatorGap, Y: vCenterY(f, b.Y, b.H)}, f, c.ColourOf(RoleText))
+	canvas.DrawText(c.label, geom.Point{X: box.X + side + c.px(indicatorGap), Y: vCenterY(f, b.Y, b.H)}, f, c.ColourOf(RoleText))
 }
 
 // HandleEvent toggles on click or Space/Enter and tracks hover/focus.

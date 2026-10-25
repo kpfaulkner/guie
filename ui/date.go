@@ -126,8 +126,8 @@ func (d *DatePicker) MinSize() geom.Size {
 		cell = maxF(f.Measure("30").W, f.Measure("Wd").W) + 10
 		lh := f.Measure("Ag").H + 6
 		return geom.Size{
-			W: cell*dateCols + datePadding.Left + datePadding.Right,
-			H: lh*dateRows + datePadding.Top + datePadding.Bottom,
+			W: cell*dateCols + d.insets(datePadding).Left + d.insets(datePadding).Right,
+			H: lh*dateRows + d.insets(datePadding).Top + d.insets(datePadding).Bottom,
 		}
 	}
 	return geom.Size{W: cell * dateCols, H: cell * dateRows}
@@ -135,7 +135,7 @@ func (d *DatePicker) MinSize() geom.Size {
 
 // grid returns the content origin and per-cell dimensions.
 func (d *DatePicker) grid() (origin geom.Point, cellW, rowH float64) {
-	inner := d.Bounds().Inset(datePadding)
+	inner := d.Bounds().Inset(d.insets(datePadding))
 	return inner.Min(), inner.W / dateCols, inner.H / dateRows
 }
 
@@ -169,8 +169,7 @@ func (d *DatePicker) Draw(canvas render.Canvas) {
 	}
 	b := d.Bounds()
 	canvas.FillRoundRect(b, d.cornerRadius(), d.ColourOf(RoleSurface))
-	strokeFocusable(canvas, b, d.cornerRadius(), d.ColourOf(RoleBorder), d.ColourOf(RoleAccent), d.focused)
-
+	d.strokeFocusable(canvas, b, d.cornerRadius(), d.focused)
 	origin, cellW, rowH := d.grid()
 	textCol := d.ColourOf(RoleText)
 	muted := d.ColourOf(RoleTextMuted)
@@ -202,7 +201,7 @@ func (d *DatePicker) Draw(canvas render.Canvas) {
 		case sameDay(date, d.selected):
 			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColourOf(RolePrimary))
 		case i == d.hover:
-			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, tint(d.ColourOf(RoleSurface), tintHover))
+			canvas.FillRoundRect(cell.Inset(geom.UniformInsets(2)), 4, tint(d.ColourOf(RoleSurface), d.tintOf(tintHover)))
 		}
 		if sameDay(date, d.today) && !sameDay(date, d.selected) {
 			canvas.StrokeRoundRect(cell.Inset(geom.UniformInsets(2)), 4, d.ColourOf(RoleAccent), 1)

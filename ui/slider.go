@@ -81,7 +81,7 @@ func (s *Slider) Draw(canvas render.Canvas) {
 	handle := mixColour(s.ColourOf(RolePrimary), s.ColourOf(RoleAccent), s.hoverFade.level)
 	canvas.FillCircle(geom.Point{X: hx, Y: y}, sliderHandle, handle)
 	if s.focused {
-		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColourOf(RoleAccent), focusRingWidth)
+		canvas.StrokeCircle(geom.Point{X: hx, Y: y}, sliderHandle+2, s.ColourOf(RoleAccent), s.focusW())
 	}
 }
 

@@ -155,7 +155,7 @@ func (t *TextField) MinSize() geom.Size {
 	const defaultWidth = 160
 	return geom.Size{
 		W: defaultWidth,
-		H: h + textFieldPadding.Top + textFieldPadding.Bottom,
+		H: h + t.insets(textFieldPadding).Top + t.insets(textFieldPadding).Bottom,
 	}
 }
 
@@ -355,7 +355,7 @@ func (t *TextField) paste() {
 
 // caretIndexAt maps an absolute x coordinate to a caret index.
 func (t *TextField) caretIndexAt(absX float64) int {
-	inner := t.Bounds().Inset(textFieldPadding)
+	inner := t.Bounds().Inset(t.insets(textFieldPadding))
 	return caretIndexForX(t.display(), absX-inner.X+t.scrollX, t.face())
 }
 
@@ -402,7 +402,7 @@ func (t *TextField) imeCaretRect() (geom.Rect, bool) {
 	if !t.focused || f == nil {
 		return geom.Rect{}, false
 	}
-	inner := t.Bounds().Inset(textFieldPadding)
+	inner := t.Bounds().Inset(t.insets(textFieldPadding))
 	x := inner.X - t.scrollX + t.caretVisualWidth(f)
 	return geom.Rect{X: x, Y: inner.Y, W: 1, H: inner.H}, true
 }
@@ -418,9 +418,8 @@ func (t *TextField) Draw(canvas render.Canvas) {
 	rad := t.cornerRadius()
 
 	canvas.FillRoundRect(b, rad, t.ColourOf(RoleSurface))
-	strokeFocusable(canvas, b, rad, t.ColourOf(RoleBorder), t.ColourOf(RoleAccent), t.focused)
-
-	inner := b.Inset(textFieldPadding)
+	t.strokeFocusable(canvas, b, rad, t.focused)
+	inner := b.Inset(t.insets(textFieldPadding))
 	canvas.PushClip(inner)
 	defer canvas.PopClip()
 

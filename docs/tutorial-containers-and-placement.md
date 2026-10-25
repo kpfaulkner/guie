@@ -115,6 +115,10 @@ controls vertical placement. The axes swap with the direction.
 a single line along the main axis with `spacing` pixels between each, then
 distribute leftover main-axis space by weight.
 
+A fixed number is exactly that many pixels. To let the theme decide instead, pass
+`ui.ThemeGap`: `ui.VBox(ui.ThemeGap)` uses the theme's `Spacing` (8 by default) scaled
+by its `Density`, and follows `App.SetTheme`. The same works for `ui.NewGrid`.
+
 ### How leftover space is shared
 
 Each child first claims its minimum. Then any space left over (after minimums and

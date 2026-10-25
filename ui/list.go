@@ -85,7 +85,7 @@ func (l *List) RowHeight() float64 {
 	if f == nil {
 		return 0
 	}
-	return f.Measure("Ag").H + 2*listRowPad
+	return f.Measure("Ag").H + 2*l.px(listRowPad)
 }
 
 // ContentHeight returns the total height of all rows.
@@ -108,7 +108,7 @@ func (l *List) MinSize() geom.Size {
 	for _, it := range l.items {
 		w = maxF(w, f.Measure(it).W)
 	}
-	return geom.Size{W: w + 2*listRowPad + scrollbarWidth, H: l.RowHeight()}
+	return geom.Size{W: w + 2*l.px(listRowPad) + scrollbarWidth, H: l.RowHeight()}
 }
 
 func (l *List) maxOffset() float64 {
@@ -185,17 +185,17 @@ func (l *List) Draw(canvas render.Canvas) {
 		case i == l.selected:
 			canvas.FillRect(row, l.ColourOf(RolePrimary))
 		case i == l.hoverRow:
-			canvas.FillRect(row, tint(l.ColourOf(RoleSurface), tintHover))
+			canvas.FillRect(row, tint(l.ColourOf(RoleSurface), l.tintOf(tintHover)))
 		}
 		textColour := l.ColourOf(RoleText)
 		if i == l.selected {
 			textColour = l.ColourOf(RoleOnPrimary)
 		}
-		canvas.DrawText(it, geom.Point{X: ox + listRowPad, Y: vCenterY(f, y, rh)}, f, textColour)
+		canvas.DrawText(it, geom.Point{X: ox + l.px(listRowPad), Y: vCenterY(f, y, rh)}, f, textColour)
 	}
 	canvas.PopClip()
 
-	canvas.StrokeRect(b, l.ColourOf(RoleBorder), 1)
+	canvas.StrokeRect(b, l.ColourOf(RoleBorder), l.borderW())
 
 	if g.vOver {
 		l.drawScrollbar(canvas, b)

@@ -14,7 +14,8 @@
 //   - Layout:    a Grid with a spanning cell and a ScrollView, in a vertical
 //     SplitPane; plus a Stack for centering
 //   - Media:     a generated image (FitContain) and the theme palette as swatches
-//   - cross-cutting: a custom theme, per-widget colour overrides, tooltips, a
+//   - cross-cutting: a custom theme with a View menu to switch to Light or High
+//     contrast (the UI is rebuilt from the new palette), per-widget colour overrides, tooltips, a
 //     status bar, and a global click counter wired through the event bus
 //
 // Run with: go run ./examples/comprehensive
@@ -37,29 +38,29 @@ import (
 func main() {
 	// A custom theme: start from the default dark palette and tweak the accent
 	// colours and corner rounding. Widgets pick these up automatically.
-	th := theme.Default()
-	th.Palette.Primary = color.RGBA{R: 0x3b, G: 0x82, B: 0xf6, A: 0xff}
-	th.Palette.Accent = color.RGBA{R: 0x60, G: 0xa5, B: 0xfa, A: 0xff}
-	th.CornerRadius = 6
-	pal := th.Palette
+	custom := theme.Default()
+	custom.Palette.Primary = color.RGBA{R: 0x3b, G: 0x82, B: 0xf6, A: 0xff}
+	custom.Palette.Accent = color.RGBA{R: 0x60, G: 0xa5, B: 0xfa, A: 0xff}
+	custom.CornerRadius = 6
 
 	app := ui.NewApp(
-		ui.WithTitle("guie — comprehensive demo"),
+		ui.WithTitle("guie - comprehensive demo"),
 		ui.WithSize(960, 680),
 		ui.WithResizable(true),
-		ui.WithTheme(th),
+		ui.WithTheme(custom),
 		ui.WithShadows(true),
 	)
 
-	// Shared status line + a tiny reporting helper used throughout.
-	status := ui.NewLabel("Ready.")
+	// Shared status line + a tiny reporting helper used throughout. The widgets
+	// are rebuilt when the theme changes, so say goes through the current one.
+	var status *ui.Label
 	say := func(s string) { status.SetText(s) }
 
 	// Global click counter, driven entirely off the event bus: every derived
 	// Click in the whole UI is published, so this updates without wiring each
 	// widget. Bus handlers run on the UI goroutine, so touching a widget is safe.
 	clicks := 0
-	clickLabel := ui.NewLabel("clicks: 0", ui.LabelColour(pal.TextMuted))
+	var clickLabel *ui.Label
 	app.Events().Subscribe(ui.EventClick, func(ev ui.Event) {
 		clicks++
 		clickLabel.SetText(fmt.Sprintf("clicks: %d", clicks))
@@ -72,55 +73,82 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// --- Menu bar ---------------------------------------------------------
-	bar := ui.NewMenuBar()
-	bar.AddMenu("File",
-		ui.NewMenuItem("New", func() { say("File ▸ New") }),
-		ui.NewMenuItem("Open…", func() { say("File ▸ Open") }),
-		ui.NewMenuItem("Save", func() { say("File ▸ Save") }),
-		ui.NewMenuItem("Quit", func() { app.Quit() }),
-	)
 	shadows := true
-	bar.AddMenu("View",
-		ui.NewMenuItem("Toggle shadows", func() {
-			shadows = !shadows
-			app.SetShadows(shadows)
-			say(fmt.Sprintf("Shadows: %v", shadows))
-		}),
-	)
-	bar.AddMenu("Help",
-		ui.NewMenuItem("About", func() {
-			app.ShowMessage("About",
-				"guie comprehensive demo\nA cross-platform Go UI toolkit.",
-				ui.DialogButton{Label: "Nice"})
-		}),
-	)
+	selectedTab := 0
 
-	// --- Tabs -------------------------------------------------------------
-	tabs := ui.NewTabContainer()
-	tabs.OnChange(func(i int) { say(fmt.Sprintf("Switched to tab %d", i)) })
-	tabs.AddTab("Controls", controlsTab(app, say, pal, swatch))
-	tabs.AddTab("Text", textTab(say, pal))
-	tabs.AddTab("Data", dataTab(say, pal))
-	tabs.AddTab("Layout", layoutTab(pal))
-	tabs.AddTab("Media", mediaTab(pal, swatch))
+	// build makes the whole UI for a theme. Most of the cards and swatches take
+	// their colours from the palette explicitly, so a theme switch rebuilds the
+	// tree rather than recolouring it in place (the tab and the click count carry
+	// over; text typed into fields does not).
+	var build func(th theme.Theme) ui.Widget
+	setTheme := func(name string, th theme.Theme) {
+		app.SetTheme(th)
+		app.SetContent(build(th))
+		say("Theme: " + name)
+	}
 
-	// --- Status bar -------------------------------------------------------
-	statusBar := ui.NewContainer()
-	statusBar.SetBackground(pal.Surface)
-	statusBar.SetLayout(ui.HBox(12))
-	statusBar.SetPadding(geom.UniformInsets(8))
-	statusBar.Add(status, ui.Weight(1))
-	statusBar.Add(clickLabel, ui.Align(geom.AlignEnd))
+	build = func(th theme.Theme) ui.Widget {
+		pal := th.Palette
+		status = ui.NewLabel("Ready.")
+		clickLabel = ui.NewLabel(fmt.Sprintf("clicks: %d", clicks), ui.LabelColour(pal.TextMuted))
 
-	// --- Root: menu bar / tabs (fill) / status bar ------------------------
-	root := ui.NewContainer()
-	root.SetLayout(ui.VBox(0))
-	root.Add(bar)
-	root.Add(tabs, ui.Weight(1))
-	root.Add(statusBar)
+		// --- Menu bar -----------------------------------------------------
+		bar := ui.NewMenuBar()
+		bar.AddMenu("File",
+			ui.NewMenuItem("New", func() { say("File > New") }),
+			ui.NewMenuItem("Open...", func() { say("File > Open") }),
+			ui.NewMenuItem("Save", func() { say("File > Save") }),
+			ui.NewMenuItem("Quit", func() { app.Quit() }),
+		)
+		bar.AddMenu("View",
+			ui.NewMenuItem("Toggle shadows", func() {
+				shadows = !shadows
+				app.SetShadows(shadows)
+				say(fmt.Sprintf("Shadows: %v", shadows))
+			}),
+			ui.NewMenuItem("Theme: Dark (custom blue)", func() { setTheme("dark", custom) }),
+			ui.NewMenuItem("Theme: Light", func() { setTheme("light", theme.Light()) }),
+			ui.NewMenuItem("Theme: High contrast", func() { setTheme("high contrast", theme.HighContrast()) }),
+		)
+		bar.AddMenu("Help",
+			ui.NewMenuItem("About", func() {
+				app.ShowMessage("About",
+					"guie comprehensive demo\nA cross-platform Go UI toolkit.",
+					ui.DialogButton{Label: "Nice"})
+			}),
+		)
 
-	app.SetContent(root)
+		// --- Tabs ---------------------------------------------------------
+		tabs := ui.NewTabContainer()
+		tabs.AddTab("Controls", controlsTab(app, say, pal, swatch))
+		tabs.AddTab("Text", textTab(say, pal))
+		tabs.AddTab("Data", dataTab(say, pal))
+		tabs.AddTab("Layout", layoutTab(pal))
+		tabs.AddTab("Media", mediaTab(pal, swatch))
+		tabs.Select(selectedTab)
+		tabs.OnChange(func(i int) {
+			selectedTab = i
+			say(fmt.Sprintf("Switched to tab %d", i))
+		})
+
+		// --- Status bar ---------------------------------------------------
+		statusBar := ui.NewContainer()
+		statusBar.SetBackground(pal.Surface)
+		statusBar.SetLayout(ui.HBox(12))
+		statusBar.SetPadding(geom.UniformInsets(8))
+		statusBar.Add(status, ui.Weight(1))
+		statusBar.Add(clickLabel, ui.Align(geom.AlignEnd))
+
+		// --- Root: menu bar / tabs (fill) / status bar --------------------
+		root := ui.NewContainer()
+		root.SetLayout(ui.VBox(0))
+		root.Add(bar)
+		root.Add(tabs, ui.Weight(1))
+		root.Add(statusBar)
+		return root
+	}
+
+	app.SetContent(build(custom))
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}

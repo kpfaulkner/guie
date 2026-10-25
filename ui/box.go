@@ -17,7 +17,19 @@ import (
 type Box struct {
 	Direction geom.Direction
 	Spacing   float64
+
+	themeGap float64 // what a negative Spacing (ThemeGap) resolves to; set by the Container
 }
+
+// gap is the spacing in force: Spacing, or the theme's when Spacing is negative.
+func (b *Box) gap() float64 {
+	if b.Spacing < 0 {
+		return b.themeGap
+	}
+	return b.Spacing
+}
+
+func (b *Box) setThemeGap(g float64) { b.themeGap = g }
 
 // NewBox returns a Box arranging children along dir.
 func NewBox(dir geom.Direction) *Box { return &Box{Direction: dir} }
@@ -40,7 +52,7 @@ func (b *Box) Measure(items []Item) geom.Size {
 		main += mainExtent(b.Direction, m)
 		cross = math.Max(cross, crossExtent(b.Direction, m))
 	}
-	main += b.Spacing * float64(len(items)-1)
+	main += b.gap() * float64(len(items)-1)
 	return sizeFor(b.Direction, main, cross)
 }
 
@@ -65,7 +77,7 @@ func (b *Box) Arrange(items []Item, content geom.Rect) {
 		totalMin += mains[i]
 		totalWeight += it.Data.Weight
 	}
-	free := mainAvail - totalMin - b.Spacing*float64(n-1)
+	free := mainAvail - totalMin - b.gap()*float64(n-1)
 	if free > 0 && totalWeight > 0 {
 		for i, it := range items {
 			if it.Data.Weight > 0 {
@@ -93,6 +105,6 @@ func (b *Box) Arrange(items []Item, content geom.Rect) {
 			r = geom.Rect{X: crossPos, Y: mainPos, W: crossLen, H: mains[i]}
 		}
 		it.Widget.SetBounds(r)
-		mainPos += mains[i] + b.Spacing
+		mainPos += mains[i] + b.gap()
 	}
 }
