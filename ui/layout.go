@@ -141,3 +141,19 @@ func distributeTracks(n int, total, spacing float64, weights []int) []float64 {
 	}
 	return tracks
 }
+
+// ThemeGap is a spacing that follows the theme. Pass it to VBox, HBox or NewGrid
+// (or set a Box or Grid Spacing to it) and the gap between children is
+// Theme.Spacing scaled by Theme.Density, worked out each time the container lays
+// out, so it follows SetTheme. Any negative spacing means the same.
+//
+// It is opt-in: an explicit number such as VBox(10) is exactly 10 whatever the
+// theme says, because the caller asked for 10.
+const ThemeGap = -1
+
+// spacingSetter is implemented by layouts that have a gap which can follow the
+// theme. The Container, which can see the theme, tells them what the theme's gap
+// is before it measures or arranges.
+type spacingSetter interface {
+	setThemeGap(gap float64)
+}

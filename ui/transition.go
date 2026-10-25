@@ -2,10 +2,23 @@ package ui
 
 import "image/color"
 
-// transitionDuration is how long a hover/press/focus state change takes to
-// fade, in seconds. Short enough to feel immediate, long enough to read as a
-// transition rather than a flicker.
-const transitionDuration = 0.12
+// motionSeconds is how long a hover/press/focus state change takes to fade, from
+// the theme (Theme.Motion.Duration, 0.12 s by default): short enough to feel
+// immediate, long enough to read as a transition rather than a flicker.
+func (b *BaseWidget) motionSeconds() float64 {
+	if b.ctx != nil && b.ctx.theme != nil {
+		if d := b.ctx.theme.Motion.Duration; d > 0 {
+			return d
+		}
+	}
+	return 0.12
+}
+
+// reducedMotion reports whether the theme asks for no movement: state changes then
+// jump to their end state in the frame they happen.
+func (b *BaseWidget) reducedMotion() bool {
+	return b.ctx != nil && b.ctx.theme != nil && b.ctx.theme.Motion.Reduced
+}
 
 // fade is a 0..1 level that eases toward a target, used to cross-fade a widget
 // between visual states (idle <-> hover, up <-> pressed). The zero value is
@@ -20,6 +33,7 @@ type fade struct {
 // fadeTo eases f toward target (0 or 1). It does nothing if f is already
 // heading there. Before the widget is mounted (no app to run animations) the
 // level snaps, so state set up front is correct on the first frame.
+// With reduced motion on, the level snaps the same way and nothing is left running.
 //
 // The animation lives on the App's animation list, so the app keeps presenting
 // frames only while a fade is running and goes idle again as soon as it lands.
@@ -32,7 +46,7 @@ func (b *BaseWidget) fadeTo(f *fade, target float64) {
 		f.anim.Stop()
 		f.anim = nil
 	}
-	if b.ctx == nil || b.ctx.animate == nil {
+	if b.ctx == nil || b.ctx.animate == nil || b.reducedMotion() {
 		f.level = target
 		return
 	}
@@ -40,7 +54,7 @@ func (b *BaseWidget) fadeTo(f *fade, target float64) {
 	if from == target {
 		return
 	}
-	f.anim = b.ctx.animate(transitionDuration, EaseOut, func(t float64) {
+	f.anim = b.ctx.animate(b.motionSeconds(), EaseOut, func(t float64) {
 		f.level = from + (target-from)*t
 	})
 }

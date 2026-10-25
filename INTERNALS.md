@@ -531,7 +531,10 @@ Grid columns/rows).
 
 - **`Box`** (`HBox`/`VBox`): sequential along the main axis with `Spacing`; each
   child takes its min main size, leftover distributed by `Weight`; cross axis per
-  `Align` (Stretch fills). This is also the "flex".
+  `Align` (Stretch fills). This is also the "flex". `Spacing` may be `ui.ThemeGap` (any
+  negative): the gap is then `Theme.Spacing x Density`, set by the owning `Container`
+  (`resolveGap`, through the unexported `spacingSetter`) before every measure and
+  arrange, so it follows `SetTheme`. Explicit spacings are never scaled.
 - **`Grid`**: fixed `Columns`, auto-flow wrapping; column/row tracks distributed
   by optional weights (equal by default) across the content rect; per-cell
   `Align`. Cell spanning is not implemented (a noted TODO).
@@ -722,6 +725,15 @@ the same frame. Widgets can already be animated via their public setters from
 app code; exposing the animator to widgets internally (through `treeContext`) is
 a straightforward future extension. See `examples/animation`.
 
+**Widget transitions and the theme (`ui/transition.go`).** A widget's own state
+changes (hover, press) ease through `BaseWidget.fadeTo`, which runs an
+`App.Animate` animation of `motionSeconds()` = `Theme.Motion.Duration` (0.12 s
+default); the tab underline slide is 1.5 x that. With `Theme.Motion.Reduced`,
+`fadeTo` and the slide jump to the end state in the frame they are triggered and
+start no animation, so the app stays idle (`needsFrames` false). This applies only
+to the widgets' own transitions: `App.Animate`/`Tween`/`OnFrame`, toast fades and
+the spinner are the application's motion and are not reduced.
+
 ---
 
 ## 11b. Drag-and-drop (`ui/dragdrop.go`)
@@ -821,7 +833,10 @@ source), and any feedback while the file is dragged over the window.
 Every widget resolves the colours it draws through **roles**, not the palette
 directly:
 
-- `ColourRole` enum mirrors the palette (`RoleBackground`…`RoleDisabled`).
+- `ColourRole` enum mirrors the palette: the nine base roles (`RoleBackground` to
+  `RoleDisabled`) and, appended after them, `RoleSuccess`, `RoleWarning`,
+  `RoleError`, `RoleInfo` (nil `Palette.Info` resolves to `Primary`) and
+  `RoleScrim`.
 - `BaseWidget.SetColour(role, c)` stores a per-widget override (nil clears it).
 - `BaseWidget.ColourOf(role)` returns the **effective** colour: the override if
   set, else `paletteColour(theme.Palette, role)`.
@@ -829,10 +844,42 @@ directly:
 Because this lives on `BaseWidget`, *every* widget supports per-widget colour
 overrides and read-back uniformly. Widget `Draw` methods call
 `w.ColourOf(RoleX)` instead of reading `theme.Palette.X`, so an override actually
-changes appearance. Derived state colours (button hover/pressed) are computed
-from the base role via `lighten`/`darken`, so overriding `RolePrimary` recolours
-the hover/pressed states too. App-level chrome that isn't a widget (modal scrim,
-tooltip box) reads the theme palette directly.
+changes appearance. App-level chrome that is not a widget (the modal scrim, the
+tooltip box, toasts) reads `a.theme` directly and so follows `SetTheme` too.
+
+**State shading comes from the theme, not from constants.** A state is an
+*amount*: `Theme.States` (`Hover`, `Pressed`, `Header`, `Emphasis`) is how far a
+widget shifts its own base colour. `tintKind` (`tintHover`, `tintHeader`,
+`tintStrong`, `tintFlat`, `tintPress`) names the state, `BaseWidget.tintOf(kind)`
+resolves it against the theme, and `tint(base, amount)` moves the base toward white
+on a dark base and toward black on a light one. A flat button's hover is
+`Hover x 4/3`; a filled button's hover is `tint(Primary, Hover x 1.5)` and its
+pressed state is `Primary` shaded toward black by `Pressed x 1.43`. So a theme
+changes how obvious every state is in one place, and overriding `RolePrimary`
+still recolours the derived states.
+
+**Widths come from the theme too:** `BaseWidget.borderW()` (`Theme.BorderWidth`)
+for control outlines, `focusW()` (`Theme.FocusWidth`) for the keyboard focus ring.
+`strokeFocusable` (`ui/focus.go`, a `BaseWidget` method) draws the border when
+unfocused and, focused, the ring in `Accent` plus a **halo** of the `Background`
+colour just inside it, so the ring stays visible on a filled control whose own
+colour matches `Accent`.
+
+**Density.** `BaseWidget.px(v)` and `insets(in)` scale a padding or gap by
+`Theme.Density` (`App.px` for toasts and tooltips). Every widget keeps its padding
+constants as the base and passes them through the accessor at each use, in
+`MinSize`, `Draw` and the hit tests alike, so the three stay in step. At density 1
+the result is exactly the base. Text, glyph sizes and anything the application
+passes itself (`VBox(10)`) are not scaled; rows and fields keep following the font
+(`text height + 2 x scaled padding`). When adding a widget, scale its paddings and
+add its expected padding to `TestDensityScalesPaddingAndOnlyPadding`.
+
+**Shadows:** `App.shadowsOn()` is `App.shadows && !Theme.NoShadows`.
+
+**The audit.** `guitest/theme_audit_test.go` draws about 27 widget states under two
+palettes that share no colour, and fails if any colour appears under both: that is
+a literal baked into a widget, or a colour cached before `SetTheme`. When adding a
+widget, add it to `auditCases`.
 
 `Container` background/border are *explicit instance colours* (default
 transparent / none), not roles — they have their own setters/getters.

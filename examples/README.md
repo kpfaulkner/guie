@@ -22,6 +22,7 @@ go run ./examples/fonts      # adjust font size at runtime (App.SetFont) + per-w
 go run ./examples/tooltips   # hover tooltips (SetTooltip) with a rest delay
 go run ./examples/splitter   # SplitPane: draggable dividers, nested splits
 go run ./examples/colours     # per-widget colour overrides (SetColour / ColourOf, roles)
+go run ./examples/theming   # runtime themes: Dark/Light/High contrast, density, spacing, reduced motion, toasts, dialog
 go run ./examples/images     # Image widget (scaled) + image buttons (ui.LoadImage)
 go run ./examples/editor     # text editor: menus, open/save, find/replace, modals
 go run ./examples/paint      # freehand drawing: mouse capture, multi-button, custom widget
@@ -59,6 +60,7 @@ What each one exercises:
 | `tooltips`| Hover tooltips via `SetTooltip`, with a rest delay and on-screen clamping |
 | `splitter`| `SplitPane`/`HSplit`/`VSplit`: draggable dividers, ratio + min sizes, nested |
 | `colours`  | Per-widget colour overrides via `SetColour`/`ColourOf` and `ColourRole`s |
+| `theming` | `App.SetTheme`: theme presets incl. `HighContrast`, custom palettes, corner radius, accent, `Theme.Density` (padding), `Theme.Spacing` with `ui.ThemeGap`, `Motion.Reduced`, status-colour toasts, `ShowConfirm` scrim, focus ring |
 | `images`  | `Image` widget (fit modes) + image buttons via `ui.LoadImage`/`ButtonImage` |
 | `editor`  | A text editor: `MenuBar`, file open/save, find/replace (replace-all is one undo step via `ReplaceRange`), Undo/Redo, word-wrap toggle, custom modal dialogs, `TextArea` selection API |
 | `paint`   | Freehand drawing: custom widget reading `ev.Pos`, pointer capture, left-draw/right-erase, colour/brush controls |

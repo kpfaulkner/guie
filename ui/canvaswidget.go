@@ -106,7 +106,7 @@ func (cw *CanvasWidget) Draw(c render.Canvas) {
 		c.PopClip()
 	}
 	if cw.focusable && cw.focused {
-		strokeFocusable(c, b, cw.cornerRadius(), cw.ColourOf(RoleBorder), cw.ColourOf(RoleAccent), true)
+		cw.strokeFocusable(c, b, cw.cornerRadius(), true)
 	}
 }
 

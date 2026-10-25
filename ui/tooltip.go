@@ -65,8 +65,8 @@ func (a *App) drawTooltip(c render.Canvas) {
 	pal := a.theme.Palette
 
 	size := f.Measure(a.tooltipText)
-	w := size.W + 2*tooltipPad
-	h := size.H + 2*tooltipPad
+	w := size.W + 2*a.px(tooltipPad)
+	h := size.H + 2*a.px(tooltipPad)
 	x := a.tooltipPos.X + tooltipCursorOff
 	y := a.tooltipPos.Y + tooltipCursorOff
 
@@ -86,11 +86,11 @@ func (a *App) drawTooltip(c render.Canvas) {
 
 	rect := geom.Rect{X: x, Y: y, W: w, H: h}
 	rad := a.theme.CornerRadius
-	if a.shadows {
+	if a.shadowsOn() {
 		drawShadow(c, rect, rad)
 	}
-	c.FillRoundRect(rect, rad, tint(pal.Surface, tintStrong))
-	c.StrokeRoundRect(rect, rad, pal.Border, 1)
-	inner := geom.Rect{X: x + tooltipPad, Y: y + tooltipPad, W: size.W, H: size.H}
+	c.FillRoundRect(rect, rad, tint(pal.Surface, tintAmount(a.theme.States, tintStrong)))
+	c.StrokeRoundRect(rect, rad, pal.Border, a.theme.BorderWidth)
+	inner := geom.Rect{X: x + a.px(tooltipPad), Y: y + a.px(tooltipPad), W: size.W, H: size.H}
 	drawText(c, a.tooltipText, inner, geom.AlignStart, f, pal.Text)
 }

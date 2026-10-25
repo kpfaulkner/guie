@@ -111,7 +111,7 @@ func (b *Button) contentSize() geom.Size {
 	}
 	gap := 0.0
 	if iconW > 0 && textW > 0 {
-		gap = buttonIconGap
+		gap = b.px(buttonIconGap)
 	}
 	return geom.Size{W: iconW + gap + textW, H: maxF(iconH, textH)}
 }
@@ -127,10 +127,18 @@ func (b *Button) face() render.FontFace {
 func (b *Button) MinSize() geom.Size {
 	c := b.contentSize()
 	return geom.Size{
-		W: c.W + buttonPadding.Left + buttonPadding.Right,
-		H: c.H + buttonPadding.Top + buttonPadding.Bottom,
+		W: c.W + b.insets(buttonPadding).Left + b.insets(buttonPadding).Right,
+		H: c.H + b.insets(buttonPadding).Top + b.insets(buttonPadding).Bottom,
 	}
 }
+
+// A filled button reads a little stronger than a flat row for the same theme: these
+// scale the theme's hover and pressed amounts. They are chosen so the default theme
+// looks close to the old lighten(1.15) / darken(0.8) pair.
+const (
+	filledHoverScale = 1.5
+	filledPressScale = 1.43
+)
 
 // fillColour resolves the background colour for the button's current state.
 func (b *Button) fillColour() color.Color {
@@ -139,9 +147,13 @@ func (b *Button) fillColour() color.Color {
 	}
 	base := b.ColourOf(RolePrimary)
 	// Cross-fade idle -> hover -> pressed rather than switching, so a state
-	// change eases in over transitionDuration.
-	c := mixColour(base, lighten(base, 1.15), b.hoverFade.level)
-	return mixColour(c, darken(base, 0.8), b.pressFade.level)
+	// change eases in over the theme's motion duration.
+	// Hover shifts the fill away from the page (lighter on a dark fill); pressed
+	// always goes darker, as a button pushed in. Both amounts come from the theme.
+	hover := tint(base, b.tintOf(tintHover)*filledHoverScale)
+	press := mixColour(base, color.Black, b.tintOf(tintPress)*filledPressScale)
+	c := mixColour(base, hover, b.hoverFade.level)
+	return mixColour(c, press, b.pressFade.level)
 }
 
 // syncFades points the hover and press fades at the button's current state.
@@ -173,9 +185,9 @@ func (b *Button) labelColour() color.Color {
 func (b *Button) flatHighlight() color.Color {
 	base := b.ColourOf(RoleSurface)
 	if b.pressed && b.hover {
-		return tint(base, tintPress)
+		return tint(base, b.tintOf(tintPress))
 	}
-	return tint(base, tintFlat)
+	return tint(base, b.tintOf(tintFlat))
 }
 
 // flatFill is the flat button's current highlight: the hover colour faded in by
@@ -183,7 +195,7 @@ func (b *Button) flatHighlight() color.Color {
 // Fully transparent at rest.
 func (b *Button) flatFill() color.Color {
 	base := b.ColourOf(RoleSurface)
-	c := mixColour(tint(base, tintFlat), tint(base, tintPress), b.pressFade.level)
+	c := mixColour(tint(base, b.tintOf(tintFlat)), tint(base, b.tintOf(tintPress)), b.pressFade.level)
 	return withAlpha(c, b.hoverFade.level)
 }
 
@@ -202,11 +214,11 @@ func (b *Button) Draw(c render.Canvas) {
 		}
 	} else {
 		c.FillRoundRect(rect, rad, b.fillColour())
-		strokeFocusable(c, rect, rad, b.ColourOf(RoleBorder), b.ColourOf(RoleAccent), b.focused)
+		b.strokeFocusable(c, rect, rad, b.focused)
 	}
 	if b.flat && b.focused {
 		// A flat button has no border at rest, only the focus ring.
-		strokeFocusable(c, rect, rad, b.ColourOf(RoleBorder), b.ColourOf(RoleAccent), true)
+		b.strokeFocusable(c, rect, rad, true)
 	}
 
 	content := b.contentSize()
@@ -218,7 +230,7 @@ func (b *Button) Draw(c render.Canvas) {
 		c.DrawImage(b.icon, dst)
 		x += s.W
 		if b.text != "" {
-			x += buttonIconGap
+			x += b.px(buttonIconGap)
 		}
 	}
 

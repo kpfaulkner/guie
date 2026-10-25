@@ -1,14 +1,10 @@
 package ui
 
 import (
-	"image/color"
-
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
-
-// scrimColour dims the background behind a modal popup.
-var scrimColour = color.RGBA{R: 0, G: 0, B: 0, A: 0xA0}
 
 // Popup is a transient overlay (dropdown list, menu, dialog) drawn above the
 // main widget tree. Its content is positioned at Bounds in surface coordinates.
@@ -102,9 +98,9 @@ func (a *App) layoutOverlays() {
 func (a *App) drawOverlays(c render.Canvas) {
 	for _, ov := range a.overlays {
 		if ov.modal {
-			c.FillRect(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H}, scrimColour)
+			c.FillRect(geom.Rect{W: a.surfaceSize.W, H: a.surfaceSize.H}, orColour(a.theme.Palette.Scrim, theme.DefaultPalette().Scrim))
 		}
-		if a.shadows {
+		if a.shadowsOn() {
 			drawShadow(c, ov.bounds, a.theme.CornerRadius)
 		}
 		if ov.content.Visible() {
@@ -175,7 +171,7 @@ func (a *App) ShowMessage(title, message string, buttons ...DialogButton) *Popup
 
 	panel := NewContainer()
 	panel.SetBackground(pal.Surface)
-	panel.SetBorder(pal.Border, 1)
+	panel.SetBorder(pal.Border, a.theme.BorderWidth)
 	panel.SetCornerRadius(a.theme.CornerRadius)
 	panel.SetLayout(VBox(12))
 	panel.SetPadding(geom.UniformInsets(16))

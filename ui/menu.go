@@ -15,14 +15,15 @@ func menuPanel(th theme.Theme, font render.FontFace, items []MenuItem, run func(
 	if f == nil {
 		f = th.Font
 	}
-	rowH := f.Measure("Ag").H + 2*menuRowPad
+	d := densityOf(th) // the popup is built outside any widget, so it reads the theme directly
+	rowH := f.Measure("Ag").H + 2*menuRowPad*d
 	var w float64
 	for _, it := range items {
 		w = maxF(w, f.Measure(it.Label).W)
 	}
 	panel := NewContainer()
 	panel.SetBackground(th.Palette.Surface)
-	panel.SetBorder(th.Palette.Border, 1)
+	panel.SetBorder(th.Palette.Border, th.BorderWidth)
 	panel.SetCornerRadius(th.CornerRadius)
 	panel.SetLayout(VBox(0))
 	for _, it := range items {
@@ -31,7 +32,7 @@ func menuPanel(th theme.Theme, font render.FontFace, items []MenuItem, run func(
 		row.font = font
 		panel.Add(row)
 	}
-	return panel, geom.Size{W: w + 2*menuRowPad, H: rowH * float64(len(items))}
+	return panel, geom.Size{W: w + 2*menuRowPad*d, H: rowH * float64(len(items))}
 }
 
 const (
@@ -95,9 +96,9 @@ func (m *MenuBar) MinSize() geom.Size {
 	}
 	var w float64
 	for _, t := range m.titles {
-		w += f.Measure(t).W + 2*menuTitlePad
+		w += f.Measure(t).W + 2*m.px(menuTitlePad)
 	}
-	return geom.Size{W: w, H: f.Measure("Ag").H + 2*menuRowPad}
+	return geom.Size{W: w, H: f.Measure("Ag").H + 2*m.px(menuRowPad)}
 }
 
 // titleRect returns the rectangle of title i within the bar.
@@ -106,9 +107,9 @@ func (m *MenuBar) titleRect(i int) geom.Rect {
 	b := m.Bounds()
 	x := b.X
 	for j := 0; j < i; j++ {
-		x += f.Measure(m.titles[j]).W + 2*menuTitlePad
+		x += f.Measure(m.titles[j]).W + 2*m.px(menuTitlePad)
 	}
-	return geom.Rect{X: x, Y: b.Y, W: f.Measure(m.titles[i]).W + 2*menuTitlePad, H: b.H}
+	return geom.Rect{X: x, Y: b.Y, W: f.Measure(m.titles[i]).W + 2*m.px(menuTitlePad), H: b.H}
 }
 
 // titleAt returns the title index at absolute point p, or -1.
@@ -137,9 +138,9 @@ func (m *MenuBar) Draw(canvas render.Canvas) {
 		case i == m.openIdx:
 			canvas.FillRect(r, m.ColourOf(RolePrimary))
 		case i == m.hover:
-			canvas.FillRect(r, tint(m.ColourOf(RoleSurface), tintHover))
+			canvas.FillRect(r, tint(m.ColourOf(RoleSurface), m.tintOf(tintHover)))
 		}
-		canvas.DrawText(t, geom.Point{X: r.X + menuTitlePad, Y: vCenterY(f, r.Y, r.H)}, f, m.ColourOf(RoleText))
+		canvas.DrawText(t, geom.Point{X: r.X + m.px(menuTitlePad), Y: vCenterY(f, r.Y, r.H)}, f, m.ColourOf(RoleText))
 	}
 }
 
@@ -218,7 +219,7 @@ func (r *menuRow) MinSize() geom.Size {
 		return geom.Size{}
 	}
 	s := f.Measure(r.label)
-	return geom.Size{W: s.W + 2*menuRowPad, H: s.H + 2*menuRowPad}
+	return geom.Size{W: s.W + 2*r.px(menuRowPad), H: s.H + 2*r.px(menuRowPad)}
 }
 
 func (r *menuRow) Draw(canvas render.Canvas) {
@@ -230,7 +231,7 @@ func (r *menuRow) Draw(canvas render.Canvas) {
 	if r.hover {
 		canvas.FillRect(b, r.ColourOf(RoleAccent))
 	}
-	canvas.DrawText(r.label, geom.Point{X: b.X + menuRowPad, Y: vCenterY(f, b.Y, b.H)}, f, r.ColourOf(RoleText))
+	canvas.DrawText(r.label, geom.Point{X: b.X + r.px(menuRowPad), Y: vCenterY(f, b.Y, b.H)}, f, r.ColourOf(RoleText))
 }
 
 func (r *menuRow) HandleEvent(ev *Event) bool {

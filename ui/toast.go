@@ -6,6 +6,7 @@ import (
 
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
+	"github.com/kpfaulkner/guie/theme"
 )
 
 // toast layout & timing constants.
@@ -108,21 +109,31 @@ func (a *App) advanceToasts(dt float64) {
 	a.toasts = kept
 }
 
-// toastColours returns the background, border and text colours for a kind, using
-// the theme where it makes sense so info toasts follow the palette.
+// toastColours returns the background, border and text colours for a kind, all from
+// the theme: the status fills (Palette.Success, Warning, Error), or Primary for an
+// info toast unless Palette.Info is set. The border is the fill shaded toward black,
+// and the text is OnPrimary, which every preset keeps readable on its status fills.
 func (a *App) toastColours(k ToastKind) (bg, border, text color.Color) {
 	pal := a.theme.Palette
+	text = pal.OnPrimary
 	switch k {
 	case ToastSuccess:
-		return color.NRGBA{R: 0x2E, G: 0x7D, B: 0x32, A: 0xff}, color.NRGBA{R: 0x1B, G: 0x5E, B: 0x20, A: 0xff}, color.White
+		bg = orColour(pal.Success, theme.DefaultPalette().Success)
 	case ToastWarning:
-		return color.NRGBA{R: 0xB7, G: 0x7A, B: 0x00, A: 0xff}, color.NRGBA{R: 0x8C, G: 0x5E, B: 0x00, A: 0xff}, color.White
+		bg = orColour(pal.Warning, theme.DefaultPalette().Warning)
 	case ToastError:
-		return color.NRGBA{R: 0xC6, G: 0x28, B: 0x28, A: 0xff}, color.NRGBA{R: 0x99, G: 0x1B, B: 0x1B, A: 0xff}, color.White
+		bg = orColour(pal.Error, theme.DefaultPalette().Error)
 	default: // ToastInfo
-		return pal.Primary, pal.Border, pal.OnPrimary
+		if pal.Info == nil {
+			return pal.Primary, pal.Border, pal.OnPrimary // as it always has
+		}
+		bg = pal.Info
 	}
+	return bg, mixColour(bg, color.Black, toastBorderShade), text
 }
+
+// toastBorderShade is how far toward black a status toast's border is from its fill.
+const toastBorderShade = 0.3
 
 // drawToasts paints the active toasts stacked from the bottom-right corner
 // upward (newest at the bottom), each at its current opacity. Toasts are not
@@ -133,27 +144,27 @@ func (a *App) drawToasts(c render.Canvas) {
 		return
 	}
 	rad := a.theme.CornerRadius
-	y := a.surfaceSize.H - toastMargin
+	y := a.surfaceSize.H - a.px(toastMargin)
 	for i := len(a.toasts) - 1; i >= 0; i-- {
 		t := a.toasts[i]
 		sz := toastTextSize(f, t.message)
-		w := sz.W + 2*toastPad
-		h := sz.H + 2*toastPad
-		x := a.surfaceSize.W - toastMargin - w
+		w := sz.W + 2*a.px(toastPad)
+		h := sz.H + 2*a.px(toastPad)
+		x := a.surfaceSize.W - a.px(toastMargin) - w
 		top := y - h
 		rect := geom.Rect{X: x, Y: top, W: w, H: h}
 
 		al := t.alpha()
 		bg, border, text := a.toastColours(t.kind)
-		if a.shadows && al > 0 {
+		if a.shadowsOn() && al > 0 {
 			drawShadow(c, rect, rad)
 		}
 		c.FillRoundRect(rect, rad, withAlpha(bg, al))
-		c.StrokeRoundRect(rect, rad, withAlpha(border, al), 1)
-		inner := geom.Rect{X: x + toastPad, Y: top + toastPad, W: sz.W, H: sz.H}
+		c.StrokeRoundRect(rect, rad, withAlpha(border, al), a.theme.BorderWidth)
+		inner := geom.Rect{X: x + a.px(toastPad), Y: top + a.px(toastPad), W: sz.W, H: sz.H}
 		drawText(c, t.message, inner, geom.AlignStart, f, withAlpha(text, al))
 
-		y = top - toastGap
+		y = top - a.px(toastGap)
 	}
 }
 

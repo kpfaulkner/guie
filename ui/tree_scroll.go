@@ -31,9 +31,9 @@ func (t *Tree) widest() float64 {
 		if !n.wOK || n.wLabel != n.Label || n.wFP != fp {
 			n.w, n.wLabel, n.wFP, n.wOK = f.Measure(n.Label).W, n.Label, fp, true
 		}
-		w = maxF(w, float64(r.depth)*treeIndent+treeChevron+treeGap+n.w)
+		w = maxF(w, float64(r.depth)*t.px(treeIndent)+treeChevron+t.px(treeGap)+n.w)
 	}
-	return w + 2*treeRowPad
+	return w + 2*t.px(treeRowPad)
 }
 
 // geomInfo carves the tree's box up between rows and bars.

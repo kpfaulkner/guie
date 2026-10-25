@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/kpfaulkner/guie/theme"
 	"image/color"
 	"testing"
 
@@ -63,11 +64,11 @@ func TestTintMovesAwayFromThePage(t *testing.T) {
 		return (299*r + 587*g + 114*b) / 1000
 	}
 	dark := color.RGBA{R: 0x26, G: 0x26, B: 0x32, A: 255}
-	if lum(tint(dark, tintHover)) <= lum(dark) {
+	if lum(tint(dark, theme.DefaultStates().Hover)) <= lum(dark) {
 		t.Error("tinting a dark surface should lighten it")
 	}
 	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	if lum(tint(white, tintHover)) >= lum(white) {
+	if lum(tint(white, theme.DefaultStates().Hover)) >= lum(white) {
 		t.Error("tinting a white surface should darken it (lighten would be a no-op)")
 	}
 }

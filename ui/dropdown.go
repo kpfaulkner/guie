@@ -81,7 +81,7 @@ func (d *DropdownCombo) MinSize() geom.Size {
 		w = maxF(w, f.Measure(o).W)
 	}
 	h := f.Measure("Ag").H
-	return geom.Size{W: w + dropdownArrowW + 2*listRowPad, H: h + 2*dropdownVPadding}
+	return geom.Size{W: w + dropdownArrowW + 2*d.px(listRowPad), H: h + 2*d.px(dropdownVPadding)}
 }
 
 func (d *DropdownCombo) label() string {
@@ -100,16 +100,15 @@ func (d *DropdownCombo) Draw(canvas render.Canvas) {
 	b := d.Bounds()
 	rad := d.cornerRadius()
 	canvas.FillRoundRect(b, rad, d.ColourOf(RoleSurface))
-	strokeFocusable(canvas, b, rad, d.ColourOf(RoleBorder), d.ColourOf(RoleAccent), d.focused || d.open)
-
+	d.strokeFocusable(canvas, b, rad, d.focused || d.open)
 	textColour := d.ColourOf(RoleText)
 	if d.selected < 0 {
 		textColour = d.ColourOf(RoleTextMuted)
 	}
-	canvas.DrawText(d.label(), geom.Point{X: b.X + listRowPad, Y: vCenterY(f, b.Y, b.H)}, f, textColour)
+	canvas.DrawText(d.label(), geom.Point{X: b.X + d.px(listRowPad), Y: vCenterY(f, b.Y, b.H)}, f, textColour)
 
 	// Chevron in the arrow area on the right.
-	cx := b.X + b.W - dropdownArrowW/2 - listRowPad
+	cx := b.X + b.W - dropdownArrowW/2 - d.px(listRowPad)
 	cy := b.Y + b.H/2
 	const aw = 4
 	canvas.DrawLine(geom.Point{X: cx - aw, Y: cy - aw/2}, geom.Point{X: cx, Y: cy + aw/2}, d.ColourOf(RoleText), 2)

@@ -307,7 +307,7 @@ func (t *TextArea) lineHeight() float64 {
 func (t *TextArea) MinSize() geom.Size {
 	return geom.Size{
 		W: 200,
-		H: t.lineHeight()*float64(defaultTextAreaRows) + textAreaPadding.Top + textAreaPadding.Bottom,
+		H: t.lineHeight()*float64(defaultTextAreaRows) + t.insets(textAreaPadding).Top + t.insets(textAreaPadding).Bottom,
 	}
 }
 
@@ -606,7 +606,7 @@ func (t *TextArea) paste() {
 // caretAt maps an absolute point to a (row, col) caret position via the visual
 // rows.
 func (t *TextArea) caretAt(p geom.Point) (int, int) {
-	inner := t.Bounds().Inset(textAreaPadding)
+	inner := t.Bounds().Inset(t.insets(textAreaPadding))
 	lh := t.lineHeight()
 	rows := t.rows()
 	vi := 0
@@ -666,7 +666,7 @@ func (t *TextArea) imeCaretRect() (geom.Rect, bool) {
 	if !t.focused || f == nil {
 		return geom.Rect{}, false
 	}
-	inner := t.Bounds().Inset(textAreaPadding)
+	inner := t.Bounds().Inset(t.insets(textAreaPadding))
 	lh := t.lineHeight()
 	rows := t.rows()
 	ci := t.caretVisualIndex(rows)
@@ -686,9 +686,8 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 	b := t.Bounds()
 	rad := t.cornerRadius()
 	canvas.FillRoundRect(b, rad, t.ColourOf(RoleSurface))
-	strokeFocusable(canvas, b, rad, t.ColourOf(RoleBorder), t.ColourOf(RoleAccent), t.focused)
-
-	inner := b.Inset(textAreaPadding)
+	t.strokeFocusable(canvas, b, rad, t.focused)
+	inner := b.Inset(t.insets(textAreaPadding))
 	lh := t.lineHeight()
 
 	if t.isEmpty() && !t.focused && t.placeholder != "" {

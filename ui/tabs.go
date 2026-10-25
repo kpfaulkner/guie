@@ -95,7 +95,7 @@ func (t *TabContainer) stripHeight() float64 {
 	if f == nil {
 		return 0
 	}
-	return f.Measure("Ag").H + 2*tabVPad
+	return f.Measure("Ag").H + 2*t.px(tabVPad)
 }
 
 // active returns the content widget of the selected tab, or nil.
@@ -128,9 +128,9 @@ func (t *TabContainer) titleRect(i int) geom.Rect {
 	b := t.Bounds()
 	x := b.X
 	for j := 0; j < i; j++ {
-		x += f.Measure(t.tabs[j].title).W + 2*tabHPad
+		x += f.Measure(t.tabs[j].title).W + 2*t.px(tabHPad)
 	}
-	return geom.Rect{X: x, Y: b.Y, W: f.Measure(t.tabs[i].title).W + 2*tabHPad, H: t.stripHeight()}
+	return geom.Rect{X: x, Y: b.Y, W: f.Measure(t.tabs[i].title).W + 2*t.px(tabHPad), H: t.stripHeight()}
 }
 
 // contentRect returns the area below the strip available to the active pane.
@@ -162,7 +162,7 @@ func (t *TabContainer) MinSize() geom.Size {
 	}
 	var stripW, cw, ch float64
 	for _, tb := range t.tabs {
-		stripW += f.Measure(tb.title).W + 2*tabHPad
+		stripW += f.Measure(tb.title).W + 2*t.px(tabHPad)
 		m := tb.content.MinSize()
 		cw = maxF(cw, m.W)
 		ch = maxF(ch, m.H)
@@ -196,12 +196,12 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 		if i == t.selected {
 			// The active tab is raised a shade and its label is full-strength;
 			// the underline below marks it.
-			canvas.FillRect(r, tint(surface, tintHover))
+			canvas.FillRect(r, tint(surface, t.tintOf(tintHover)))
 			col = t.ColourOf(RoleText)
 		} else if hv > 0 {
-			canvas.FillRect(r, withAlpha(tint(surface, tintHover), hv))
+			canvas.FillRect(r, withAlpha(tint(surface, t.tintOf(tintHover)), hv))
 		}
-		canvas.DrawText(tb.title, geom.Point{X: r.X + tabHPad, Y: vCenterY(f, r.Y, r.H)}, f, col)
+		canvas.DrawText(tb.title, geom.Point{X: r.X + t.px(tabHPad), Y: vCenterY(f, r.Y, r.H)}, f, col)
 	}
 	// Separator line under the strip, with the active-tab underline over it.
 	canvas.DrawLine(geom.Point{X: b.X, Y: b.Y + sh}, geom.Point{X: b.X + b.W, Y: b.Y + sh}, t.ColourOf(RoleBorder), 1)
@@ -218,7 +218,7 @@ func (t *TabContainer) Draw(canvas render.Canvas) {
 	}
 
 	if t.focused {
-		strokeFocusable(canvas, b, 0, t.ColourOf(RoleBorder), t.ColourOf(RoleAccent), true)
+		t.strokeFocusable(canvas, b, 0, true)
 	}
 }
 
@@ -287,14 +287,14 @@ func (t *TabContainer) slideIndicator(from, to int) {
 		t.indAnim.Stop()
 		t.indAnim = nil
 	}
-	if t.ctx == nil || t.ctx.animate == nil || t.face() == nil ||
+	if t.ctx == nil || t.ctx.animate == nil || t.face() == nil || t.reducedMotion() ||
 		from < 0 || from >= len(t.tabs) {
 		t.indT = 1
 		return
 	}
 	t.indFrom, t.indTo = t.indicatorSpan(), t.span(to)
 	t.indT = 0
-	t.indAnim = t.ctx.animate(transitionDuration*1.5, EaseOut, func(v float64) { t.indT = v })
+	t.indAnim = t.ctx.animate(t.motionSeconds()*1.5, EaseOut, func(v float64) { t.indT = v })
 	t.indAnim.OnDone(func() { t.indT = 1; t.indAnim = nil })
 }
 
