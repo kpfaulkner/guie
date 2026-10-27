@@ -101,13 +101,13 @@ go run ./examples/dragdrop    # drag-and-drop between panels
 |---|---|
 | Windows | Developed and tested here. |
 | macOS | Expected to work, **untested**. HiDPI and the Cmd-based shortcuts are implemented but have not been seen on real hardware. |
-| Linux | Expected to work, **untested**. Ebiten needs cgo here, so a C compiler and the X11/GL development packages are required (on Debian/Ubuntu: `libgl1-mesa-dev xorg-dev libasound2-dev`). |
+| Linux | Expected to work, **untested**. Ebiten 2.10+ no longer needs cgo here, so no C compiler or development headers are required to build (`CGO_ENABLED=0` cross-compiles). The X11/GL/ALSA runtime libraries are still needed to run. |
 | Raspberry Pi | Builds natively on a Pi (arm64); a Pi 4 or 5 with the desktop Mesa driver is the realistic target. Untested. |
 | Web (WASM) | The library packages build for `GOOS=js GOARCH=wasm`; running it in a browser has not been tried. |
 
 `guitest` needs no display or GPU, so UI tests run on a headless CI machine. The
-packages still link Ebiten, though, so on Linux and macOS `go test` needs the cgo
-toolchain above (it does not on Windows).
+packages still link Ebiten, so `go test` on Linux and macOS needs the X11/GL
+runtime libraries to link and load, but no C toolchain.
 
 ## Testing
 

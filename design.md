@@ -450,17 +450,14 @@ lives behind the EBiten seam, and the one `runtime.GOOS` check correctly yields
 and runs here" exercise, not a framework one. Findings (verified by cross-compile
 attempts from a Windows dev box):
 
-- **CGo is required on Linux.** Unlike Windows/macOS, there is no CGo-free path:
-  `CGO_ENABLED=0` fails because EBiten's Linux backend pulls in GLFW (OpenGL /
-  X11) via CGo. So a C compiler and the target's dev headers are mandatory.
-- **Build natively on the Pi (recommended).** Install Go for arm64, then the
-  EBiten Linux build deps via apt (`libgl1-mesa-dev xorg-dev libasound2-dev
-  libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev`), then
-  `go build`. CGo "just works" because the compiler and headers are local.
-- **Cross-compiling is fiddly.** `GOOS=linux GOARCH=arm64 CGO_ENABLED=1` needs an
-  ARM cross C toolchain (e.g. `CC="zig cc -target aarch64-linux-gnu"`) *plus* a
-  sysroot of the Pi's X11/GL/ALSA headers. Doable for CI, not worth it for a
-  one-off — prefer the native build.
+- **CGo is not required on Linux (EBiten 2.10+).** guie is on EBiten v2.10.5,
+  whose macOS and Linux/BSD backends no longer use CGo. No C compiler or dev
+  headers are needed to build; the X11/GL/ALSA runtime libraries are still
+  needed on the target.
+- **Cross-compiling is straightforward.** `GOOS=linux GOARCH=arm64
+  CGO_ENABLED=0 go build ./...` from a Windows dev box builds cleanly (checked
+  for linux/amd64, linux/arm64, darwin and windows). Building natively on the Pi
+  also works, with just Go for arm64 installed. Running on the Pi is untested.
 - **Architecture.** Use 64-bit Raspberry Pi OS → `GOARCH=arm64`. 32-bit is
   `GOARCH=arm GOARM=7`; Pi Zero/1 are ARMv6 (`GOARM=6`) and realistically too
   slow to bother with.
