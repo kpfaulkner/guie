@@ -15,6 +15,7 @@ go run ./examples/controls   # TextField, Checkbox, RadioGroup, Slider, Progress
 go run ./examples/scroll     # ScrollView over a tall list (wheel + draggable thumb)
 go run ./examples/showcase   # MenuBar + List + DropdownCombo with popups
 go run ./examples/dialog     # modal dialogs (scrim, blocked background, Esc to close)
+go run ./examples/filedialog # file dialog: open (one or several), save with replace prompt, choose folder, filters, places
 go run ./examples/textarea   # multi-line TextArea: newlines, caret nav, wheel scroll
 go run ./examples/tabs       # TabContainer: switch panes via the tab strip
 go run ./examples/table      # Table: header + weighted columns, selectable scrollable rows
@@ -53,6 +54,7 @@ What each one exercises:
 | `scroll`  | `ScrollView`: wheel + draggable thumb + gutter paging, interactive widgets inside the viewport, `SetHorizontalScroll` with a very wide row (bar along the bottom, Shift+wheel) |
 | `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection, scroll, `OnActivate` on double-click/Enter, `SetHorizontalScroll` with a long row), `DropdownCombo`, overlay popups |
 | `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal; `App.ShowConfirm` (reports once to a callback, `ConfirmLabels`, `ConfirmDefaultCancel`) |
+| `filedialog` | `App.ShowFileDialog`: open (`FileDialogMultiple`), save (`FileDialogName`, `FileDialogDefaultExt`, replace prompt), choose a folder, filters, places pane, hidden toggle, type-ahead; the OS filesystem and an in-memory `fs.FS` via `FSFileSystem` |
 | `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap (toggle with `SetWrap` to see sideways scrolling), selection, double-click selects a word, cut/copy/paste, undo/redo (Ctrl+Z), scrolling |
 | `tabs`    | `TabContainer`: tab strip, click/Left-Right to switch, panes keep their state |
 | `table`   | `Table`: header row, weighted columns, selectable + scrollable body rows, click-header sort (numeric "Years" column); `SetHorizontalScroll` with `Column.MinWidth` (scrolls across when narrow); `OnActivate` on double-click/Enter |

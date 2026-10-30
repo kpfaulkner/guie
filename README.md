@@ -23,7 +23,11 @@ Ebiten.
   `ColourPicker`, `Image`, tooltips and toasts.
 - **Custom drawing:** `CanvasWidget` for charts, paint surfaces and HUDs, drawn
   with the same `render.Canvas` primitives the built-in widgets use.
-- **Dialogs:** modal dialogs, `App.ShowMessage` and `App.ShowConfirm`.
+- **Dialogs:** modal dialogs, `App.ShowMessage` and `App.ShowConfirm`, and a file
+  dialog, `App.ShowFileDialog`, for opening files (one or several), saving (with
+  a replace prompt) and choosing a folder, with a New folder button. It has
+  filters, places, a hidden-files toggle and type-ahead, and browses the OS or
+  any `io/fs.FS`.
 - **Input:** callbacks as the main API plus an optional event bus, focus and Tab
   order, keyboard accelerators, double-click, in-process drag-and-drop, OS file
   drops, clipboard (the OS clipboard by default), and IME for committed text.
@@ -39,7 +43,8 @@ Ebiten.
   (see [Testing](#testing)).
 
 Not done yet: accessibility (screen readers), rich text, data binding, multiple
-OS windows, native file dialogs and a native macOS menu bar. They are tracked in
+OS windows, the operating system's own file dialogs (`ShowFileDialog` is drawn by
+guie, not native) and a native macOS menu bar. They are tracked in
 [`design.md`](design.md).
 
 ## Documentation

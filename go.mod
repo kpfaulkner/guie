@@ -3,7 +3,7 @@ module github.com/kpfaulkner/guie
 go 1.25.0
 
 require (
-	github.com/hajimehoshi/ebiten/v2 v2.10.5e-
+	github.com/hajimehoshi/ebiten/v2 v2.10.5
 	golang.design/x/clipboard v0.8.0
 	golang.org/x/image v0.45.0
 )
