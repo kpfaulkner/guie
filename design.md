@@ -1804,6 +1804,33 @@ Needs a manual run on Windows and Linux; say so in the PR.
      and the label colour, because a mark with only one of them is a bug).
      Not looked at in a real window: an attempt to capture one was stopped when
      another window took the foreground.
+   - **Asynchronous directory reads** (added after step 5). `FileSystem.ReadDir`
+     runs on a background goroutine, so a slow network share or a huge folder
+     no longer freezes the window. The work goes through a new, general
+     `App.Async(work, done)`: `work` runs on its own goroutine and `done` runs on
+     the UI goroutine at the start of a later frame (it is `Do` underneath).
+     `App.AsyncPending()` counts jobs whose `done` has not yet run, which is what
+     lets the headless harness wait for them. In the dialog, `load` starts a
+     read and `navigate(dir, then func(ok bool))` applies it; callers that used
+     to act on the new listing straight after `navigate` (Up selecting the folder
+     just left, a typed file path selecting the file, Save clearing the name
+     after entering a folder) now do it in `then`. While a read runs the dialog
+     keeps its old listing and stays responsive. After 150 ms the status line
+     says "Loading <dir>..."; a quick read never shows it. Reads are numbered, and
+     a later one supersedes an earlier one, so clicking A then B lands in B even
+     if A answers last. A result that arrives after the dialog closed is dropped,
+     which also stops a start-directory fallback from carrying on after Cancel.
+     OK and Enter do nothing until the first listing has arrived (there is no
+     directory to resolve a typed name against). Only `ReadDir` is moved off the
+     UI goroutine: `Stat` (a typed path, Save's overwrite check) and `Mkdir` are
+     still synchronous, and so can still stall on a hung share. A `FileSystem`
+     must now allow `ReadDir` to run alongside its other methods; both bundled
+     ones do. In tests, `Harness.Step` waits for `App.Async` work and delivers it
+     before returning, so the existing tests did not change; `HoldAsync(true)`
+     turns that off to look at the in-flight state. Tests: `ui/app_async_test.go`
+     (3) and `guitest/filedialog_async_test.go` (7, using a filesystem that holds
+     chosen reads). Not run with the race detector (no cgo toolchain here), so
+     that is worth doing on Linux or macOS.
 
 Steps 1-3 were the useful core; 4 and 5 could have slipped without blocking a
 release.

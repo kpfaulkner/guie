@@ -175,6 +175,9 @@ type fileDialog struct {
 
 	reselecting bool // restoring a selection after a re-sort; selection handlers must not touch the name field
 
+	loadGen  int  // numbers directory reads; only the latest one's result is used
+	loadBusy bool // the read numbered loadGen has not come back yet
+
 	typed      typeAhead   // letters typed in the listing, for jumping to an entry
 	placeCells []placeCell // the places pane, empty when there is none
 
@@ -364,11 +367,15 @@ func (d *fileDialog) openInitialDir() {
 		tries = append(tries, h)
 	}
 	tries = append(tries, d.fsys.Roots()[0].Path)
-	for _, dir := range tries {
-		if d.navigate(dir) {
-			return
-		}
+	var try func(i int)
+	try = func(i int) {
+		d.navigate(tries[i], func(ok bool) {
+			if !ok && i+1 < len(tries) {
+				try(i + 1)
+			}
+		})
 	}
+	try(0)
 }
 
 // resolve reports the result to the caller, once.
@@ -403,28 +410,68 @@ func (d *fileDialog) setStatus(msg string, isErr bool) {
 	d.status.SetText(msg)
 }
 
-// navigate lists dir and makes it the current directory. If it cannot be read
-// the dialog stays where it was, shows why, and navigate returns false.
-func (d *fileDialog) navigate(dir string) bool {
-	ents, err := d.fsys.ReadDir(dir)
-	if err != nil {
-		d.setStatus(err.Error(), true)
-		d.pathField.SetText(d.dir)
-		return false
-	}
-	d.dir = dir
-	d.entries = ents
-	d.pathField.SetText(dir)
-	if d.mode != FileSave { // a name being typed for Save survives browsing
-		d.nameField.SetText("")
-		d.autoName = ""
-	}
-	d.setStatus("", false)
-	_, hasParent := d.fsys.Parent(dir)
-	d.up.SetEnabled(hasParent)
-	d.updatePlaces()
-	d.refresh()
-	return true
+// loadingHintDelay is how long a directory read runs before the dialog says it
+// is loading, so a quick read never flashes the message.
+const loadingHintDelay = 150 * time.Millisecond
+
+// load reads dir off the UI goroutine, so a slow disk or network share does not
+// freeze the window, and calls then with the result on the UI goroutine. The
+// dialog keeps showing (and answering to) the old listing meanwhile. A later load
+// supersedes an earlier one, whose result is dropped, as is any result that
+// arrives after the dialog has closed.
+func (d *fileDialog) load(dir string, then func(ents []fs.FileInfo, err error)) {
+	d.loadGen++
+	gen := d.loadGen
+	d.loadBusy = true
+	hint := time.AfterFunc(loadingHintDelay, func() {
+		d.app.Do(func() {
+			if d.loadBusy && d.loadGen == gen && !d.done {
+				d.setStatus("Loading "+dir+"...", false)
+			}
+		})
+	})
+	var ents []fs.FileInfo
+	var err error
+	d.app.Async(func() { ents, err = d.fsys.ReadDir(dir) }, func() {
+		hint.Stop()
+		if d.loadGen != gen || d.done {
+			return
+		}
+		d.loadBusy = false
+		then(ents, err)
+	})
+}
+
+// navigate lists dir and makes it the current directory, then calls then (if not
+// nil) with whether that worked. The read is asynchronous, so then is how a
+// caller acts on the new listing. If dir cannot be read the dialog stays where it
+// was and shows why.
+func (d *fileDialog) navigate(dir string, then func(ok bool)) {
+	d.load(dir, func(ents []fs.FileInfo, err error) {
+		if err != nil {
+			d.setStatus(err.Error(), true)
+			d.pathField.SetText(d.dir)
+			if then != nil {
+				then(false)
+			}
+			return
+		}
+		d.dir = dir
+		d.entries = ents
+		d.pathField.SetText(dir)
+		if d.mode != FileSave { // a name being typed for Save survives browsing
+			d.nameField.SetText("")
+			d.autoName = ""
+		}
+		d.setStatus("", false)
+		_, hasParent := d.fsys.Parent(dir)
+		d.up.SetEnabled(hasParent)
+		d.updatePlaces()
+		d.refresh()
+		if then != nil {
+			then(true)
+		}
+	})
 }
 
 // goUp moves to the parent directory and selects the one just left.
@@ -434,15 +481,17 @@ func (d *fileDialog) goUp() {
 		return
 	}
 	from := d.dir
-	if !d.navigate(parent) {
-		return
-	}
-	for _, e := range d.shown {
-		if e.IsDir() && d.fsys.Join(parent, e.Name()) == from {
-			d.selectName(e.Name())
+	d.navigate(parent, func(ok bool) {
+		if !ok {
 			return
 		}
-	}
+		for _, e := range d.shown {
+			if e.IsDir() && d.fsys.Join(parent, e.Name()) == from {
+				d.selectName(e.Name())
+				return
+			}
+		}
+	})
 }
 
 // goToTyped handles Enter in the path field: a directory is opened, a file
@@ -459,16 +508,23 @@ func (d *fileDialog) goToTyped(text string) {
 	case err != nil:
 		d.setStatus(err.Error(), true)
 	case info.IsDir():
-		d.navigate(target)
+		d.navigate(target, nil)
 	default:
-		if parent, ok := d.fsys.Parent(target); ok && d.navigate(parent) {
-			d.selectName(info.Name())
+		if parent, ok := d.fsys.Parent(target); ok {
+			d.navigate(parent, func(ok bool) {
+				if ok {
+					d.selectName(info.Name())
+				}
+			})
 		}
 	}
 }
 
 // accept handles OK and Enter in the name field, by mode.
 func (d *fileDialog) accept() {
+	if d.dir == "" {
+		return // the first listing has not arrived, so there is no directory to resolve against
+	}
 	switch d.mode {
 	case FileSave:
 		d.acceptSave()
@@ -489,9 +545,11 @@ func (d *fileDialog) acceptSave() {
 		return
 	}
 	if info, err := d.fsys.Stat(d.fsys.Resolve(d.dir, text)); err == nil && info.IsDir() {
-		if d.navigate(d.fsys.Resolve(d.dir, text)) {
-			d.nameField.SetText("")
-		}
+		d.navigate(d.fsys.Resolve(d.dir, text), func(ok bool) {
+			if ok {
+				d.nameField.SetText("")
+			}
+		})
 		return
 	}
 	target, exists, err := saveTarget(d.fsys, d.dir, text, d.cfg.defaultExt)
@@ -549,7 +607,7 @@ func (d *fileDialog) acceptOpen() {
 	}
 	if text == "" {
 		if e := d.selectedEntry(); e != nil && e.IsDir() {
-			d.navigate(d.fsys.Join(d.dir, e.Name()))
+			d.navigate(d.fsys.Join(d.dir, e.Name()), nil)
 			return
 		}
 		d.setStatus("Choose a file.", true)
@@ -563,7 +621,7 @@ func (d *fileDialog) acceptOpen() {
 	case err != nil:
 		d.setStatus(err.Error(), true)
 	case info.IsDir():
-		d.navigate(target)
+		d.navigate(target, nil)
 	default:
 		d.finish([]string{target}, true)
 	}
@@ -608,7 +666,7 @@ func (d *fileDialog) activateRow(i int) {
 	target := d.fsys.Join(d.dir, e.Name())
 	switch {
 	case e.IsDir():
-		d.navigate(target)
+		d.navigate(target, nil)
 	case d.mode == FileSave:
 		d.nameField.SetText(e.Name())
 		d.acceptSave()
@@ -848,15 +906,17 @@ func (d *fileDialog) newFolder() {
 // reloadAndSelect re-reads the current directory, which something outside the
 // dialog has changed, and selects name in it.
 func (d *fileDialog) reloadAndSelect(name string) {
-	ents, err := d.fsys.ReadDir(d.dir)
-	if err != nil {
-		d.setStatus(err.Error(), true)
-		return
-	}
-	d.entries = ents
-	d.refresh()
-	d.selectName(name)
-	d.setStatus(fmt.Sprintf("Created folder %q.", name), false)
+	dir := d.dir
+	d.load(dir, func(ents []fs.FileInfo, err error) {
+		if err != nil {
+			d.setStatus(err.Error(), true)
+			return
+		}
+		d.entries = ents
+		d.refresh()
+		d.selectName(name)
+		d.setStatus(fmt.Sprintf("Created folder %q.", name), false)
+	})
 }
 
 // fileDialogPlace is one shortcut in the places pane.
@@ -902,7 +962,7 @@ func (d *fileDialog) placesPane(places []fileDialogPlace) Widget {
 		p := p
 		b := NewButton(p.name, ButtonFlat())
 		b.OnClick(func() {
-			d.navigate(p.path)
+			d.navigate(p.path, nil)
 			d.table.RequestFocus()
 		})
 		cell := NewContainer()

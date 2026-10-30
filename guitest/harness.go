@@ -1,8 +1,10 @@
 package guitest
 
 import (
+	"fmt"
 	"io/fs"
 	"testing/fstest"
+	"time"
 
 	"github.com/kpfaulkner/guie/geom"
 	"github.com/kpfaulkner/guie/render"
@@ -27,6 +29,8 @@ type Harness struct {
 	driver *driver
 	last   *Recording
 	err    error
+
+	holdAsync bool // Step does not wait for App.Async work
 
 	mouse geom.Point
 	down  render.ButtonSet
@@ -101,7 +105,36 @@ func (h *Harness) DropFiles(files map[string][]byte) *Recording {
 // Step runs one frame with the currently accumulated input, stores and returns
 // the frame's Recording, and clears the per-frame input edges (held mouse
 // buttons and keys persist).
+//
+// Work started with App.Async is waited for and its result delivered before Step
+// returns, by running further frames with no input, so a test sees the settled
+// state. HoldAsync turns that off.
 func (h *Harness) Step() *Recording {
+	rec := h.frame()
+	deadline := time.Now().Add(asyncWait)
+	// A job counts until its result has run, and results run at the start of a
+	// frame, so keep stepping (with no input) until none is left.
+	for !h.holdAsync && h.App.AsyncPending() > 0 {
+		if time.Now().After(deadline) {
+			h.err = fmt.Errorf("guitest: App.Async work still running after %v", asyncWait)
+			return rec
+		}
+		time.Sleep(50 * time.Microsecond)
+		rec = h.frame()
+	}
+	return rec
+}
+
+// asyncWait is how long Step waits for App.Async work before giving up.
+const asyncWait = 5 * time.Second
+
+// HoldAsync controls whether Step waits for App.Async work. It does by default;
+// pass true to observe the app while background work is still running, and false
+// (then Step) to let it land.
+func (h *Harness) HoldAsync(hold bool) { h.holdAsync = hold }
+
+// frame runs one frame; see Step.
+func (h *Harness) frame() *Recording {
 	in := render.InputState{
 		MousePos:      h.mouse,
 		MouseDown:     h.down,

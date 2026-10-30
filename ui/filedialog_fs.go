@@ -24,6 +24,10 @@ type FileRoot struct {
 //
 // Paths are opaque to the dialog: it only passes back what a FileSystem handed
 // it, or what Resolve returned for text the user typed.
+//
+// The dialog calls ReadDir on a background goroutine, so a slow directory does
+// not freeze the window, while it calls everything else on the UI goroutine. A
+// FileSystem must therefore allow ReadDir to run alongside its other methods.
 type FileSystem interface {
 	// Roots lists the top-level places (drives). It never returns an empty slice.
 	Roots() []FileRoot

@@ -44,9 +44,10 @@ type App struct {
 	shadows   bool // draw drop shadows under overlays/tooltips
 	debug     bool // draw a debug outline around every widget's bounds
 
-	mu      sync.Mutex  // guards pending
-	pending []func()    // work queued via Do, run at the start of each frame
-	quit    atomic.Bool // set by Quit to stop the loop
+	mu      sync.Mutex   // guards pending
+	pending []func()     // work queued via Do, run at the start of each frame
+	quit    atomic.Bool  // set by Quit to stop the loop
+	bg      atomic.Int32 // background jobs started by Async that have not queued their result yet
 
 	closeReq func() bool // set by OnCloseRequest; vetoes window closing when it returns false
 
@@ -279,6 +280,35 @@ func (a *App) Do(fn func()) {
 	a.mu.Unlock()
 	a.Invalidate()
 }
+
+// Async runs work on its own goroutine, then runs done on the UI goroutine at the
+// start of a following frame (as Do does). Use it for something slow, such as
+// reading a directory on a network share, so the window keeps responding. work
+// must not touch widgets; whatever it produces reaches the UI through a variable
+// that done reads. Call it from the UI goroutine; done may call it again.
+//
+// A nil work does nothing. A nil done just runs work.
+func (a *App) Async(work, done func()) {
+	if work == nil {
+		return
+	}
+	a.bg.Add(1)
+	go func() {
+		work()
+		// The job counts until done has run (after it, so a done that starts more
+		// work never lets the count touch zero in between).
+		a.Do(func() {
+			if done != nil {
+				done()
+			}
+			a.bg.Add(-1)
+		})
+	}()
+}
+
+// AsyncPending reports how many Async jobs have not yet had their result run on
+// the UI goroutine. It is for tests that need to wait for background work to land.
+func (a *App) AsyncPending() int { return int(a.bg.Load()) }
 
 // Invalidate asks for one frame to be drawn. It is safe to call from any
 // goroutine.
