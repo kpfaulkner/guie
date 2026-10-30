@@ -192,6 +192,47 @@ dialog** — `Tab` can't reach the blocked widgets behind it.
 
 > Runnable demo: [`examples/dialog`](../examples/dialog).
 
+### File dialogs
+
+`ShowFileDialog` is a ready-made modal for choosing files. Like `ShowConfirm` it
+reports once to a callback: `ok` is false (and `paths` nil) for Cancel, `Escape`
+or any other close.
+
+```go
+app.ShowFileDialog(ui.FileOpen, func(paths []string, ok bool) {
+    if ok {
+        open(paths[0])
+    }
+},
+    ui.FileDialogFilters(
+        ui.FileFilter{Name: "Images", Patterns: []string{"*.png", "*.jpg"}},
+        ui.FileFilter{Name: "All files"},
+    ),
+)
+```
+
+The mode picks what it chooses: `ui.FileOpen` an existing file (add
+`ui.FileDialogMultiple()` for several), `ui.FileSave` a file name, which asks
+before replacing an existing file and can add a default extension
+(`ui.FileDialogDefaultExt("txt")`), and `ui.FileSelectDir` a folder. It browses
+the real filesystem by default; `ui.FileDialogFS(ui.FSFileSystem(fsys))` browses
+any `io/fs.FS` instead, such as an `embed.FS`, and is what the tests use. Paths
+from an `fs.FS` start with a slash (`/docs/a.txt`): strip it before opening them
+in that `fs.FS`.
+
+The dialog only chooses; it never reads or writes the file. The user can switch
+drives and jump to home folders from the places pane, toggle hidden files, sort by
+a column header, and type to jump to an entry. `Backspace` or `Alt+Up` goes to the
+parent folder.
+
+Save and folder dialogs also get a **New folder** button, which asks for a name and
+creates the folder in the directory being browsed. It appears only when the
+filesystem can create directories: the real one can, `FSFileSystem` over an
+`fs.FS` cannot, because an `fs.FS` is read-only. A custom `ui.FileSystem` opts in
+by also implementing `ui.DirMaker` (a single `Mkdir(path string) error` method).
+
+> Runnable demo: [`examples/filedialog`](../examples/filedialog).
+
 ### Non-modal popups
 
 Dropdowns and menus are overlays too, but **non-modal**: they float above the UI

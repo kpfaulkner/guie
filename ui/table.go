@@ -56,10 +56,17 @@ type Table struct {
 	sortAsc  bool // sort direction
 	striped  bool // alternate rows get a subtle tint
 
-	onSelect      func(int)
-	onActivate    func(int)
-	onHeaderClick func(int)
-	font          render.FontFace
+	// Multiple selection (see table_multi.go). selected stays the active row; sel
+	// is the set of selected rows, parallel to rows, and only used when multi.
+	multi  bool
+	sel    []bool
+	anchor int // fixed end of a Shift range, -1 = none
+
+	onSelect          func(int)
+	onSelectionChange func([]int)
+	onActivate        func(int)
+	onHeaderClick     func(int)
+	font              render.FontFace
 }
 
 // NewTable returns a Table with the given columns. Click-to-sort is enabled by
@@ -69,6 +76,7 @@ func NewTable(columns []Column) *Table {
 		BaseWidget: NewBase(),
 		columns:    columns,
 		selected:   -1,
+		anchor:     -1,
 		hoverRow:   -1,
 		hoverCol:   -1,
 		sortable:   true,
@@ -140,6 +148,14 @@ func (t *Table) applySort() {
 		return
 	}
 	sel := t.selectedRow()
+	var picked map[*string]bool // multiple selection follows its rows through the sort
+	var anchorRow []string
+	if t.multi {
+		picked = t.pickedRows()
+		if t.anchor >= 0 && t.anchor < len(t.rows) {
+			anchorRow = t.rows[t.anchor]
+		}
+	}
 	c := t.sortCol
 	less := t.columns[c].Less
 	sort.SliceStable(t.rows, func(i, j int) bool {
@@ -153,6 +169,9 @@ func (t *Table) applySort() {
 		return a < b
 	})
 	t.restoreSelection(sel)
+	if t.multi {
+		t.restoreMulti(picked, anchorRow)
+	}
 	t.clamp()
 	t.Invalidate()
 }
@@ -193,7 +212,10 @@ func sameRow(a, b []string) bool {
 	return len(a) > 0 && len(b) > 0 && &a[0] == &b[0]
 }
 
-// OnSelect registers the handler invoked with the newly selected row index.
+// OnSelect registers the handler invoked with the newly selected row index. With
+// multiple selection it reports the active row each time it becomes selected,
+// not rows that are deselected or that a Ctrl/Cmd+arrow merely moves the cursor
+// onto; use OnSelectionChange to follow the whole set.
 func (t *Table) OnSelect(fn func(int)) { t.onSelect = fn }
 
 // OnActivate registers the handler invoked with a row index when that row is
@@ -206,6 +228,7 @@ func (t *Table) OnActivate(fn func(int)) { t.onActivate = fn }
 func (t *Table) SetRows(rows [][]string) {
 	t.rows = rows
 	t.selected = -1
+	t.sel, t.anchor = nil, -1
 	t.offset = 0
 	t.Invalidate()
 }
@@ -216,7 +239,9 @@ func (t *Table) AddRow(cells ...string) {
 	t.Invalidate()
 }
 
-// Selected returns the selected row index, or -1.
+// Selected returns the selected row index, or -1. With multiple selection it is
+// the active row, the one last clicked or moved to, which after a Ctrl/Cmd+click
+// that deselects it is not necessarily selected; use SelectedRows for the set.
 func (t *Table) Selected() int { return t.selected }
 
 // RowCount returns the number of rows.
@@ -233,14 +258,25 @@ func (t *Table) Row(i int) []string {
 	return t.rows[i]
 }
 
-// SetSelected sets the selection and fires OnRowSelect if it changed.
+// SetSelected selects row i, and only row i, firing OnSelect and
+// OnSelectionChange if that changed anything.
 func (t *Table) SetSelected(i int) {
-	if i < 0 || i >= len(t.rows) || i == t.selected {
+	if i < 0 || i >= len(t.rows) {
+		return
+	}
+	if t.multi {
+		t.commit(rowSet(len(t.rows), i), i, i)
+		return
+	}
+	if i == t.selected {
 		return
 	}
 	t.selected = i
 	if t.onSelect != nil {
 		t.onSelect(i)
+	}
+	if t.onSelectionChange != nil {
+		t.onSelectionChange([]int{i})
 	}
 }
 
@@ -524,15 +560,21 @@ func (t *Table) Draw(canvas render.Canvas) {
 		}
 		rowRect := geom.Rect{X: b.X - t.offsetX, Y: y, W: g.totalW, H: rh}
 		textColour := t.ColourOf(RoleText)
-		if t.striped && i%2 == 1 && i != t.selected && i != t.hoverRow {
+		if t.striped && i%2 == 1 && !t.isSelected(i) && i != t.hoverRow {
 			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), t.tintOf(tintHeader)/2))
 		}
 		switch {
-		case i == t.selected:
+		case t.isSelected(i):
 			canvas.FillRect(rowRect, t.ColourOf(RolePrimary))
 			textColour = t.ColourOf(RoleOnPrimary)
 		case i == t.hoverRow:
 			canvas.FillRect(rowRect, tint(t.ColourOf(RoleSurface), t.tintOf(tintHover)))
+		}
+		if t.multi && t.focused && i == t.selected && !t.isSelected(i) {
+			// The keyboard cursor, when it is on a row that is not selected (after
+			// Ctrl+arrow, or Space deselecting it): without it the user could not
+			// tell where Space would act.
+			canvas.StrokeRect(geom.Rect{X: rowRect.X + 0.5, Y: rowRect.Y + 0.5, W: rowRect.W - 1, H: rowRect.H - 1}, t.ColourOf(RoleAccent), 1)
 		}
 		for c := range t.columns {
 			if c >= len(row) {
@@ -650,7 +692,7 @@ func (t *Table) HandleEvent(ev *Event) bool {
 			return true
 		}
 		if i := t.rowAt(ev.Pos.Y); i >= 0 {
-			t.SetSelected(i)
+			t.clickRow(i, ev.Modifiers)
 		}
 		return true
 	case EventDoubleClick:
@@ -680,21 +722,25 @@ func (t *Table) HandleEvent(ev *Event) bool {
 		t.hoverRow = -1
 		return true
 	case EventKeyDown:
-		return t.handleKey(ev.Key)
+		return t.handleKey(ev.Key, ev.Modifiers)
 	}
 	return false
 }
 
-func (t *Table) handleKey(k render.Key) bool {
+func (t *Table) handleKey(k render.Key, mods render.ModifierSet) bool {
 	switch k {
-	case render.KeyDown:
-		t.moveSelection(1)
-	case render.KeyUp:
-		t.moveSelection(-1)
-	case render.KeyHome:
-		t.selectAndShow(0)
-	case render.KeyEnd:
-		t.selectAndShow(len(t.rows) - 1)
+	case render.KeyDown, render.KeyUp, render.KeyHome, render.KeyEnd:
+		t.navigate(k, t.navModeFor(mods))
+	case render.KeySpace:
+		if !t.multi || mods.Has(render.ModAlt) {
+			return false
+		}
+		t.toggleActive()
+	case render.KeyA:
+		if !t.multi || !mods.Has(render.ModPrimary) {
+			return false
+		}
+		t.selectAll()
 	case render.KeyLeft, render.KeyRight:
 		if !t.hscroll {
 			return false
@@ -716,14 +762,6 @@ func (t *Table) handleKey(k render.Key) bool {
 		return false
 	}
 	return true
-}
-
-func (t *Table) moveSelection(delta int) {
-	next := t.selected + delta
-	if t.selected < 0 {
-		next = 0
-	}
-	t.selectAndShow(next)
 }
 
 func (t *Table) selectAndShow(i int) {

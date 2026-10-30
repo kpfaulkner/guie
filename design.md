@@ -1305,6 +1305,532 @@ is all it can offer; the example sets one as a habit.
 
 ---
 
+## FILE DIALOG (IN-TOOLKIT OPEN / SAVE / PICK-DIRECTORY)
+
+*Status: all five phases done (see Build order): open, save, select-folder, multi-select, places pane, hidden toggle and type-ahead. Not yet run in a real window.*
+
+A modal file picker drawn by guie itself, built from existing widgets. It is the
+answer to "native file dialogs" in the README's not-done list, with one caveat:
+it is **not** the OS dialog. A native wrapper (e.g. `ncruces/zenity`) is a
+separate, optional helper and is out of scope here (see Out of scope).
+
+### Why in-toolkit
+
+- **Themed and testable.** It follows the active `Theme`, and runs in `guitest`
+  with no window, GPU or OS dialog.
+- **Works everywhere guie does**, including WASM, where there is no native picker
+  and no filesystem path (see "Payload: `fs.FS`, not paths" under OS file drops).
+- **No cgo.** The usual Go pickers need GTK/Cocoa; that breaks the Windows-edit,
+  Linux-build workflow.
+- The parts already exist: `ShowModal`, `Table`, `List`/`Tree`, `Splitter`,
+  `TextField`, `Dropdown`, `Checkbox`, `Button`, `ShowConfirm`.
+
+### What it is made of
+
+```
++-- Open file ------------------------------------------+
+| [<Up]  [ /home/ken/projects                         ]  |
+| +-----------+---------------------------------------+  |
+| | Places    | Name              Size    Modified    |  |
+| | > Home    | src/                      2026-10-01  |  |
+| | > Desktop | README.md         3.1 KB  2026-10-29  |  |
+| | > C:      | go.mod            0.4 KB  2026-10-30  |  |
+| | > D:      |                                       |  |
+| +-----------+---------------------------------------+  |
+| File name: [ README.md                ] [Images (*.png)v]|
+| [ ] Show hidden                      [Cancel]  [Open]  |
++--------------------------------------------------------+
+```
+
+Path bar = `TextField` plus an Up `Button`. Places = `List` in the left pane of a
+`Splitter`. Listing = `Table` (name, size, modified). Footer = `TextField`,
+`Dropdown`, `Checkbox`, two `Button`s. All inside one `ShowModal` panel.
+
+### API - mirrors `ShowConfirm` / `ConfirmOption`
+
+One entry point, functional options, callback fires **exactly once**.
+
+```go
+// FileDialogMode picks what the dialog selects.
+type FileDialogMode int
+
+const (
+	FileOpen      FileDialogMode = iota // choose existing file(s)
+	FileSave                            // choose a (possibly new) file name
+	FileSelectDir                       // choose a directory
+)
+
+// FileFilter is one entry in the filter dropdown. Patterns are path.Match
+// patterns matched case-insensitively against the base name; directories are
+// always shown. An empty Patterns list matches everything.
+type FileFilter struct {
+	Name     string   // "Images"
+	Patterns []string // "*.png", "*.jpg"
+}
+
+// ShowFileDialog shows a modal file dialog. onResult is called exactly once:
+// ok is true with at least one path when the user confirmed, and false with a
+// nil slice for Cancel, Escape, or any other close (App.Close, App.closeAll).
+// Paths are in the FileSystem's own form (absolute filepath for the OS one).
+// Keyboard focus returns to whatever held it before the dialog opened.
+func (a *App) ShowFileDialog(mode FileDialogMode,
+	onResult func(paths []string, ok bool), opts ...FileDialogOption) *Popup
+
+type FileDialogOption func(*fileDialogConfig)
+
+func FileDialogTitle(s string) FileDialogOption          // default per mode
+func FileDialogLabels(ok, cancel string) FileDialogOption // default "Open"/"Save"/"Select", "Cancel"
+func FileDialogFS(fsys FileSystem) FileDialogOption       // default OSFileSystem()
+func FileDialogStart(dir string) FileDialogOption         // default: FS home, else first root
+func FileDialogName(name string) FileDialogOption         // prefilled name (Save)
+func FileDialogFilters(f ...FileFilter) FileDialogOption  // first is the default
+func FileDialogMultiple() FileDialogOption                // FileOpen only; uses Table multi-select
+func FileDialogShowHidden(on bool) FileDialogOption       // initial state of the checkbox
+func FileDialogDefaultExt(ext string) FileDialogOption    // Save: appended if the name has none
+func FileDialogNoOverwritePrompt() FileDialogOption       // Save: skip the "replace?" confirm
+```
+
+No per-mode wrappers (`ShowOpenFile` etc.) in v1: one symbol keeps the surface
+small before the API freeze, and wrappers are additive later.
+
+### FileSystem seam
+
+Hard-coding `os` would make the dialog untestable and desktop-only. A small
+interface in `ui` (stdlib types only, so `render` stays untouched):
+
+```go
+// FileSystem is what the dialog browses.
+type FileSystem interface {
+	Roots() []FileRoot                         // drives / top-level places
+	Home() string                              // "" if none
+	ReadDir(dir string) ([]fs.FileInfo, error) // unsorted, unfiltered
+	Stat(path string) (fs.FileInfo, error)     // follows symlinks
+	Join(dir, name string) string
+	Resolve(dir, p string) string              // typed text -> clean path; no disk access
+	Parent(path string) (string, bool)         // false at a root
+}
+
+type FileRoot struct{ Name, Path string }
+
+// DirMaker is optional. A dialog offers New folder only if its FileSystem
+// implements it (added after step 5).
+type DirMaker interface{ Mkdir(path string) error }
+
+func OSFileSystem() FileSystem            // filepath semantics; drives on Windows
+func FSFileSystem(fsys fs.FS) FileSystem  // rooted slash paths ("/docs/a.txt") over any io/fs.FS
+```
+
+- `OSFileSystem` lists drives with a build-tagged helper (`GetLogicalDrives` on
+  Windows, `/` elsewhere). It must not `Stat` `A:`..`Z:` in a loop: that stalls
+  on empty or network drives.
+- `FSFileSystem` covers `embed.FS`, a dropped-files `fs.FS`, WASM, and **tests**
+  (`fstest.MapFS`), so no hand-written fake is needed.
+- Separator handling lives only in the two implementations. The dialog never
+  calls `filepath` or `path` itself.
+
+### Behaviour
+
+- **Open.** Single click selects and copies the name into the name field.
+  Double-click / Enter on a directory navigates; on a file it confirms. Typing a
+  path in the name field: an existing directory navigates, an existing file
+  confirms, a missing one keeps the dialog open with an inline error.
+- **Save.** Name field is required. If the target exists, `ShowConfirm`
+  ("Replace X?") stacks over the dialog, default focus on Cancel
+  (`ConfirmDefaultCancel`). `FileDialogDefaultExt` is applied before the exists
+  check, so the prompt names the real file.
+- **SelectDir.** Table lists directories only; OK returns the selected
+  directory, or the current one if none is selected.
+- **Listing.** Directories first, then files; within each, by the active sort.
+  Hidden = leading `.`, except on Windows where it is the file's hidden
+  attribute (see step 5).
+- **Sorting is the dialog's, not the table's.** `Column.Less` sees only cell
+  strings, so it cannot group directories first or compare sizes and dates
+  properly. The dialog calls `Table.SetSortable(false)`, handles
+  `OnHeaderClick`, sorts its own `[]fs.FileInfo`, and calls `SetRows`. A row
+  index maps straight to an entry; no re-lookup by name cell.
+- **Errors.** `ReadDir` failure (permissions, vanished dir) shows a one-line
+  status under the listing and stays in the previous directory. Never a panic,
+  never an empty listing that looks like success.
+- **Filter.** Changing it refilters in memory; no re-read.
+- **Keys.** Enter = default button, Escape = Cancel, Backspace in the listing =
+  Up, Alt+Up = Up. Typing jumps to the entry starting with the typed letters
+  (step 5).
+- **Sizing.** `ShowModal` sizes to `MinSize`, so the panel reports about
+  640x420 clamped to the surface. It does not resize with the window while open.
+- **Remembering the last directory** is the caller's job (`FileDialogStart`).
+  No hidden global state; same stance as `WithWindowStateFile` being opt-in.
+
+### Facts about existing widgets this design relies on
+
+Checked in the code, not assumed:
+
+- `Table` culls off-screen rows in `Draw`, so a directory of thousands of
+  entries costs a row-sized draw per frame, not a directory-sized one. Rows are
+  `[]string`, so `SetRows` rebuilds are cheap but the model lives in the dialog.
+- `Table` was **single-select only**, so `FileDialogMultiple` needed a `Table`
+  extension first (phase 4, done). It is the only widget change in the plan.
+- `Table` is text-only. No file/folder icons in v1: directories get a trailing
+  separator (`src/`). Icons wait on image cells (open question).
+- `ShowConfirm` already shows the pattern for exactly-once results, focus
+  restore and `onClose` wiring; `ShowFileDialog` copies it.
+
+### Design decisions (locked)
+
+- In-toolkit, built from existing widgets; no new drawing primitives.
+- One entry point `ShowFileDialog` + options; callback exactly once.
+- `FileSystem` interface with `OSFileSystem` and `FSFileSystem`; no direct `os`
+  use in the dialog.
+- Dialog owns sorting and filtering; `Table` stays a dumb grid.
+- Synchronous `ReadDir` in v1.
+- No native-dialog fallback inside this API.
+
+### Open questions
+
+- ~~**Stacked modals.**~~ Resolved by the phase 0 spike: `ShowConfirm` over a
+  `ShowModal` becomes the active modal, and closing it leaves the first modal
+  open and active again.
+- **Slow directories.** Network mounts can block `ReadDir` and freeze the frame.
+  Option: read in a goroutine, show "Loading...", post the result back to the
+  UI thread. Needs a thread-safe post primitive; check whether `App` has one.
+  Defer until a real app hits it, but keep `ReadDir` behind one method so the
+  change is local.
+- **Icons.** Needs `Table` image cells, or a custom-drawn listing built on
+  `CanvasWidget`. Not worth it for v1.
+- **Resizable dialog.** Would need a resize handle on `Popup`; separate feature.
+- ~~**Places beyond drives and home.**~~ Resolved in step 5: Desktop, Documents
+  and Downloads are offered when they exist under home, found by `Stat` rather
+  than by asking the OS for localised names.
+
+### Tests
+
+Pure logic in `ui` (table-driven, no UI): filter matching (case, multi-pattern,
+empty), sort order (dirs first, size/date/name, both directions, stability),
+human-readable size, `FSFileSystem` Join/Parent at the root, the Save extension
+and overwrite decision.
+
+Dialog behaviour in `guitest` over `fstest.MapFS`:
+
+- Navigate in via double-click and Enter, up via button, Backspace and path bar.
+- Open confirms a file; Escape and Cancel give `ok == false`; callback fires
+  once on every path, including `App.Close`.
+- Save: missing file confirms directly; existing file raises the confirm;
+  Cancel on it returns to the dialog; default ext appended.
+- SelectDir lists only directories and returns the right one.
+- Filter dropdown hides non-matching files but keeps directories.
+- `ReadDir` error shows status and keeps the old listing (use a wrapper FS that
+  fails on one path).
+- Focus returns to the prior widget after close.
+- Recorded draw ops: dialog uses theme colours after `SetTheme`.
+
+Not covered headlessly: the real `OSFileSystem` (drive discovery, permissions).
+Needs a manual run on Windows and Linux; say so in the PR.
+
+### Build order (each step ships on its own)
+
+0. **Spike (no commit-worthy code).** Confirm stacked modals, a 640x420 modal
+   fits and lays out `Splitter` + `Table`, and a 5,000-row `Table` stays smooth.
+   Resolves the first open question and the Table-scale risk early.
+   *Done. Findings:*
+   - Stacked modals work (see open questions).
+   - `ShowModal` sizes to `MinSize`, and nothing offers a fixed size. The dialog
+     needs a small wrapper widget that embeds its panel `Container` and
+     overrides `MinSize` (about 640x420, clamped to the surface). In the spike
+     that wrapper centred correctly at 640x420 on a 1024x768 surface.
+   - The panel must use `VBox` with `Weight(1)` on the `HSplit` for the split to
+     get any size. A bare `Container` gave the table zero bounds.
+   - `Table` inside `HSplit` inside a modal drew only the visible rows (48
+     texts) at 50, 5,000 and 50,000 rows. Headless frame cost was 19us, 23us
+     and 72us: nearly flat, with a small linear part. That is op recording, not
+     GPU time, so the "smooth with thousands of rows" claim is still only
+     checked for the CPU side; confirm in a real window during phase 2.
+1. **`FileSystem` + pure logic.** `FileSystem`, both implementations, filter,
+   sort, size formatting, with their unit tests. No UI.
+   *Done* in `ui/filedialog_fs.go`, `ui/filedialog_logic.go`,
+   `ui/filedialog_roots_{windows,other}.go` and their `_test.go` files.
+   Changes from the sketch above:
+   - `FileSystem` gained `Resolve(dir, p)`, so the dialog never needs
+     `filepath.IsAbs` or `path.Join` for text typed in the path or name field.
+   - `FileFilter` is exported now; `matches`, `visibleEntries`, `sortEntries`,
+     `humanSize`, `formatModTime`, `withDefaultExt` and `saveTarget` are
+     unexported helpers for the dialog.
+   - Windows drives come from `GetLogicalDrives` via stdlib `syscall`, not
+     `golang.org/x/sys`, to keep the module's direct dependencies unchanged.
+   - Symbolic links are followed inside `ReadDir`, so a link to a directory is
+     navigable; a broken link stays listed as a plain file.
+   - Sort order was plain case-insensitive at step 1 ("file10" before "file2").
+     It is natural now: see "Natural sort order" under step 5.
+   - `TestOSFileSystemSymlinkToDirIsDir` skips on Windows without the symlink
+     privilege; it needs a run on Linux or macOS.
+2. **Open dialog.** `ShowFileDialog(FileOpen)`: path bar, Up, listing, name
+   field, filter, OK/Cancel, focus restore. `guitest` navigation tests.
+   *Done* in `ui/filedialog.go` (`ShowFileDialog`, options, the dialog),
+   `guitest/filedialog_test.go` (23 tests) and `examples/filedialog`. Differences
+   from the design above:
+   - **`FSFileSystem` paths are rooted** (`/docs/a.txt`, root `/`), not
+     unrooted io/fs paths. Found by a test: the path bar showed `docs/sub`,
+     and retyping it resolved relative to the current directory as
+     `docs/docs/sub`. Rooted paths behave like absolute OS paths. The cost is
+     that a result path must have its leading slash stripped before use with
+     the `fs.FS` (documented on `FSFileSystem`).
+   - **Only some options exist so far**: `FileDialogTitle`, `Labels`, `FS`,
+     `Start`, `Filters`, `ShowHidden`. `Name`, `DefaultExt` and
+     `NoOverwritePrompt` arrived with Save (step 3) and `Multiple` comes with
+     step 4, so no option is exported that does nothing. (As built at step 2,
+     `FileSave` and `FileSelectDir` reported a cancel; step 3 replaced that.)
+   - **`FileDialogShowHidden` only sets the initial state.** There is no
+     checkbox yet (step 5).
+   - **A "Drives" button** appears when the filesystem has more than one root
+     (Windows). It opens a context menu of the drives. Without it a Windows
+     user could only change drive by typing a path. Replaced by the places
+     pane in step 5.
+   - **The dialog panel is a small `fileDialogPanel` widget** wrapping the
+     `Container`: it reports the fixed 640x420 (clamped to the surface, never
+     below 320x240) and turns Backspace / Alt+Up that bubble up from the
+     listing into "parent directory".
+   - **Table sort indicator without table sorting.** The dialog sets each
+     column's `Less` to a constant false and calls `SortBy`, which draws the
+     indicator but leaves the dialog's own order alone.
+   - **Selecting a directory clears the name field**, so OK on a selected
+     directory enters it and OK on a selected file confirms it. A path typed
+     in the path bar that names a file opens its directory with the file
+     selected.
+   - **Harness quirk to remember when writing dialog tests:** within one frame
+     the app handles key presses before typed runes, so `TypeText` needs a
+     `Step()` before the `Enter` that follows it.
+   Not verified: nothing here has run in a real window. Check look and feel,
+   the Drives menu, a 5,000-file directory and Backspace-to-parent by hand.
+3. **Save and SelectDir.** Overwrite confirm, default ext, directory-only mode.
+   *Done* in `ui/filedialog.go`, `guitest/filedialog_save_test.go` (24 tests)
+   and the `examples/filedialog` buttons "Save..." and "Choose folder...".
+   `FileDialogName`, `FileDialogDefaultExt` and `FileDialogNoOverwritePrompt`
+   now exist; `FileSave` and `FileSelectDir` work, and only an unknown mode
+   value reports a cancel at once. Behaviour as built:
+   - **Save.** Opens with the name field focused; a `FileDialogName`
+     suggestion is selected, so typing replaces it. Titles and buttons are
+     "Save file" / "Save". OK with an empty name says "Enter a file name."
+     A name that is a directory opens it and clears the field; anything else
+     goes through `saveTarget` (default extension, folder check).
+   - **Replace prompt.** If the target exists, `ShowConfirm` ("Replace file?",
+     labels Replace / Cancel, `ConfirmDefaultCancel`) is stacked over the
+     dialog, and names the file with the extension applied. Enter on it
+     cancels, Escape closes only the prompt, and `App.Close` of the dialog
+     takes the prompt with it and still reports one cancel.
+     `FileDialogNoOverwritePrompt` skips it.
+   - **Double-click or Enter on a file in Save** puts its name in the field
+     and takes the same path as OK, so an existing file is still confirmed.
+   - **The typed name survives browsing in Save.** Selecting a folder row,
+     opening a folder or going up leaves the name field alone; in Open and
+     Select folder, navigating clears it.
+   - **Select folder.** Lists directories only, no filter dropdown (label
+     "Folder:"). Selecting a row puts its name in the field; double-click or
+     Enter browses into it; OK returns the typed or selected folder, or the
+     folder being browsed if the field is empty. A typed name must exist and
+     be a folder.
+   - **Re-sorting or re-filtering no longer rewrites the name field** when the
+     selection is put back (`reselecting` guard), so a name typed after
+     selecting a row is not lost.
+   - **Not covered by tests:** the filter dropdown is not offered a
+     "default extension from filter" shortcut (the extension is explicit by
+     design), and the dialog does not check that the folder is writable.
+4. **Multi-select.** `Table.SetMultiSelect`, `Table.SelectedRows`, ctrl/shift
+   click and keys, then `FileDialogMultiple`. Table tests land with it.
+   *Done.* `Table` multiple selection is in `ui/table_multi.go` (the only change to
+   an existing widget, plus about 40 lines in `ui/table.go`), tested in
+   `ui/table_multi_test.go` (17 tests); `FileDialogMultiple` is in
+   `ui/filedialog.go`, tested in `guitest/filedialog_multi_test.go` (13 tests);
+   the example has an "Open several..." button.
+   - **Table API (all additive, off by default):** `SetMultiSelect(bool)`,
+     `MultiSelect()`, `SelectedRows() []int`, `SetSelectedRows(...int)` and
+     `OnSelectionChange(func([]int))`. A table that never turns it on behaves
+     as before; the one visible difference is that `OnSelectionChange` also
+     fires in single-select mode, with one row.
+   - **Model:** a set of selected rows, the active row (what `Selected()`,
+     `OnSelect` and `OnActivate` mean, unchanged) and an anchor for Shift
+     ranges. Plain click or arrow key collapses to one row; Ctrl/Cmd+click
+     toggles; Shift+click or Shift+Up/Down/Home/End selects anchor..active;
+     Ctrl/Cmd+Shift+click adds the range; Ctrl/Cmd+A selects all (only with
+     multi on). It uses `ModPrimary`, so Cmd on macOS.
+   - **`Selected()` caveat:** after a Ctrl+click that deselects a row, the
+     active row is not necessarily selected. Use `SelectedRows()` for the set.
+   - **Sorting keeps the set.** `applySort` records selected rows and the
+     anchor by identity (as it already did for the active row) and restores
+     them. `SetRows` clears everything silently, like `OnSelect`.
+   - **Keyboard-only selection** (added after step 5). In multi mode,
+     Ctrl/Cmd+Up, Down, Home and End move the cursor (the active row) without
+     touching the selection; Space, or Ctrl+Space, toggles the cursor row, and
+     with no cursor selects the first row; Ctrl/Cmd+Shift+arrows, Home and End
+     add the range from the anchor, as Ctrl+Shift+click does. So a keyboard-only
+     user can build any set: move, Space, move, Space. Alt+Space is left to the
+     window system, and with multi off none of this applies (Ctrl+arrow is a
+     plain arrow, Space is not consumed). `navigate` in `ui/table_multi.go` is
+     the one place Up, Down, Home and End are decided, in four modes (plain,
+     Shift, Ctrl+Shift, Ctrl); it replaced `extendBy`, `extendAndShow` and the
+     old `moveSelection`.
+   - **The cursor is drawn.** When the cursor is on a row that is not selected
+     (after Ctrl+arrow, or Space deselecting it) the table strokes that row in
+     the accent colour, only while it has focus and multi is on, since
+     otherwise the user could not see where Space would act. A selected cursor
+     row needs nothing: the fill shows it.
+   - **`OnSelect` rule tightened:** in multi mode it fires when the active row
+     becomes selected (moved onto, or toggled on), not when a row is
+     deselected, not for a cursor-only move, and not for select-all when the
+     active row was already selected. Before this it also fired for a deselected
+     row that a Ctrl+click moved the cursor onto. `OnSelectionChange` is the
+     handler for the whole set.
+   - **In the file dialog**, Space in a multi-select listing toggles and is
+     ignored by type-ahead; in a single-select dialog, or in Save and folder
+     mode, a space continues a prefix being typed ("my fi" finds "my file.txt")
+     and is ignored at the start of one. The cost in a multi-select dialog is
+     that type-ahead cannot match past a space: typing "my f" finds the first
+     name starting "myf", not "my f". Type the part before the space and use
+     the arrow keys from there. Ctrl+arrow
+     does not change the name field, since it changes no selection; Enter on a
+     cursor row that is part of the selection returns the whole selection, and
+     on one that is not, just that row.
+   - **Dialog behaviour:** the name field shows the selected files, one name as
+     is and several quoted (`"a.txt" "b.txt"`). OK or Enter returns every
+     selected file in listing order, skipping directories. If the user edits
+     the name field, what they typed wins over the selection. A double-click
+     collapses to the row clicked and returns just that file. Selecting only
+     directories and pressing OK opens the active one. Changing sort keeps the
+     selection; a filter that hides selected files drops them from it and from
+     the name field; navigating clears it.
+   - `FileDialogMultiple` applies to `FileOpen` only; `FileSave` and
+     `FileSelectDir` ignore it.
+   - **Quoted names containing a quote character** are not escaped in the
+     summary. It only matters for display, since the returned paths come from
+     the selection and not from parsing the field.
+5. **Polish.** Places pane + `Splitter`, hidden-file toggle, type-ahead,
+   `examples/filedialog`, README feature bullet, tutorial mention.
+   *Done.* In `ui/filedialog.go` and `ui/filedialog_logic.go`; tested in
+   `guitest/filedialog_places_test.go` (16 tests) and
+   `ui/filedialog_typeahead_test.go` (3 tests). Docs: README feature bullet and
+   not-done line, `docs/tutorial-events-and-overlays.md` ("File dialogs"),
+   `examples/README.md`.
+   - **Places pane** replaces the Drives button. An `HSplit` puts it left of the
+     listing (22%, minimums 90 and 200). It lists Home, then Desktop, Documents
+     and Downloads under it if they exist (checked with `Stat`, so no guessing at
+     localised names), then every root. It is hidden when there is only one
+     place, which is the case for a plain `FSFileSystem`. Each place is a flat
+     `Button` in a `ScrollView`, not a `List`: a list keeps highlighting the last
+     place picked after the user browses elsewhere, and `List` cannot clear its
+     selection. (The current place is marked separately, see "Current place"
+     below.) Clicking a place, or the Up button, moves focus to the listing so
+     type-ahead keeps working.
+   - **Show hidden** is a checkbox at the bottom left, in every mode.
+     `FileDialogShowHidden` sets its initial state. Toggling keeps the selection
+     where the rows survive.
+   - **Type-ahead** in the listing: a typed letter selects the next entry whose
+     name starts with what was typed (case-insensitive, directories included).
+     Letters typed within a second of each other build up the prefix; a longer
+     pause starts over, and a new first letter searches from the row after the
+     current one. The same letter repeated cycles through the entries starting
+     with it. It acts only when the listing has focus, so typing in the name or
+     path field is untouched. The pure parts (`typeAhead`, `typeAheadMatch`) are
+     unit-tested with injected times; the one-second timeout itself is not
+     exercised through the harness.
+   - **Windows hidden attribute** (added after step 5). `isHidden` in
+     `ui/filedialog_logic.go` reads `FILE_ATTRIBUTE_HIDDEN` from the entry's
+     `Sys()` (`*syscall.Win32FileAttributeData`, in `ui/filedialog_hidden_windows.go`),
+     and falls back to the leading dot when there is no such data: on other
+     platforms (`ui/filedialog_hidden_other.go`) and for any `io/fs.FS` that does
+     not carry Windows attributes. This follows Explorer: on Windows a
+     `.gitignore` is shown and `$Recycle.Bin` is not, and the `.git` folder is
+     hidden because git sets the attribute on it, not because of its name. Tested
+     in `ui/filedialog_hidden_windows_test.go` and
+     `guitest/filedialog_hidden_windows_test.go` (real files with the attribute
+     set), which only build and run on Windows. Only the hidden attribute is
+     read: files with the system attribute but not hidden are still listed.
+   - **New folder button** (added after step 5), in Save and Select folder
+     dialogs, next to Up. `DirMaker` is a separate optional interface, not a
+     method on `FileSystem`, so existing implementations and read-only ones keep
+     working: `OSFileSystem` implements it (`os.Mkdir`, mode 0755, one level, no
+     parents) and `FSFileSystem` does not, since it wraps a read-only `fs.FS`, so
+     the button is simply absent there. It is not shown in Open dialogs, where
+     there is nothing to save into. The button opens a small modal over the
+     dialog with the suggested name selected ("New folder", or the first free
+     "New folder (2)", "(3)" ...). Create (or Enter) validates with
+     `validFolderName`: one path element, no `/` or `\`, not `.` or `..`.
+     Errors, including "already exists" and whatever the OS says (permissions,
+     characters Windows forbids), show in the prompt, which stays open to be
+     corrected. On success the folder is created in the directory being browsed,
+     the listing is re-read, the new folder is selected, and focus goes to the
+     listing; it does not navigate into it, as in Explorer. In Select folder
+     that selection is the answer to OK. In Save the typed file name is left
+     alone. Closing the dialog closes the prompt with it, and Cancel or Escape on
+     the prompt returns focus to the New folder button. Tested in
+     `guitest/filedialog_newfolder_test.go` (13 tests, over a `writableFS`
+     wrapper that adds directory entries to an `fstest.MapFS`) and
+     `ui/filedialog_newfolder_test.go`. The real `os.Mkdir` path is covered only
+     by the `OSFileSystem.Mkdir` unit test, not through the dialog.
+   - **Natural sort order** (added after step 5). Names compare ignoring case,
+     with each run of ASCII digits taken as a number: `file2` before `file10`,
+     `img09` before `img10`, `dir9` before `dir10`. `naturalCompare` in
+     `ui/filedialog_logic.go` does it in place with no allocation (checked by a
+     test), because sorting is O(n log n) comparisons. Numbers compare by value
+     with no integer type involved, so a 30-digit run cannot overflow; leading
+     zeros do not count (`a007` equals `a7`). A digit against a non-digit
+     compares as the characters do. `compareNames` adds a plain string
+     comparison where that finds no difference, so `a`/`A` and `a01`/`a1` still
+     have a fixed order and the sort stays total; a test checks it is
+     antisymmetric and transitive over every string of up to three characters
+     from an alphabet picked to hit those cases, and that distinct names never
+     compare equal. 50,000 names sort in under 0.1 s. It applies to the Name
+     column, in both directions, to directories, and as the tie-break for the
+     Size and Modified sorts. Only ASCII digits form numbers; other scripts'
+     digits compare as characters. Case folding is `unicode.ToLower`, not full
+     locale collation, so accented letters sort by code point after folding,
+     not as a dictionary would.
+   - **Current place** (added after step 5). The pane marks the place the dialog
+     is in: a primary-coloured fill behind the label, which is drawn in the
+     on-primary colour, like a selected row. "In" means the most specific place
+     that is the browsed folder or one of its ancestors, found by
+     `currentPlaceIndex` in `ui/filedialog_logic.go` walking up with
+     `FileSystem.Parent`. So Documents and everything below it is Documents; any
+     other folder under home is Home; a folder above home, or on another path
+     entirely, is the filesystem root's place; and a folder under no place marks
+     nothing. If two places have the same path the earlier wins. The mark is
+     recomputed after every successful navigation, so it follows a click, a
+     double-click, Up, Backspace, the path bar and New folder alike, and a
+     refused navigation (unreadable folder) leaves it where it was. Each button
+     sits in a small container whose background is switched; this uses only
+     public widget API (`Container.SetBackground`, `SetColour`), so `Button` and
+     `List` were not touched. On Windows the path comparison ignores case, so a
+     drive typed as `c:` still matches `C:`; elsewhere it is exact. The colours
+     are read when the mark moves, so a theme switched while the dialog is open
+     is picked up the next time the user navigates, not immediately. Tested in
+     `ui/filedialog_places_test.go` (5 tests) and
+     `guitest/filedialog_currentplace_test.go` (6 tests, which check both the fill
+     and the label colour, because a mark with only one of them is a bug).
+     Not looked at in a real window: an attempt to capture one was stopped when
+     another window took the foreground.
+
+Steps 1-3 were the useful core; 4 and 5 could have slipped without blocking a
+release.
+
+### Files
+
+New: `ui/filedialog.go`, `ui/filedialog_fs.go`, `ui/filedialog_roots_windows.go`,
+`ui/filedialog_roots_other.go`, `ui/filedialog_logic.go`,
+`ui/table_multi.go`, their `_test.go` files (`ui/filedialog_fs_test.go`,
+`ui/filedialog_logic_test.go`, `ui/filedialog_typeahead_test.go`,
+`ui/table_multi_test.go`), `guitest/filedialog_test.go`,
+`guitest/filedialog_save_test.go`, `guitest/filedialog_multi_test.go`,
+`guitest/filedialog_places_test.go`, `examples/filedialog/main.go`.
+Changed: `ui/table.go` (step 4 only), `README.md`, `examples/README.md`,
+`docs/tutorial-events-and-overlays.md`.
+
+### Out of scope
+
+- A native OS dialog. If wanted, add later as a separate `NativeFileDialog`
+  helper (desktop only, no WASM, not testable in `guitest`), not as a mode of
+  this API.
+- Thumbnails / previews, drag-out, bookmarks, recent files, and renaming or
+  deleting files.
+- Accessibility, same as the rest of the toolkit (see ROADMAP).
+
+---
+
 ## IMPLEMENTATION PLAN
 
 1. **Skeleton & backend seam** — `geom` types, `render.Canvas`/`Input`
