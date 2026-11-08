@@ -647,7 +647,12 @@ ride on every event.
   opens a non-modal popup (built by the shared `menuPanel` helper, also used by
   `MenuBar`) at the cursor, clamped on-screen. Choosing a row runs its action
   after closing the menu (so an action that opens a dialog isn't torn down with
-  it); clicking elsewhere or Escape dismisses it.
+  it); clicking elsewhere or Escape dismisses it. An item can be
+  `MenuItem.Disabled` (a `menuRow` with its enabled flag off: drawn in
+  `RoleTextMuted`, with no hover, and clicking it leaves the menu open), or a
+  separator (`MenuItem.Separator`, or `NewMenuSeparator`: a `menuSeparator`, a
+  `RoleBorder` line). `tidyMenu` drops separators at either end of a menu or
+  next to another, so a menu built from conditional groups needs no bookkeeping.
 
 ### 10.6 Event bus (`ui/bus.go`)
 
@@ -1343,7 +1348,7 @@ leaves the line list and other lines untouched.
 | `Tree` | tree.go | hierarchical `TreeNode`s, expand/collapse chevrons, keyboard nav, scroll; opt-in horizontal scroll (§13g) |
 | `Table` | table.go | header + weighted columns, selectable scrollable body, click-header sort; opt-in horizontal scroll with `Column.MinWidth` (§13g) |
 | `DropdownCombo` | dropdown.go | opens a popup `List` |
-| `MenuBar`/`Menu`/`MenuItem` | menu.go | popup menus, hover-switch between titles |
+| `MenuBar`/`Menu`/`MenuItem` | menu.go | popup menus, hover-switch between titles, disabled items and separators |
 | `Slider` | slider.go | drag + arrow keys, `[0,1]` |
 | `Stepper` | stepper.go | numeric value, up/down buttons + arrows + wheel, min/max/step |
 | `ProgressBar` | progressbar.go | non-interactive fill |

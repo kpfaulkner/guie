@@ -5,7 +5,8 @@
 // click outside or press Escape to dismiss popups.
 //
 // It also demonstrates keyboard accelerators (Ctrl/Cmd+N, Ctrl/Cmd+S,
-// Ctrl/Cmd+Shift+S) and a context menu — right-click the list.
+// Ctrl/Cmd+Shift+S) and a context menu: right-click the list. Its items grey
+// out to suit the selection, and a separator divides them into groups.
 //
 // Run with: go run ./examples/showcase
 package main
@@ -59,13 +60,24 @@ func main() {
 	list.SetHorizontalScroll(true) // the long row scrolls instead of being clipped
 	// Double-click a row (or press Enter on it) to activate it.
 	list.OnActivate(func(i int) { say(fmt.Sprintf("List: opened %s", fruits[i])) })
-	list.OnSelect(func(i int) { say(fmt.Sprintf("List: %s", fruits[i])) })
 	// Right-click the list for a context menu acting on the current selection.
-	list.SetContextMenu(
-		ui.NewMenuItem("Select first", func() { list.SetSelected(0) }),
-		ui.NewMenuItem("Select last", func() { list.SetSelected(len(fruits) - 1) }),
-		ui.NewMenuItem("Show selection", func() { say(fmt.Sprintf("Selected: %s", fruits[list.Selected()])) }),
-	)
+	// Items that make no sense for it are greyed out, so the menu is set again
+	// each time the selection changes.
+	updateMenu := func() {
+		sel, last := list.Selected(), len(fruits)-1
+		list.SetContextMenu(
+			ui.MenuItem{Label: "Select first", Action: func() { list.SetSelected(0) }, Disabled: sel == 0},
+			ui.MenuItem{Label: "Select last", Action: func() { list.SetSelected(last) }, Disabled: sel == last},
+			ui.NewMenuSeparator(),
+			ui.MenuItem{Label: "Show selection", Action: func() { say(fmt.Sprintf("Selected: %s", fruits[list.Selected()])) }, Disabled: sel < 0},
+			ui.MenuItem{Label: "Delete (the list is read-only)", Disabled: true},
+		)
+	}
+	updateMenu()
+	list.OnSelect(func(i int) {
+		say(fmt.Sprintf("List: %s", fruits[i]))
+		updateMenu()
+	})
 	content.Add(list, ui.Weight(1))
 
 	right := ui.NewContainer()

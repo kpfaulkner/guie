@@ -52,7 +52,7 @@ What each one exercises:
 | `windowstate`| `WithWindowStateFile`: restores window size, position and maximised state, saved on exit; `App.WindowGeometry` |
 | `controls`| `TextField` (typing, caret), `Checkbox`, `RadioButton`/`RadioGroup`, `Slider` → `ProgressBar` |
 | `scroll`  | `ScrollView`: wheel + draggable thumb + gutter paging, interactive widgets inside the viewport, `SetHorizontalScroll` with a very wide row (bar along the bottom, Shift+wheel) |
-| `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection, scroll, `OnActivate` on double-click/Enter, `SetHorizontalScroll` with a long row), `DropdownCombo`, overlay popups |
+| `showcase`| `MenuBar` + `Menu`/`MenuItem`, `List` (selection, scroll, `OnActivate` on double-click/Enter, `SetHorizontalScroll` with a long row), `DropdownCombo`, overlay popups, a context menu with `MenuItem.Disabled` items that follow the selection and `NewMenuSeparator` |
 | `dialog`  | Modal dialogs via `App.ShowMessage`/`ShowModal`: scrim, blocked background, button + Esc dismissal; `App.ShowConfirm` (reports once to a callback, `ConfirmLabels`, `ConfirmDefaultCancel`) |
 | `filedialog` | `App.ShowFileDialog`: open (`FileDialogMultiple`), save (`FileDialogName`, `FileDialogDefaultExt`, replace prompt), choose a folder, filters, places pane, hidden toggle, type-ahead; the OS filesystem and an in-memory `fs.FS` via `FSFileSystem` |
 | `textarea`| Multi-line `TextArea`: typing, newlines, soft word-wrap (toggle with `SetWrap` to see sideways scrolling), selection, double-click selects a word, cut/copy/paste, undo/redo (Ctrl+Z), scrolling |

@@ -73,11 +73,11 @@ func contextTarget(w Widget) Widget {
 }
 
 // ShowContextMenu opens a popup menu of items at the given surface position,
-// clamped to stay on screen. It returns the popup (nil if there are no items).
-// Choosing an item runs its Action and closes the menu; clicking elsewhere or
-// pressing Escape dismisses it.
+// clamped to stay on screen. It returns the popup (nil if there are no items,
+// separators not counting). Choosing an item runs its Action and closes the
+// menu; clicking elsewhere or pressing Escape dismisses it.
 func (a *App) ShowContextMenu(at geom.Point, items ...MenuItem) *Popup {
-	if len(items) == 0 {
+	if len(tidyMenu(items)) == 0 {
 		return nil
 	}
 	var popup *Popup
