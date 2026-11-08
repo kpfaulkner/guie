@@ -62,11 +62,26 @@ func (a *App) runAccelerator(key render.Key, mods render.ModifierSet) bool {
 	return false
 }
 
-// contextTarget walks up from w to the first widget with a context menu, or nil.
-func contextTarget(w Widget) Widget {
+// contextMenuAt is implemented by a widget whose context menu depends on where
+// in it the right-click was, such as a Table's. A widget with this method is
+// asked it instead of ContextMenu. pos is the absolute cursor position.
+type contextMenuAt interface {
+	ContextMenuAt(pos geom.Point) []MenuItem
+}
+
+// contextMenuFor walks up from w to the first widget with a context menu at
+// pos and returns its items, or nil if none has one. Each widget is asked
+// once, so a menu may be built, with side effects, as it is asked for.
+func contextMenuFor(w Widget, pos geom.Point) []MenuItem {
 	for ; w != nil; w = w.Parent() {
-		if len(w.ContextMenu()) > 0 {
-			return w
+		var items []MenuItem
+		if at, ok := w.(contextMenuAt); ok {
+			items = at.ContextMenuAt(pos)
+		} else {
+			items = w.ContextMenu()
+		}
+		if len(items) > 0 {
+			return items
 		}
 	}
 	return nil

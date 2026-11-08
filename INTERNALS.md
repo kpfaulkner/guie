@@ -653,6 +653,11 @@ ride on every event.
   separator (`MenuItem.Separator`, or `NewMenuSeparator`: a `menuSeparator`, a
   `RoleBorder` line). `tidyMenu` drops separators at either end of a menu or
   next to another, so a menu built from conditional groups needs no bookkeeping.
+  A widget whose menu depends on where it was clicked implements the optional
+  `ContextMenuAt(pos)`, which `contextMenuFor` prefers to `ContextMenu` and asks
+  once. `Table.OnRowContextMenu(fn)` uses it to give `fn` the row at the press,
+  worked out then: `hoverRow` only changes when the pointer moves, and rows can
+  scroll under a still pointer.
 
 ### 10.6 Event bus (`ui/bus.go`)
 

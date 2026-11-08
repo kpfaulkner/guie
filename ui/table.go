@@ -65,6 +65,7 @@ type Table struct {
 	onSelect          func(int)
 	onSelectionChange func([]int)
 	onActivate        func(int)
+	onRowMenu         func(int) []MenuItem
 	onHeaderClick     func(int)
 	font              render.FontFace
 }
@@ -223,6 +224,26 @@ func (t *Table) OnSelect(fn func(int)) { t.onSelect = fn }
 // the displayed (possibly sorted) row, as for OnSelect. Double-clicking the
 // header does nothing extra.
 func (t *Table) OnActivate(fn func(int)) { t.onActivate = fn }
+
+// OnRowContextMenu registers fn to give the context menu for a row when it is
+// right-clicked. The index is the displayed (possibly sorted) row. It is asked
+// once per right-click, so it may select the row before building the items.
+// A right-click off the rows (the header, the space below them, a scrollbar)
+// gets the menu from SetContextMenu, if there is one.
+func (t *Table) OnRowContextMenu(fn func(row int) []MenuItem) { t.onRowMenu = fn }
+
+// ContextMenuAt returns the context menu for a right-click at pos. The row is
+// worked out from pos when it is asked for, rather than kept from the last
+// pointer move, because rows can scroll under a pointer that has not moved.
+func (t *Table) ContextMenuAt(pos geom.Point) []MenuItem {
+	onBar := t.overflow() && t.scrollTrack().Contains(pos)
+	if t.onRowMenu != nil && !onBar {
+		if i := t.rowAt(pos.Y); i >= 0 {
+			return t.onRowMenu(i)
+		}
+	}
+	return t.ContextMenu()
+}
 
 // SetRows replaces all rows and clears the selection.
 func (t *Table) SetRows(rows [][]string) {

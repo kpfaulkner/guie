@@ -640,9 +640,9 @@ func (a *App) dispatchPointer(in render.InputState) {
 	// A right-press over a widget that has a context menu opens it at the cursor
 	// instead of dispatching a normal press.
 	if in.MousePressed.Has(render.MouseRight) && !inPopup {
-		if t := contextTarget(hit); t != nil {
+		if items := contextMenuFor(hit, pos); len(items) > 0 {
 			a.hideTooltip()
-			a.ShowContextMenu(pos, t.ContextMenu()...)
+			a.ShowContextMenu(pos, items...)
 			return
 		}
 	}
