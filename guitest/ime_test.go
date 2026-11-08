@@ -118,3 +118,14 @@ func TestIMETextAreaCommit(t *testing.T) {
 		t.Fatalf("textarea commit should set text, got %q", ta.Text())
 	}
 }
+
+func TestIMEOffForReadOnlyTextArea(t *testing.T) {
+	h := guitest.New(240, 120)
+	ta := ui.NewTextArea(ui.TextAreaReadOnly())
+	h.SetContent(ta)
+	h.Step()
+	h.Click(40, 30)
+	if h.IMEEnabled() {
+		t.Fatal("focusing a read-only text area should not enable IME")
+	}
+}

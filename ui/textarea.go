@@ -57,6 +57,8 @@ type TextArea struct {
 	wrap      bool
 	wrapWidth float64 // content width used for the last wrap pass
 
+	readOnly bool // the user can select and copy but not change the text
+
 	placeholder string
 	onChange    func(string)
 
@@ -150,6 +152,11 @@ func TextAreaWrap() TextAreaOption {
 	return func(t *TextArea) { t.wrap = true }
 }
 
+// TextAreaReadOnly constructs the area read-only; see SetReadOnly.
+func TextAreaReadOnly() TextAreaOption {
+	return func(t *TextArea) { t.readOnly = true }
+}
+
 // NewTextArea returns an empty TextArea configured by opts.
 func NewTextArea(opts ...TextAreaOption) *TextArea {
 	t := &TextArea{BaseWidget: NewBase(), lines: [][]rune{{}}}
@@ -161,6 +168,31 @@ func NewTextArea(opts ...TextAreaOption) *TextArea {
 
 // OnChange registers the handler invoked whenever the text changes.
 func (t *TextArea) OnChange(fn func(string)) { t.onChange = fn }
+
+// SetReadOnly makes the area read-only, or editable again. A read-only area
+// can still be focused, scrolled, navigated with the arrow keys, selected and
+// copied from, but typing, Enter, Backspace, Delete, cut, paste, undo, redo
+// and IME composition do nothing, and no caret is drawn. It is for showing
+// text the user may want to copy, such as a log or a document, where
+// SetEnabled(false) would also stop selection.
+//
+// It only restricts the user: SetText and ReplaceRange still change the text.
+func (t *TextArea) SetReadOnly(v bool) {
+	if v == t.readOnly {
+		return
+	}
+	t.readOnly = v
+	if v {
+		t.preedit, t.preeditCaret = "", 0
+	}
+	t.Invalidate()
+}
+
+// ReadOnly reports whether the area is read-only.
+func (t *TextArea) ReadOnly() bool { return t.readOnly }
+
+// imeDisabled tells the App not to turn IME on while a read-only area has focus.
+func (t *TextArea) imeDisabled() bool { return t.readOnly }
 
 // Text returns the full contents with lines joined by '\n'.
 func (t *TextArea) Text() string {
@@ -663,7 +695,7 @@ func (t *TextArea) caretXWithPreedit(f render.FontFace, r visRow) float64 {
 // candidate-window placement.
 func (t *TextArea) imeCaretRect() (geom.Rect, bool) {
 	f := t.face()
-	if !t.focused || f == nil {
+	if !t.focused || t.readOnly || f == nil {
 		return geom.Rect{}, false
 	}
 	inner := t.Bounds().Inset(t.insets(textAreaPadding))
@@ -734,7 +766,7 @@ func (t *TextArea) Draw(canvas render.Canvas) {
 			canvas.DrawText(string(seg), geom.Point{X: ox, Y: y}, f, textColour)
 		}
 	}
-	if t.focused {
+	if t.focused && !t.readOnly {
 		r := rows[ci]
 		caretX := ox + t.caretXWithPreedit(f, r)
 		caretY := inner.Y + float64(ci)*lh - t.scrollY
@@ -875,6 +907,9 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 		t.preeditCaret = 0
 		return true
 	case EventComposition:
+		if t.readOnly {
+			return false
+		}
 		t.setPreedit(ev.Comp.Text, ev.Comp.Caret)
 		return true
 	case EventDoubleClick:
@@ -895,7 +930,7 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 		t.clampScroll()
 		return true
 	case EventText:
-		if ev.Rune >= 0x20 && ev.Rune != 0x7f {
+		if ev.Rune >= 0x20 && ev.Rune != 0x7f && !t.readOnly {
 			t.insertRune(ev.Rune)
 			return true
 		}
@@ -907,6 +942,9 @@ func (t *TextArea) HandleEvent(ev *Event) bool {
 
 func (t *TextArea) handleKey(k render.Key, mods render.ModifierSet) bool {
 	extend := mods.Has(render.ModShift)
+	if t.readOnly && editingKey(k, mods) {
+		return false // not handled, so it can still reach an accelerator
+	}
 	if mods.Has(render.ModPrimary) {
 		switch k {
 		case render.KeyA:
@@ -956,6 +994,23 @@ func (t *TextArea) handleKey(k render.Key, mods render.ModifierSet) bool {
 		return false
 	}
 	return true
+}
+
+// editingKey reports whether k with mods would change the text: the keys a
+// read-only TextArea ignores.
+func editingKey(k render.Key, mods render.ModifierSet) bool {
+	if mods.Has(render.ModPrimary) {
+		switch k {
+		case render.KeyX, render.KeyV, render.KeyZ, render.KeyY:
+			return true
+		}
+		return false
+	}
+	switch k {
+	case render.KeyEnter, render.KeyBackspace, render.KeyDelete:
+		return true
+	}
+	return false
 }
 
 func (t *TextArea) moveLeft(extend bool) {

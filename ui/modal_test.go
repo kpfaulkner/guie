@@ -74,3 +74,27 @@ func TestShowModalCenters(t *testing.T) {
 		t.Fatalf("dialog should be centered, got %+v", p.bounds)
 	}
 }
+
+func TestPopupOnCloseRunsOnEscapeAndAfterExistingHandler(t *testing.T) {
+	app := newDialogApp()
+	var order []string
+	p := app.ShowConfirm("Delete?", "Sure?", func(ok bool) { order = append(order, "confirm") })
+	p.OnClose(func() { order = append(order, "mine") })
+	p.OnClose(nil) // ignored
+	app.closeTop() // what Escape does
+	if len(order) != 2 || order[0] != "confirm" || order[1] != "mine" {
+		t.Fatalf("order %v", order)
+	}
+}
+
+func TestPopupOnCloseForShowModal(t *testing.T) {
+	app := newDialogApp()
+	closed := 0
+	p := app.ShowModal(NewLabel("x"))
+	p.OnClose(func() { closed++ })
+	app.Close(p)
+	app.Close(p) // already closed: not run again
+	if closed != 1 {
+		t.Fatalf("closed %d times", closed)
+	}
+}

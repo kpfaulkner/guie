@@ -27,6 +27,24 @@ func NewPopup(content Widget, bounds geom.Rect, onClose func()) *Popup {
 	return &Popup{content: content, bounds: bounds, onClose: onClose}
 }
 
+// OnClose registers fn to run when the popup is dismissed, however that happens:
+// a button, Escape, App.Close, or a popup below it closing. It runs after any
+// handler already registered (such as the one ShowConfirm uses), so adding one
+// never stops a built-in dialog from reporting its result. Use it to tidy up
+// after a dialog built with ShowModal, which sets no handler of its own.
+func (p *Popup) OnClose(fn func()) {
+	if fn == nil {
+		return
+	}
+	prev := p.onClose
+	p.onClose = func() {
+		if prev != nil {
+			prev()
+		}
+		fn()
+	}
+}
+
 // openPopup mounts the popup's content, lays it out at its bounds and pushes it
 // onto the overlay stack.
 func (a *App) openPopup(p *Popup) {

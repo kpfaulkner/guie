@@ -239,6 +239,23 @@ func (t *Table) AddRow(cells ...string) {
 	t.Invalidate()
 }
 
+// SetRow replaces the cells of row i, in the table's current (possibly sorted)
+// order, keeping the selection and scroll position. It is for rows whose
+// contents change after they are added, such as a status that fills in later;
+// SetRows would reset the selection and scroll to the top.
+//
+// The row stays at index i even when the table is sorted and the new cells
+// would sort elsewhere, so rows do not jump about under the user; the next sort
+// puts it in place. An out-of-range i is ignored. As with AddRow, the table
+// keeps cells, so do not modify it afterwards.
+func (t *Table) SetRow(i int, cells ...string) {
+	if i < 0 || i >= len(t.rows) {
+		return
+	}
+	t.rows[i] = cells
+	t.Invalidate()
+}
+
 // Selected returns the selected row index, or -1. With multiple selection it is
 // the active row, the one last clicked or moved to, which after a Ctrl/Cmd+click
 // that deselects it is not necessarily selected; use SelectedRows for the set.

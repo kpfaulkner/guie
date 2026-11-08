@@ -516,8 +516,17 @@ func (a *App) setFocus(w Widget) {
 	// text widget holds focus.
 	if a.ime != nil {
 		_, editable := w.(imeEditable)
+		if d, ok := w.(imeDisabler); ok && d.imeDisabled() {
+			editable = false // e.g. a read-only TextArea
+		}
 		a.ime.SetIMEEnabled(editable)
 	}
+}
+
+// imeDisabler is implemented by imeEditable widgets that can temporarily not
+// accept IME input, such as a read-only TextArea.
+type imeDisabler interface {
+	imeDisabled() bool
 }
 
 // moveFocus advances focus to the next (delta=+1) or previous (delta=-1)
