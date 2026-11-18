@@ -31,7 +31,10 @@ var mouseButtons = []struct {
 // down to the logical pixels the framework lays out and hit-tests in. On a
 // 1x display this is a no-op; at 2x an undivided position lands at double the
 // intended coordinates and every hit test misses.
-func pollInput(scale float64) render.InputState {
+//
+// kp maps the numeric keypad by NumLock and remembers what each held keypad key
+// meant when it went down (keypad.go).
+func pollInput(scale float64, kp *keypad) render.InputState {
 	if scale <= 0 {
 		scale = 1
 	}
@@ -55,9 +58,11 @@ func pollInput(scale float64) render.InputState {
 	wx, wy := ebiten.Wheel()
 	in.WheelDelta = geom.Point{X: wx, Y: wy}
 
-	in.KeysDown = mapKeys(inpututil.AppendPressedKeys(nil))
-	in.KeysPressed = mapKeys(inpututil.AppendJustPressedKeys(nil))
-	in.KeysReleased = mapKeys(inpututil.AppendJustReleasedKeys(nil))
+	in.KeysDown, in.KeysPressed, in.KeysReleased = kp.keys(
+		inpututil.AppendPressedKeys(nil),
+		inpututil.AppendJustPressedKeys(nil),
+		inpututil.AppendJustReleasedKeys(nil),
+		ebiten.IsNumLockOn())
 	in.Runes = ebiten.AppendInputChars(nil)
 	in.Modifiers = pollModifiers()
 	// EBiten reports dropped files for the single tick after the OS drop, then

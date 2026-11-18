@@ -30,6 +30,9 @@ func (d *Driver) SetIMERect(r geom.Rect) {}
 // before RunGame as well as during the loop, and it is a no-op off the desktop.
 func (d *Driver) SetCloseHandled(handled bool) { ebiten.SetWindowClosingHandled(handled) }
 
+// SetTitle satisfies render.TitleController.
+func (d *Driver) SetTitle(title string) { ebiten.SetWindowTitle(title) }
+
 // SetContinuousFrames and RequestFrame satisfy render.FrameScheduler, which is
 // what keeps an idle window from costing a core on macOS.
 //
@@ -70,6 +73,7 @@ func (d *Driver) Run(cfg render.Config, hooks render.Hooks) error {
 	ebiten.SetWindowTitle(cfg.Title)
 	if len(cfg.Icon) > 0 {
 		ebiten.SetWindowIcon(cfg.Icon)
+		setDockIcon(cfg.Icon) // macOS windows have no icon; the Dock's is the app's
 	}
 	if cfg.Resizable {
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
@@ -84,7 +88,16 @@ func (d *Driver) Run(cfg render.Config, hooks render.Hooks) error {
 		scale:  1,
 		want:   cfg.Geometry,
 	}
-	return ebiten.RunGame(g)
+	return ebiten.RunGameWithOptions(g, runOptions(cfg))
+}
+
+// runOptions are the RunGame options for cfg. Only the app id is set; every
+// other field keeps Ebitengine's default, as RunGame would.
+func runOptions(cfg render.Config) *ebiten.RunGameOptions {
+	if cfg.AppID == "" {
+		return nil
+	}
+	return &ebiten.RunGameOptions{X11ClassName: cfg.AppID, X11InstanceName: cfg.AppID}
 }
 
 // game is the internal ebiten.Game that drives the framework's hooks. It is the
@@ -103,6 +116,7 @@ type game struct {
 	sized         bool
 	placed        bool                  // the first-Update window placement has run
 	want          render.WindowGeometry // the geometry the app asked for
+	keypad        keypad                // the keypad keys held, by what they meant when pressed
 }
 
 // Update polls input and forwards it to the framework's Update hook. A
@@ -128,7 +142,7 @@ func (g *game) Update() error {
 	if g.hooks.Update == nil {
 		return nil
 	}
-	if err := g.hooks.Update(pollInput(g.scale)); err != nil {
+	if err := g.hooks.Update(pollInput(g.scale, &g.keypad)); err != nil {
 		if errors.Is(err, render.ErrTerminated) {
 			return ebiten.Termination
 		}

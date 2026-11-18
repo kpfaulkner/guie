@@ -239,9 +239,26 @@ Package name `ebitenbackend`. The only place that touches EBiten.
 `ebiten.AppendInputChars` for runes, and modifier flags. `keymap.go` maps
 `ebiten.Key` → `render.Key` for the supported subset.
 
+The numeric keypad is mapped in `keypad.go`, by NumLock (`ebiten.IsNumLockOn`).
+EBiten reports keypad keys by position (KeyNumpad7 whatever NumLock says). With
+NumLock off they become Home, End, PageUp, PageDown, the arrows, Insert and
+Delete; with it on they are no key and the digit arrives as a rune. Keypad 5 and
++ - * / = are no key in either state, keypad Enter is Enter in both. The `game`
+keeps a `keypad` that remembers what each held keypad key meant when it went
+down, so a key held while NumLock is toggled is released under the name it was
+pressed with.
+
 ### 4.5 Driver / loop (`driver.go`)
 
-- `Driver.Run` sets window title/size/resizable and calls `ebiten.RunGame(g)`.
+- `Driver.Run` sets window title/size/resizable and calls
+  `ebiten.RunGameWithOptions(g, runOptions(cfg))`. The options are nil (what
+  `RunGame` passes) unless `Config.AppID` is set, which becomes the X11
+  WM_CLASS (class and instance) that a Linux desktop entry's StartupWMClass
+  matches.
+- `Config.Icon` goes to `ebiten.SetWindowIcon` and, on macOS, where windows have
+  no icon, to the Dock: `setDockIcon` (`dockicon_darwin.go`) hands the largest
+  image to `[NSApp setApplicationIconImage:]` through purego's objc package,
+  before the loop starts, on the main thread. Elsewhere it does nothing.
 - `game` implements `ebiten.Game`:
   - `Update()` polls input, calls `hooks.Update`. **If the hook returns
     `render.ErrTerminated`, it is mapped to `ebiten.Termination`** so the loop

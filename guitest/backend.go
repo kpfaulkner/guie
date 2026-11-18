@@ -143,12 +143,21 @@ func (c *canvas) SubCanvas(r geom.Rect) render.Canvas {
 // invokes the hooks on demand via step.
 type driver struct {
 	hooks  render.Hooks
+	config render.Config // what the App passed to Run
 	width  int
 	height int
 
 	// IME state recorded via render.IMEController, for test assertions.
 	imeEnabled bool
 	imeRect    geom.Rect
+
+	// title is the last title set through render.TitleController.
+	title string
+
+	// unfocused models the window in the background, and attention counts
+	// render.AttentionController requests.
+	unfocused bool
+	attention int
 
 	// closeHandled records the last render.CloseInterceptor toggle: true while the
 	// app has a close handler installed and expects to veto closes.
@@ -170,8 +179,18 @@ func newDriver() *driver { return &driver{} }
 func (d *driver) SetIMEEnabled(on bool)  { d.imeEnabled = on }
 func (d *driver) SetIMERect(r geom.Rect) { d.imeRect = r }
 
+// SetTitle satisfies render.TitleController so tests can see title changes.
+func (d *driver) SetTitle(title string) { d.title = title }
+
+// WindowFocused and RequestAttention satisfy render.AttentionController. The
+// fake window is focused unless a test says otherwise, and every request is
+// counted.
+func (d *driver) WindowFocused() bool    { return !d.unfocused }
+func (d *driver) RequestAttention() bool { d.attention++; return true }
+
 func (d *driver) Run(cfg render.Config, hooks render.Hooks) error {
 	d.hooks = hooks
+	d.config = cfg
 	d.width, d.height = cfg.Width, cfg.Height
 	d.applied = cfg.Geometry
 	if g := cfg.Geometry; g.Width > 0 && g.Height > 0 {

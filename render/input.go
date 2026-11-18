@@ -112,6 +112,35 @@ const (
 	Key7
 	Key8
 	Key9
+
+	// Function and editing keys. Added after the original set, so the values of
+	// the keys above did not change.
+	KeyF1
+	KeyF2
+	KeyF3
+	KeyF4
+	KeyF5
+	KeyF6
+	KeyF7
+	KeyF8
+	KeyF9
+	KeyF10
+	KeyF11
+	KeyF12
+	KeyInsert
+
+	// Punctuation keys, named by the US layout key they sit on.
+	KeyMinus
+	KeyEqual
+	KeyBracketLeft
+	KeyBracketRight
+	KeyBackslash
+	KeySemicolon
+	KeyQuote
+	KeyComma
+	KeyPeriod
+	KeySlash
+	KeyBackquote
 )
 
 // Composition is the in-progress IME preedit (uncommitted) text for a frame. It

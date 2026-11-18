@@ -30,6 +30,11 @@ type Config struct {
 	// standard image.Image values, so applications set the icon without importing
 	// any graphics backend.
 	Icon []image.Image
+	// AppID names the application to the desktop, where the platform has such a
+	// name: the X11 WM_CLASS on Linux, which GNOME matches against a desktop
+	// entry's StartupWMClass to find the icon and group windows. Empty keeps the
+	// backend's default.
+	AppID string
 	// Geometry, when set, overrides Width/Height and places the window: the way an
 	// application restores where it was last time. See WindowGeometry.
 	Geometry WindowGeometry
@@ -109,6 +114,29 @@ type FrameScheduler interface {
 	// itself - work finishing on a background goroutine, say. It must be safe
 	// to call from any goroutine, and before Run, where it may be dropped.
 	RequestFrame()
+}
+
+// TitleController is an optional capability a Driver may implement to change
+// the title of its window while it is open. The framework type-asserts a Driver
+// for it; a Driver without it keeps the title it was started with.
+type TitleController interface {
+	// SetTitle changes the window title. It is called from the UI goroutine.
+	SetTitle(title string)
+}
+
+// AttentionController is an optional capability a Driver may implement to say
+// whether its window has the OS keyboard focus and to ask the OS to draw the
+// user's eye to it, for an application that has something to report while it
+// is in the background. The framework type-asserts a Driver for it; without
+// it the window counts as focused and attention cannot be asked for.
+type AttentionController interface {
+	// WindowFocused reports whether the window is the one the OS sends keys to.
+	WindowFocused() bool
+	// RequestAttention asks the OS to mark the window, such as a taskbar flash
+	// that lasts until the window is brought forward, without taking focus. It
+	// returns false when the platform has no way to do it. It is called from the
+	// UI goroutine.
+	RequestAttention() bool
 }
 
 // IMEController is an optional capability a Driver may implement to support

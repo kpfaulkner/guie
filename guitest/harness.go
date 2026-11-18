@@ -173,6 +173,25 @@ func (h *Harness) IMEEnabled() bool { return h.driver.imeEnabled }
 // candidate-window placement.
 func (h *Harness) IMERect() geom.Rect { return h.driver.imeRect }
 
+// Title returns the window title last set with App.SetTitle, as the backend saw
+// it. It is empty until the title has been changed after Run.
+func (h *Harness) Title() string { return h.driver.title }
+
+// Config returns the window configuration the App passed to its driver: the
+// title, size, icon and app id it was built with.
+func (h *Harness) Config() render.Config { return h.driver.config }
+
+// SetWindowFocused models the window gaining (true) or losing (false) the OS
+// keyboard focus, as App.WindowFocused reports it. The window starts focused.
+func (h *Harness) SetWindowFocused(on bool) *Harness {
+	h.driver.unfocused = !on
+	return h
+}
+
+// AttentionRequests is how many times the app asked for the user's attention
+// with App.RequestAttention.
+func (h *Harness) AttentionRequests() int { return h.driver.attention }
+
 // Err returns the first error returned by the framework's Update hook, if any.
 func (h *Harness) Err() error { return h.err }
 

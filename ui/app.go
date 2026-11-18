@@ -30,12 +30,14 @@ import (
 // from a background goroutine.
 type App struct {
 	driver    render.Driver
-	ime       render.IMEController    // non-nil if the driver supports IME
-	closer    render.CloseInterceptor // non-nil if the driver can defer window closing
-	windower  render.WindowController // non-nil if the driver can report window geometry
-	running   bool                    // Run has been called: the backend window exists (or is about to)
-	statePath string                  // window state file, "" for none
-	geom      WindowGeometry          // last restorable window geometry
+	ime       render.IMEController       // non-nil if the driver supports IME
+	closer    render.CloseInterceptor    // non-nil if the driver can defer window closing
+	windower  render.WindowController    // non-nil if the driver can report window geometry
+	titler    render.TitleController     // non-nil if the driver can retitle the window
+	attn      render.AttentionController // non-nil if the driver knows window focus and can ask for attention
+	running   bool                       // Run has been called: the backend window exists (or is about to)
+	statePath string                     // window state file, "" for none
+	geom      WindowGeometry             // last restorable window geometry
 	haveGeom  bool
 	frames    render.FrameScheduler // non-nil if the driver can gate frames
 	cfg       render.Config
@@ -134,6 +136,12 @@ func NewApp(opts ...AppOption) *App {
 	}
 	if c, ok := a.driver.(render.WindowController); ok {
 		a.windower = c
+	}
+	if c, ok := a.driver.(render.TitleController); ok {
+		a.titler = c
+	}
+	if c, ok := a.driver.(render.AttentionController); ok {
+		a.attn = c
 	}
 	// Detect optional frame gating. A driver that has it starts continuous, so
 	// the window is up and painted before frames are allowed to stop.
@@ -735,7 +743,7 @@ func (a *App) dispatchKeyboard(in render.InputState) {
 			a.closeTop()
 			continue
 		}
-		if k == render.KeyTab {
+		if k == render.KeyTab && !a.focusedCapturesTab() {
 			if in.Modifiers.Has(render.ModShift) {
 				a.moveFocus(-1)
 			} else {
@@ -903,4 +911,49 @@ func contains(parent, target Widget) bool {
 		}
 	}
 	return false
+}
+
+// SetTitle changes the window title. Before Run it changes the title the window
+// opens with. Call it from the UI goroutine (an event callback, or inside Do).
+// With a driver that cannot retitle a running window it only records the title.
+func (a *App) SetTitle(title string) {
+	a.cfg.Title = title
+	if a.running && a.titler != nil {
+		a.titler.SetTitle(title)
+	}
+}
+
+// WindowFocused reports whether the window has the OS keyboard focus. It is true
+// before Run and with a driver that cannot tell. Call it from the UI goroutine.
+func (a *App) WindowFocused() bool {
+	if !a.running || a.attn == nil {
+		return true
+	}
+	return a.attn.WindowFocused()
+}
+
+// RequestAttention asks the OS to draw the user's eye to the window without
+// taking focus, such as a flashing taskbar button. It returns false when the
+// driver cannot, or before Run. Call it from the UI goroutine.
+func (a *App) RequestAttention() bool {
+	if !a.running || a.attn == nil {
+		return false
+	}
+	return a.attn.RequestAttention()
+}
+
+// TabCapturer is implemented by a widget that wants Tab and Shift+Tab for
+// itself, such as a terminal. While it has focus and CapturesTab returns true,
+// the keys are delivered to it as ordinary EventKeyDown events instead of moving
+// focus. A widget that does not implement it, or returns false, keeps the
+// default behaviour.
+type TabCapturer interface {
+	CapturesTab() bool
+}
+
+// focusedCapturesTab reports whether the focused widget has asked to receive
+// Tab itself.
+func (a *App) focusedCapturesTab() bool {
+	tc, ok := a.focused.(TabCapturer)
+	return ok && tc.CapturesTab()
 }

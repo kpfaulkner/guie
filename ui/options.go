@@ -40,6 +40,13 @@ func WithIcon(icons ...image.Image) AppOption {
 	return func(a *App) { a.cfg.Icon = icons }
 }
 
+// WithAppID names the application to the desktop (on Linux, the X11 WM_CLASS
+// that a desktop entry's StartupWMClass matches). Use the name of the
+// application's .desktop file, such as "myapp". See render.Config.AppID.
+func WithAppID(id string) AppOption {
+	return func(a *App) { a.cfg.AppID = id }
+}
+
 // WithTheme sets the app's theme.
 func WithTheme(t theme.Theme) AppOption {
 	return func(a *App) { a.theme = t }
