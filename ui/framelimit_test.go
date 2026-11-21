@@ -158,3 +158,90 @@ type countingDriver struct{ requests atomic.Int64 }
 func (d *countingDriver) Run(render.Config, render.Hooks) error { return nil }
 func (d *countingDriver) SetContinuousFrames(bool)              {}
 func (d *countingDriver) RequestFrame()                         { d.requests.Add(1) }
+
+// raterDriver reports a refresh rate the test sets, and counts how often it is
+// asked.
+type raterDriver struct {
+	pacingDriver
+	hz    int
+	asked int
+}
+
+func (d *raterDriver) RefreshRate() int { d.asked++; return d.hz }
+
+// raterApp returns a running app on a raterDriver at hz, on a clock the test
+// moves.
+func raterApp(t *testing.T, hz int, opts ...AppOption) (*App, *raterDriver, *time.Time) {
+	t.Helper()
+	d := &raterDriver{hz: hz}
+	a := NewApp(append([]AppOption{WithDriver(d)}, opts...)...)
+	now := time.Unix(1000, 0)
+	a.now = func() time.Time { return now }
+	if err := a.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	return a, d, &now
+}
+
+// The limit follows the display: more than one frame a refresh is never seen.
+func TestFrameLimitFollowsTheRefreshRate(t *testing.T) {
+	a, _, _ := raterApp(t, 144)
+	frame(t, a)
+	if got := a.limit.rateNow(); got != 144 {
+		t.Errorf("limit is %d frames a second on a 144 Hz display, want 144", got)
+	}
+}
+
+// A display whose rate is not known gets the fixed default.
+func TestFrameLimitUnknownRateUsesTheDefault(t *testing.T) {
+	a, _, _ := raterApp(t, 0)
+	frame(t, a)
+	if got := a.limit.rateNow(); got != DefaultBackgroundFrameRate {
+		t.Errorf("limit is %d with the rate unknown, want %d", got, DefaultBackgroundFrameRate)
+	}
+}
+
+// A rate the app chose is kept whatever the display does.
+func TestFrameLimitFixedRateIsKept(t *testing.T) {
+	a, d, _ := raterApp(t, 144, WithBackgroundFrameRate(30))
+	frame(t, a)
+	if got := a.limit.rateNow(); got != 30 {
+		t.Errorf("limit is %d, want the 30 the app set", got)
+	}
+	if d.asked != 0 {
+		t.Errorf("asked the display's rate %d times with the rate fixed, want 0", d.asked)
+	}
+}
+
+// The rate is asked for at most once a second however many frames run, and a
+// change (the window moved to another display) is followed.
+func TestFrameLimitChecksTheRateOnceASecond(t *testing.T) {
+	a, d, now := raterApp(t, 60)
+	for range 50 {
+		frame(t, a)
+		*now = now.Add(10 * time.Millisecond)
+	}
+	if d.asked != 1 {
+		t.Fatalf("asked the rate %d times in half a second, want 1", d.asked)
+	}
+	d.hz = 120
+	*now = now.Add(refreshCheckEvery)
+	frame(t, a)
+	if got := a.limit.rateNow(); got != 120 {
+		t.Errorf("limit is %d after the display changed to 120 Hz, want 120", got)
+	}
+}
+
+// setRate keeps the tokens earned at the old rate.
+func TestFrameLimitSetRateKeepsTokens(t *testing.T) {
+	f := newFakeLimiter(60)
+	for range frameBurst {
+		f.ask()
+	}
+	f.advance(time.Second/60 + time.Millisecond) // one token at 60 a second
+	f.setRate(240)
+	f.ask()
+	if f.asked != frameBurst+1 || len(f.timers) != 0 {
+		t.Errorf("after a rate change asked %d frames with %d timers, want %d and none", f.asked, len(f.timers), frameBurst+1)
+	}
+}

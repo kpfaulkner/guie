@@ -116,6 +116,18 @@ type FrameScheduler interface {
 	RequestFrame()
 }
 
+// RefreshRater is an optional capability a Driver may implement to report the
+// refresh rate of the display its window is on. The framework holds frames it
+// asks for from outside input to that rate, since more than one a refresh are
+// never seen; without it the framework uses a fixed rate.
+type RefreshRater interface {
+	// RefreshRate is the refresh rate, in Hz, of the display the window is
+	// on, or 0 when it is not known. It is called from the UI goroutine during
+	// the loop, about once a second, so it may be a system call but not a slow
+	// one.
+	RefreshRate() int
+}
+
 // TitleController is an optional capability a Driver may implement to change
 // the title of its window while it is open. The framework type-asserts a Driver
 // for it; a Driver without it keeps the title it was started with.

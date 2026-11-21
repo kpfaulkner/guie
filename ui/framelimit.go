@@ -6,8 +6,15 @@ import (
 )
 
 // DefaultBackgroundFrameRate is how many frames a second Invalidate (and so Do
-// and Quit) may ask for once its burst is used up. See WithBackgroundFrameRate.
-const DefaultBackgroundFrameRate = 120
+// and Quit) may ask for once its burst is used up, when the refresh rate of the
+// window's display is not known. When it is known (the driver is a
+// render.RefreshRater) the limit follows it, as more than one frame a refresh
+// is never seen. See WithBackgroundFrameRate.
+const DefaultBackgroundFrameRate = 60
+
+// refreshCheckEvery is how often the display's refresh rate is asked for, so a
+// window moved to a display with another rate follows it.
+const refreshCheckEvery = time.Second
 
 // frameBurst is how many frames Invalidate asks for at once before the rate
 // applies. A key press is drawn by the input frame, and its echo and a prompt
@@ -79,6 +86,24 @@ func (l *frameLimiter) request(ask func()) {
 		l.mu.Unlock()
 		ask()
 	})
+}
+
+// setRate changes the rate, keeping the tokens earned so far. fps 0 or less
+// means no limit.
+func (l *frameLimiter) setRate(fps int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.rate != 0 {
+		l.refill() // at the old rate, up to now
+	}
+	l.rate = float64(max(fps, 0))
+}
+
+// rateNow is the rate in frames per second, 0 for no limit.
+func (l *frameLimiter) rateNow() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return int(l.rate)
 }
 
 // refill adds the tokens earned since the last refill. l.mu must be held.

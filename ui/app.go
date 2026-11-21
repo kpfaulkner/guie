@@ -61,6 +61,9 @@ type App struct {
 	continuous bool
 	drawn      bool
 	limit      *frameLimiter // holds Invalidate to a steady rate (framelimit.go)
+	limitFixed bool          // WithBackgroundFrameRate set the rate; do not follow the display
+	rater      render.RefreshRater
+	rateAt     time.Time // when the display's refresh rate was last asked for
 
 	root        Widget
 	ctx         *treeContext
@@ -150,6 +153,9 @@ func NewApp(opts ...AppOption) *App {
 	if f, ok := a.driver.(render.FrameScheduler); ok {
 		a.frames = f
 		a.continuous = true
+	}
+	if r, ok := a.driver.(render.RefreshRater); ok {
+		a.rater = r
 	}
 
 	a.bus = newEventBus()
@@ -333,11 +339,34 @@ func (a *App) AsyncPending() int { return int(a.bg.Load()) }
 // before Run may be dropped, since there is no window yet to draw into.
 //
 // A few frames asked for together are presented at once; a stream of them is
-// held to DefaultBackgroundFrameRate (see WithBackgroundFrameRate), with the
-// last request always drawn.
+// held to the refresh rate of the window's display, or DefaultBackgroundFrameRate
+// when that is not known (see WithBackgroundFrameRate), with the last request
+// always drawn.
 func (a *App) Invalidate() {
 	if a.frames != nil {
 		a.limit.request(a.frames.RequestFrame)
+	}
+}
+
+// followRefreshRate sets the Invalidate limit to the refresh rate of the
+// window's display, asking for it at most once every refreshCheckEvery so a
+// window moved to another display follows it. It runs on the UI goroutine, at
+// the start of each Update; a rate set with WithBackgroundFrameRate is kept.
+func (a *App) followRefreshRate() {
+	if a.limitFixed || a.rater == nil {
+		return
+	}
+	t := a.now()
+	if !a.rateAt.IsZero() && t.Sub(a.rateAt) < refreshCheckEvery {
+		return
+	}
+	a.rateAt = t
+	hz := a.rater.RefreshRate()
+	if hz <= 0 {
+		hz = DefaultBackgroundFrameRate
+	}
+	if hz != a.limit.rateNow() {
+		a.limit.setRate(hz)
 	}
 }
 
@@ -379,6 +408,7 @@ func (a *App) update(in render.InputState) error {
 	if a.quit.Load() {
 		return render.ErrTerminated
 	}
+	a.followRefreshRate()
 	// Run frame callbacks and animations first, so any value changes they make
 	// are laid out and drawn this same frame.
 	a.advanceFrame(nominalFrameDelta)

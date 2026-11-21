@@ -12,8 +12,8 @@ var (
 	user32            = windows.NewLazySystemDLL("user32.dll")
 	procFlashWindowEx = user32.NewProc("FlashWindowEx")
 
-	hwndOnce sync.Once
-	hwnd     windows.HWND
+	hwndMu sync.Mutex
+	hwnd   windows.HWND
 )
 
 // glfwClass is the window class Ebitengine's GLFW port registers.
@@ -33,12 +33,29 @@ type flashWInfo struct {
 }
 
 // ownWindow finds this process's GLFW window. Ebitengine does not hand out its
-// handle, so the top-level windows are searched once for one of its class
-// owned by this process.
+// handle, so the top-level windows are searched for one of its class owned by
+// this process. A search that finds nothing (the window is not up yet) is
+// tried again next time; once found, the handle is kept.
 func ownWindow() windows.HWND {
-	hwndOnce.Do(func() {
+	hwndMu.Lock()
+	defer hwndMu.Unlock()
+	if hwnd == 0 {
+		_ = windows.EnumWindows(findOwnWindow(), nil) // returns an error when the callback stops it
+	}
+	return hwnd
+}
+
+var (
+	findOnce sync.Once
+	findCb   uintptr
+)
+
+// findOwnWindow is the EnumWindows callback that sets hwnd. It is made once:
+// Go allows only a limited number of callbacks per process.
+func findOwnWindow() uintptr {
+	findOnce.Do(func() {
 		pid := uint32(os.Getpid())
-		cb := windows.NewCallback(func(h windows.HWND, _ uintptr) uintptr {
+		findCb = windows.NewCallback(func(h windows.HWND, _ uintptr) uintptr {
 			var owner uint32
 			if _, err := windows.GetWindowThreadProcessId(h, &owner); err != nil || owner != pid {
 				return 1
@@ -51,9 +68,8 @@ func ownWindow() windows.HWND {
 			hwnd = h
 			return 0 // stop
 		})
-		_ = windows.EnumWindows(cb, nil) // returns an error when the callback stops it
 	})
-	return hwnd
+	return findCb
 }
 
 // requestAttention flashes the taskbar button until the window is brought
