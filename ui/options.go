@@ -78,6 +78,14 @@ func WithContinuousRedraw(v bool) AppOption {
 	return func(a *App) { a.alwaysDraw = v }
 }
 
+// WithBackgroundFrameRate sets how many frames a second App.Invalidate (and so
+// Do and Quit) may ask for once a short burst is used up. The default is
+// DefaultBackgroundFrameRate; 0 takes the limit off. Frames for input are not
+// limited.
+func WithBackgroundFrameRate(fps int) AppOption {
+	return func(a *App) { a.limit = newFrameLimiter(fps) }
+}
+
 // WithFont sets the default text face used by widgets that don't override it.
 func WithFont(f render.FontFace) AppOption {
 	return func(a *App) { a.theme.Font = f }

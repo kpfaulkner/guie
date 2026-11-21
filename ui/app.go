@@ -60,6 +60,7 @@ type App struct {
 	alwaysDraw bool
 	continuous bool
 	drawn      bool
+	limit      *frameLimiter // holds Invalidate to a steady rate (framelimit.go)
 
 	root        Widget
 	ctx         *treeContext
@@ -108,6 +109,7 @@ func NewApp(opts ...AppOption) *App {
 			Height:    600,
 			Resizable: true,
 		},
+		limit: newFrameLimiter(DefaultBackgroundFrameRate),
 	}
 	for _, o := range opts {
 		o(a)
@@ -329,9 +331,13 @@ func (a *App) AsyncPending() int { return int(a.bg.Load()) }
 //
 // It is a no-op with a driver that presents continuously, and a frame asked for
 // before Run may be dropped, since there is no window yet to draw into.
+//
+// A few frames asked for together are presented at once; a stream of them is
+// held to DefaultBackgroundFrameRate (see WithBackgroundFrameRate), with the
+// last request always drawn.
 func (a *App) Invalidate() {
 	if a.frames != nil {
-		a.frames.RequestFrame()
+		a.limit.request(a.frames.RequestFrame)
 	}
 }
 
