@@ -205,15 +205,10 @@ func (c *canvas) DrawText(s string, pos geom.Point, face render.FontFace, clr co
 	if !ok || ff == nil {
 		return
 	}
-	drawn := ff.face
-	if c.scale != 1 {
-		// Rasterize glyphs at physical size so text stays crisp on HiDPI
-		// displays. The cached face keeps its logical size for measurement; this
-		// is a shallow copy that shares the underlying font source.
-		scaled := *ff.face
-		scaled.Size = ff.face.Size * c.scale
-		drawn = &scaled
-	}
+	// Rasterize glyphs at physical size so text stays crisp on HiDPI displays.
+	// The face keeps its logical size for measurement; the scaled one is a copy
+	// that shares the font source, kept on the face for the next call.
+	drawn := ff.scaledFace(c.scale)
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(pos.X*c.scale, pos.Y*c.scale)
 	op.ColorScale.ScaleWithColor(clr)

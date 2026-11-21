@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"os"
-
 	ebitenbackend "github.com/kpfaulkner/guie/internal/ebiten"
 	"github.com/kpfaulkner/guie/render"
 )
@@ -20,11 +18,10 @@ func LoadFontBytes(ttf []byte, size float64) (render.FontFace, error) {
 }
 
 // LoadFont reads a TrueType/OpenType font file and builds a face at the given
-// point size.
+// point size. Each file is read and parsed once and kept: later faces of the
+// same file, at any size, share it, so a program that loads a large font for
+// several sizes or windows reads it once. A file changed on disk after its
+// first load is not seen until the program restarts.
 func LoadFont(path string, size float64) (render.FontFace, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return LoadFontBytes(data, size)
+	return ebitenbackend.LoadFontFile(path, size)
 }

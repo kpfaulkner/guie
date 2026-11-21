@@ -46,11 +46,24 @@ func (d *Driver) SetTitle(title string) { ebiten.SetWindowTitle(title) }
 //
 // Both are concurrent-safe in ebiten, which is what lets RequestFrame be called
 // from a background goroutine and the mode be switched mid-loop.
+//
+// On demand, the tick rate is SyncWithFPS: one Update per frame. At the default
+// 60 TPS, ebiten works out the number of Updates from the time since the last
+// tick, and a frame woken less than about half a tick after the previous one
+// runs none. Input is handed to the game only in an Update, so a key pressed a
+// few milliseconds after another event (the release of the key before it, say)
+// waited for the next OS event, often its own release 50-150 ms later. On
+// demand, each frame is a wake for something that changed, so one Update per
+// frame is what is wanted. Continuous frames go back to 60 TPS, because
+// animations step a fixed 1/60 s per Update and would run fast on a high
+// refresh rate display.
 func (d *Driver) SetContinuousFrames(on bool) {
 	if on {
+		ebiten.SetTPS(ebiten.DefaultTPS)
 		ebiten.SetFPSMode(ebiten.FPSModeVsyncOn)
 		return
 	}
+	ebiten.SetTPS(ebiten.SyncWithFPS)
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMinimum)
 }
 
